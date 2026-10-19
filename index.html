@@ -350,7 +350,12 @@ $('impFile').onchange=async e=>{
 };
 
 /* ---------- copia local para usar sin internet (solo cuando se sirve por https) ---------- */
-if('serviceWorker' in navigator&&location.protocol!=='file:'){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+  const habia=!!navigator.serviceWorker.controller;let recargado=false;
+  // si llega una versión nueva se recarga sola, salvo en medio de una sesión
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(habia&&!recargado&&!enCurso()){recargado=true;location.reload()}});
+  navigator.serviceWorker.register('sw.js').then(r=>{document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})})}).catch(()=>{});
+}
 
 renderHist();render();
 </script>
