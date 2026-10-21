@@ -24,6 +24,7 @@
   --bg:#140d0f;--surface:#1c1416;--fg:#f2e7e9;--muted:#a8959a;--line:#2e2225;--soft:#2a1e21;
   --art:#f0435a;--ven:#7f9be2;--cap:#4fc99d;color-scheme:dark}}
 html,body{background:var(--bg);margin:0}
+[hidden]{display:none!important}
 body{color:var(--fg);font-family:var(--body);-webkit-tap-highlight-color:transparent}
 main{max-width:460px;margin:0 auto;padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box}
 button{font-family:inherit;color:inherit;cursor:pointer;background:none}
@@ -83,7 +84,7 @@ th:first-child,td:first-child{text-align:left} th{color:var(--muted);font-weight
 .card .g{font-family:var(--disp);font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.03em}
 .card .meta{display:flex;flex-wrap:wrap;gap:14px;font-family:var(--mono);font-size:12px}
 .muted{color:var(--muted)}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px 14px;border-top:1px solid var(--line);background:var(--surface)}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 12px 14px;border-top:1px solid var(--line);background:var(--surface)}
 nav button{height:54px;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:500;color:var(--muted)}
 nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
 /* Muñeco: una pose por estado del reloj. Trabajo = curl alterno (isometría: brazos a 90° temblando; vacío: respira),
@@ -120,6 +121,47 @@ nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
 #pad.rest #mono .resp{animation:respira 3.2s ease-in-out infinite}
 #pad.rest #mono .z{animation:zz 2.4s ease-out infinite} #pad.rest #mono .z2{animation-delay:1.2s}
 @media (prefers-reduced-motion: reduce){#mono *{animation:none!important}}
+/* Récord personal: el muñeco celebra aunque esté en descanso. */
+#mono .estrella{display:none}
+#pad.record #mono{color:var(--amb)}
+#pad.record #mono .sentado{display:none} #pad.record #mono .pie{display:inline;animation:salta .6s ease-in-out infinite}
+#pad.record #mono .bl{transform:rotate(115deg);animation:none} #pad.record #mono .br{transform:rotate(-115deg);animation:none}
+#pad.record #mono .pl,#pad.record #mono .pr{animation:none}
+#pad.record #mono .estrella{display:inline;transform-origin:50px 40px;animation:brilla .6s ease-in-out infinite}
+@keyframes brilla{0%,100%{opacity:.35;transform:scale(.9)}50%{opacity:1;transform:scale(1.08)}}
+:root{--amb:#c98a00}
+#rutinas{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+#rutinas button{flex:none;height:34px;padding:0 12px;border:1px solid var(--line);border-radius:17px;background:var(--surface);font-size:13px;white-space:nowrap}
+#rutinas button[aria-pressed="true"]{border-color:var(--fg);font-weight:600}
+#rutinas button:disabled{opacity:.5}
+#grupos sup{font-size:10px;margin-left:3px;font-weight:700}
+.hint{font-size:12px;color:var(--muted);margin:0}
+button.pb{text-align:left;font-family:inherit;color:inherit;cursor:pointer}
+.kgv{font-family:var(--disp);font-weight:800;font-size:34px;font-variant-numeric:tabular-nums;line-height:1.1}
+.aviso-d{border:2px solid var(--amb);border-radius:14px;padding:12px;font-size:14px;line-height:1.45;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+.aviso-d b{color:var(--amb)}
+.aviso-d button,.btn2{align-self:flex-start;height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--line);font-size:14px;font-weight:600;background:var(--bg)}
+.sem{display:grid;grid-template-columns:76px 1fr 84px;align-items:center;gap:8px;font-size:13px}
+.sem .track{position:relative;height:14px;border-radius:7px}
+.sem .banda{position:absolute;top:0;bottom:0;border-left:2px solid var(--muted);border-right:2px solid var(--muted);opacity:.45}
+.sem .val small{color:var(--muted)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center;font-family:var(--mono);font-size:12px}
+.cal .h{color:var(--muted);font-size:11px}
+.cal .d{min-height:44px;border-radius:8px;padding:3px 0;display:flex;flex-direction:column;align-items:center;gap:1px;border:1px solid transparent;min-width:0}
+.cal .d.on{background:var(--soft);border-color:var(--cap)}
+.cal .d.hoy{outline:2px solid var(--art);outline-offset:-2px}
+.cal .d small{font-size:9px;color:var(--cap);line-height:1.15;font-weight:500}
+.calnav{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.calnav button{width:40px;height:36px;border:1px solid var(--line);border-radius:10px;font-size:16px}
+.big2{font-family:var(--disp);font-weight:800;font-size:42px;line-height:1}
+select,#editor input{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;height:42px;padding:0 10px;max-width:100%;box-sizing:border-box}
+#editor{gap:8px} #editor input,#editor select{width:100%}
+.tog{display:flex;gap:8px;flex-wrap:wrap}
+.tog button{height:44px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:14px}
+.tog button[aria-pressed="true"]{background:var(--cap);border-color:var(--cap);color:var(--bg);font-weight:600}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)} .leg i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+#graf svg{width:100%;height:auto;display:block;overflow:visible}
+#vProg h2{margin-top:4px}
 /* Estilos visuales: cada uno redefine las variables de color y letra (ver ESTILOS abajo). */
 html[data-recto] *{border-radius:3px!important}
 #estilos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -169,9 +211,22 @@ aplicarEstilo(estilo);
   <header><h1>Congestión · <span id="gnom">Bíceps</span></h1><div id="blk">3 estaciones</div></header>
 
   <section id="vReloj" style="display:flex;flex-direction:column;gap:14px">
+    <div id="rutinas" role="group" aria-label="Rutina"></div>
     <div id="grupos"></div>
+    <p id="rutHint" class="hint" hidden></p>
     <div id="meta"></div>
+    <div id="desc"></div>
     <div id="plan"></div>
+    <p id="planHint" class="hint">Toca un ejercicio para cambiarlo por otro.</p>
+    <section id="editor" class="card" hidden>
+      <h2 id="edT">Cambiar ejercicio</h2>
+      <label class="lbl" for="edN">Nombre</label><input id="edN" list="edL" maxlength="60" autocomplete="off">
+      <datalist id="edL"></datalist>
+      <label class="lbl" for="edS">Nombre corto</label><input id="edS" maxlength="14" autocomplete="off">
+      <label class="lbl" for="edR">Repeticiones por serie</label><select id="edR"></select>
+      <p class="hint">Se conserva la forma de llegar al fallo de la estación original (parciales, isometría o variante fácil).</p>
+      <div class="acc"><button id="edOk" type="button" style="border:2px solid var(--cap);color:var(--cap);font-weight:600">Guardar</button><button id="edRes" type="button" style="border:1px solid var(--line)">Original</button><button id="edNo" type="button" style="border:1px solid var(--line)">Cancelar</button></div>
+    </section>
     <button id="pad" type="button">
       <svg id="mono" viewBox="0 0 100 100" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
         <g class="pie">
@@ -181,6 +236,7 @@ aplicarEstilo(estilo);
           <g class="bl"><path d="M50 31L40 49"/><g class="al"><path d="M40 49V67"/><path d="M34 69h12" stroke-width="3"/><path d="M34 64v10M46 64v10" stroke-width="4"/></g></g>
           <g class="br"><path d="M50 31L60 49"/><g class="ar"><path d="M60 49V67"/><path d="M54 69h12" stroke-width="3"/><path d="M54 64v10M66 64v10" stroke-width="4"/></g></g>
         </g>
+        <g class="estrella" fill="currentColor" stroke="none"><path d="M16 8l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/><path d="M84 14l1.6 4.4 4.4 1.6-4.4 1.6-1.6 4.4-1.6-4.4-4.4-1.6 4.4-1.6z"/><path d="M80 52l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3-3.3-1.2 3.3-1.2z"/></g>
         <g class="sentado">
           <path d="M16 76h66M22 76v16M76 76v16" stroke-width="4" opacity=".45"/>
           <path d="M14 94h14" stroke-width="3" opacity=".6"/><path d="M14 89v10M28 89v10" stroke-width="4" opacity=".6"/>
@@ -199,6 +255,11 @@ aplicarEstilo(estilo);
       <span id="bar"></span>
     </button>
     <section id="report" hidden>
+      <div class="step" id="kgFila">
+        <button id="kgMenos" type="button" aria-label="Menos peso">−</button>
+        <div style="text-align:center"><div class="lbl">Peso</div><div id="kgv" class="kgv">—</div></div>
+        <button id="kgMas" type="button" aria-label="Más peso">+</button>
+      </div>
       <div class="step">
         <button id="minus" type="button" aria-label="Una rep menos">−</button>
         <div style="text-align:center"><div class="lbl">Reps hechas</div><div id="done">0</div></div>
@@ -216,12 +277,25 @@ aplicarEstilo(estilo);
     </div>
     <div class="stats"><span>Bajo congestión: <b id="tuc">0:00</b></span><span>Reps: <b id="tot">0</b></span><span>Isometría: <b id="iso">0 s</b></span><span>Efectivas: <b id="efv">0</b></span><span id="save">Sin guardar aún</span></div>
     <div class="tbl"><table>
-      <thead><tr><th>Serie</th><th>Reps</th><th>RIR</th><th>P</th><th>Desc.</th><th>Ef.</th></tr></thead>
+      <thead><tr><th>Serie</th><th>Reps</th><th>Kg</th><th>RIR</th><th>P</th><th>Desc.</th><th>Ef.</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <div class="acc"><button id="terminar" type="button">Terminar y guardar</button><button id="nueva" type="button">Nueva sesión</button></div>
     <p class="nota"><b>Cómo decide.</b> La congestión decae como e^(−t/110 s) y la capacidad se recupera como 1 − A·e^(−t/τ_C). El descanso es el que maximiza C·P: t* = τ_C·ln[A(τ_C+τ_P)/τ_C], con un ruido log-normal pequeño. Las mini-series tienen objetivo aleatorio entre 65 y 90 % de RTF·C. Cuando ya no da, el reloj no te deja parar: cambia a una variante más fácil en 10 s. El core cierra con 3 vacíos de duración sorteada por una ley de potencias entre 15 y 50 s.</p>
+    <p class="nota"><b>Peso y progresión.</b> Al reportar la primera serie de cada ejercicio, anota el peso. La próxima vez el reloj te dice con cuánto empezar: si hiciste el tope del rango con 1 o más en reserva, o te sobraron 4 o más, sube (1 kg si usas menos de 10 kg, 2 kg hasta 40 kg, 2,5 kg por encima); si no llegaste al mínimo del rango al fallo, baja. Un récord es superar tu mejor 1RM estimado: peso × (1 + (reps + reserva)/30).</p>
     <p class="nota"><b>Series efectivas.</b> Cada sesión tiene una meta de series efectivas que se reparte entre los ejercicios. Una serie completa con 5 reps o más vale 1 si te quedaban 0–1 en reserva, ¾ con 2, ¼ con 3 y nada con 4 o más: una serie suave no suma. Una mini-serie vale la mitad (con 4 reps o más). Una isometría hasta el fallo vale ½ si dura 30 s. Los vacíos no cuentan. Si al cerrar un ejercicio falta meta, el reloj te da un descanso largo y otra ronda (hasta 3); si en una ronda nueva ya no logras ni ⅓ de serie efectiva, pasa al siguiente.</p>
+  </section>
+
+  <section id="vProg" hidden style="display:flex;flex-direction:column;gap:10px">
+    <div id="pDesc"></div>
+    <h2>Esta semana</h2>
+    <div id="pSem" class="card"></div>
+    <h2>Constancia</h2>
+    <div id="pCal" class="card"></div>
+    <h2>Récords personales</h2>
+    <div id="pRec" class="card"></div>
+    <h2>Progreso por ejercicio</h2>
+    <div id="pGraf" class="card"></div>
   </section>
 
   <section id="vHist" hidden style="display:flex;flex-direction:column;gap:10px">
@@ -237,7 +311,10 @@ aplicarEstilo(estilo);
   </section>
 
   <section id="vEstilo" hidden style="display:flex;flex-direction:column;gap:10px">
-    <h2>Estilo visual</h2>
+    <h2>Voz y vibración</h2>
+    <div class="tog"><button id="cVoz" type="button" aria-pressed="true">Voz</button><button id="cVib" type="button" aria-pressed="true">Vibración</button><button id="cProbar" type="button">Probar</button></div>
+    <p class="muted" style="font-size:13px;margin:0">La voz anuncia cada serie, el descanso, los últimos 10 segundos, las sugerencias de peso y los récords. Usa la voz en español del teléfono; mantén el volumen multimedia alto. La vibración avisa al empezar y al terminar cada descanso.</p>
+    <h2 style="margin-top:8px">Estilo visual</h2>
     <p class="muted" style="font-size:13px;margin:0">Solo cambia el aspecto; el reloj funciona igual. Rojo, azul y verde siguen significando trabajo, descanso y cambio de fase en cada estilo, con sus propios tonos.</p>
     <div id="estilos"></div>
   </section>
@@ -247,11 +324,14 @@ aplicarEstilo(estilo);
   <button id="tReloj" type="button" aria-current="page">
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><span>Reloj</span>
   </button>
+  <button id="tProg" type="button">
+    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M4 20h16M8 16l4-5 3 3 5-7"/></svg><span>Progreso</span>
+  </button>
   <button id="tHist" type="button">
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span>Historial</span>
   </button>
   <button id="tEstilo" type="button">
-    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2l-.3-.8c-.4-1.1.4-2.2 1.6-2.2H17a4 4 0 0 0 4-4c0-5-4-9-9-9z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="8" r="1.2"/></svg><span>Estilo</span>
+    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2l-.3-.8c-.4-1.1.4-2.2 1.6-2.2H17a4 4 0 0 0 4-4c0-5-4-9-9-9z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="8" r="1.2"/></svg><span>Ajustes</span>
   </button>
 </nav>
 
@@ -290,7 +370,41 @@ const CAT={
 const TP=110,MAXMYO=5,SHIFT=10,KEY='reloj-anomalo-sesiones';
 // Meta de series efectivas por sesión (hipertrofia, cada grupo 2–3 veces por semana); más de 10 por sesión apenas suma.
 const META_DEF={biceps:6,triceps:6,espalda:8,pecho:8,hombros:8,abdominales:6,piernas:9},META_MIN=4,META_MAX=12,MAXRONDA=3,MKEY='reloj-anomalo-metas';
+// Ejercicios propios: se puede cambiar nombre y rango de cada estación; la forma de llegar al fallo se conserva.
+const BASE=JSON.parse(JSON.stringify(CAT)),EJKEY='reloj-anomalo-ejercicios',AKEY='reloj-anomalo-ajustes',DKEY='reloj-anomalo-descarga',RKEY='reloj-anomalo-rutina';
+const ALT={
+ biceps:['Curl con barra','Curl con barra Z','Curl en polea','Curl concentrado','Curl araña','Curl Bayesian en polea','Curl martillo con cuerda'],
+ triceps:['Press francés','Extensión en polea alta con barra','Patada en polea','Press cerrado','Extensión sobre la cabeza en polea','Fondos en máquina'],
+ espalda:['Dominadas','Remo con barra','Remo en polea sentado','Remo en máquina','Jalón con agarre neutro','Remo en T','Pullover con mancuerna'],
+ pecho:['Press banca con barra','Press inclinado con barra','Press en máquina','Pec deck','Cruces en polea','Press declinado','Flexiones lastradas'],
+ hombros:['Press militar con barra','Press de hombro en máquina','Elevaciones laterales en polea','Face pull','Pájaros con mancuernas','Elevación lateral en máquina'],
+ abdominales:['Crunch en máquina','Rueda abdominal','Elevación de piernas en banco','Crunch inverso','Pallof press'],
+ piernas:['Sentadilla con barra','Prensa','Zancada búlgara','Peso muerto rumano','Extensión de cuádriceps','Curl femoral sentado','Hip thrust','Gemelo sentado']};
+const RANGOS=['5–8','6–10','8–12','10–15','12–20','15–25'];
+const rango=r=>{const m=String(r).match(/(\d+)\D+(\d+)/);return m?[+m[1],+m[2]]:[8,12]};
+let misEj={};try{misEj=JSON.parse(localStorage.getItem(EJKEY)||'{}')}catch(e){}
+function aplicarEjercicios(){for(const g in BASE)BASE[g].e.forEach((x,i)=>{const m=misEj[g]&&misEj[g][i];
+  CAT[g].e[i]=m?{...x,...m,d:Math.round((rango(m.r)[0]+rango(m.r)[1])/2)}:{...x}})}
+aplicarEjercicios();
+let CFG={voz:true,vibra:true};try{Object.assign(CFG,JSON.parse(localStorage.getItem(AKEY)||'{}'))}catch(e){}
+let descarga={};try{descarga=JSON.parse(localStorage.getItem(DKEY)||'{}')}catch(e){}
+// Rutinas: varios grupos seguidos; al cerrar uno, 2 min de cambio y empieza el siguiente.
+const RUTINAS=[{n:'Un grupo'},{n:'Pecho + Tríceps',g:['pecho','triceps']},{n:'Espalda + Bíceps',g:['espalda','biceps']},{n:'Brazos',g:['biceps','triceps']},
+ {n:'Piernas + Abdomen',g:['piernas','abdominales']},{n:'Hombros + Abdomen',g:['hombros','abdominales']},{n:'La mía',mia:1}];
+let rutI=0,miaLista=[],rutPos=0,rutEf=0;
+try{const r=JSON.parse(localStorage.getItem(RKEY)||'{}');rutI=Math.min(RUTINAS.length-1,r.i||0);miaLista=(r.mia||[]).filter(g=>CAT[g])}catch(e){}
+const rutLista=()=>{const R=RUTINAS[rutI];return R.mia?miaLista:R.g||[]};
+const enRutina=()=>rutLista().length>1;
+const guardarRut=()=>{try{localStorage.setItem(RKEY,JSON.stringify({i:rutI,mia:miaLista}))}catch(e){}};
 const now=()=>Date.now()/1000;
+const num=x=>String(Math.round(x*10)/10).replace('.',',');
+const kgTxt=k=>k==null?'—':k>0?num(k)+' kg':'corporal';
+let vozEs=null;
+function decir(t){if(!CFG.voz||!t||!window.speechSynthesis)return;try{const sp=speechSynthesis;
+  if(!vozEs){const vs=sp.getVoices();vozEs=vs.find(v=>/^es[-_](US|MX|DO|419)/i.test(v.lang))||vs.find(v=>/^es/i.test(v.lang))||null}
+  sp.cancel();const u=new SpeechSynthesisUtterance(t.replace(/–/g,' a ').replace(/·/g,',').replace(/\breps\b/g,'repeticiones'));
+  u.lang=vozEs?vozEs.lang:'es-ES';if(vozEs)u.voice=vozEs;u.rate=1.05;sp.speak(u)}catch(e){}}
+const vibrar=pt=>{if(CFG.vibra)try{navigator.vibrate&&navigator.vibrate(pt)}catch(e){}};
 const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
 const levy=()=>{const a=2.2,lo=15,hi=50,u=Math.random();return Math.round(lo*Math.pow(1-u*(1-Math.pow(lo/hi,a-1)),-1/(a-1)))};
@@ -306,7 +420,7 @@ let metas={...META_DEF};
 try{Object.assign(metas,JSON.parse(localStorage.getItem(MKEY)||'{}'))}catch(e){}
 function fresh(){return {st:'idle',P:0,C:1,tauC:35,P0:0,C0:1,sec:0,nIn:0,R1:0,RTF:0,target:0,phase:'act',levyN:0,levyT:0,
   t0:0,last:0,restDur:0,lastSec:-1,workDur:0,hechas:0,label:'',sets:[],tuc:0,iso:0,id:null,start:null,
-  meta:0,metaE:[],ef:0,efE:0,ronda:1,esRonda:false}}
+  meta:0,metaE:[],ef:0,efE:0,ronda:1,esRonda:false,kg:null,sug:null,aviso:'',pr:0,prTxt:'',rutTrans:false}}
 S=fresh();
 const est=()=>CAT[grupo].e[S.sec];
 const enCurso=()=>S.st!=='idle'&&S.st!=='done';
@@ -316,13 +430,58 @@ function bump(R,p,dur,ext){const g=.6*(R/(R+8))*(.5+.5*p);S.P=S.P+(1-S.P)*g;
   const D=(.3+.7*p**3)*(.6+.4*Math.min(1,dur/35))*(ext?.75:1);S.C*=1-D;S.tauC*=1.04}
 function etiqueta(){const E=est();
   if(S.phase==='vac')return `Vacío ${S.levyN+1}/3 · objetivo ${S.levyT} s`;
-  if(S.phase==='act')return `${E.n}: ${E.r} reps`;
+  if(S.phase==='act')return `${E.n}: ${E.r} reps`+(S.kg!=null?` · ${kgTxt(S.kg)}`:'');
   if(S.phase==='hold')return `${E.extN} hasta el fallo`;
   if(S.phase==='ext')return `${E.extN}: ${S.target} reps`;
   return `${E.s}: ${S.target} reps · ${E.tempo}`}
 
-function empezar(){const t=now();beep(1320,.25);try{navigator.vibrate&&navigator.vibrate(250)}catch(e){}
-  Object.assign(S,{st:'work',t0:t,last:t});render()}
+function empezar(){const t=now();beep(1320,.25);vibrar(250);
+  Object.assign(S,{st:'work',t0:t,last:t,aviso:'',rutTrans:false});decir(fraseTrabajo());render()}
+function fraseTrabajo(){const E=est(),kg=S.kg>0?`, con ${num(S.kg)} kilos`:'';
+  if(S.phase==='act')return `${E.n}. ${E.r} reps${kg}`;
+  if(S.phase==='myo')return `Mini serie de ${S.target}`;
+  if(S.phase==='ext')return `${E.extN}, ${S.target}`;
+  if(S.phase==='hold')return `${E.extN}, hasta el fallo`;
+  return `Vacío, ${S.levyT} segundos`}
+function fraseDescanso(mode){
+  if(mode==='rest')return `Descanso, ${Math.round(S.restDur)} segundos`;
+  if(mode==='shift')return `Cambio ya: ${S.label}`;
+  return S.esRonda?`Otra ronda. Descansa ${Math.round(S.restDur)} segundos`:`Siguiente: ${S.label}`}
+/* ---------- peso y progresión ---------- */
+const rirN=r=>r==='4+'?4:(parseInt(r,10)||0);
+const e1=r=>(+r.kg||0)*(1+((parseInt(r.reps,10)||0)+rirN(r.rir))/30);   // 1RM estimado (Epley con reserva)
+const incDe=kg=>kg<10?1:kg<40?2:2.5;
+const gDe=h=>h.g||Object.keys(CAT).find(k=>CAT[k].n===h.grupo);
+// Por sesión anterior de un ejercicio (de la más reciente a la más antigua): su primera serie principal y el mejor 1RM estimado.
+function previas(g,n,excl){const out=[];
+  for(const h of hist){if(h.id===excl||gDe(h)!==g)continue;
+    const r=(h.sets||[]).filter(x=>x.ej===n&&x.k==='act.'&&x.kg!=null);
+    if(r.length)out.push({...r[0],mejor:Math.max(...r.map(e1)),fecha:h.start})}
+  return out}
+const descargaActiva=()=>!!descarga.hasta&&Date.now()<Date.parse(descarga.hasta);
+// Regla de doble progresión sobre la primera serie del ejercicio.
+function regla(E,r){const [lo,hi]=rango(E.r),R=parseInt(r.reps,10)||0,n=rirN(r.rir),kg=+r.kg||0;
+  if(descargaActiva())return {kg,txt:`semana de descarga: ${kgTxt(kg)} y para lejos del fallo`,cambio:false};
+  if(kg>0&&(n>=4||(R>=hi&&n>=1)))return {kg:kg+incDe(kg),txt:`sube a ${num(kg+incDe(kg))} kg`,cambio:true};
+  if(kg>0&&R<lo&&n===0){const k=Math.max(0,kg-incDe(kg-.01));return {kg:k,txt:`baja a ${kgTxt(k)}`,cambio:true}}
+  if(kg===0&&(n>=4||R>=hi+3))return {kg,txt:'añade peso o pasa a una variante más difícil',cambio:true};
+  return {kg,txt:R>=hi?`repite ${kgTxt(kg)}`:`repite ${kgTxt(kg)} y busca ${hi} reps`,cambio:false}}
+function sugerir(g,E){if(E.levy)return null;const p=previas(g,E.n)[0];return p?{...regla(E,p),prev:p}:null}
+function prepEstacion(){const E=est();S.sug=sugerir(grupo,E);S.kg=S.sug?S.sug.kg:null}
+function esRecord(row){if(row.k!=='act.'||!(row.kg>0))return false;
+  const antes=previas(grupo,row.ej,S.id).map(p=>p.mejor);if(!antes.length)return false;
+  const hoy=S.sets.filter(r=>r.ej===row.ej&&r.k==='act.'&&r.kg>0).map(e1);
+  return e1(row)>Math.max(...antes,...hoy)*1.005}
+function fanfarria(){beep(880,.12);setTimeout(()=>beep(1175,.12),140);setTimeout(()=>beep(1568,.35),280);vibrar([60,40,60,40,200])}
+const metaHoy=g=>descargaActiva()?Math.max(2,Math.ceil(metas[g]/2)):metas[g];
+function iniciarSesion(){const E0=CAT[grupo].e[0];
+  Object.assign(S,{id:'s'+Date.now()+Math.random().toString(36).slice(2,6),start:new Date().toISOString(),phase:E0.levy?'vac':'act',levyT:E0.levy?levy():0,
+    meta:metaHoy(grupo),metaE:repartir(grupo)});prepEstacion()}
+// En rutina: al cerrar un grupo, guarda y pasa al siguiente tras 2 min.
+function sigueRutina(){const L=rutLista();if(!enRutina()||rutPos>=L.length-1)return false;
+  rutEf+=S.ef;rutPos++;grupo=L[rutPos];S=fresh();iniciarSesion();const t=now();
+  Object.assign(S,{st:'trans',t0:t,last:t,restDur:120,lastSec:-1,rutTrans:true});S.label=`${CAT[grupo].n}: ${etiqueta()}`;
+  $('save').textContent='Sin guardar aún';beep(660,.2);vibrar([200,100,200]);decir(`Grupo terminado. Sigue ${CAT[grupo].n}. Descansa dos minutos`);render();return true}
 /* Serie efectiva (modelo de reps efectivas): serie completa con 5+ reps vale 1 a RIR 0–1, ¾ a RIR 2, ¼ a RIR 3 y 0 a RIR 4+
    (una serie suave no suma); mini-serie = la mitad; isometría hasta el fallo = ½ si dura 30 s; los vacíos no cuentan.
    El historial anterior guardaba «3+»: se cuenta como RIR 3. */
@@ -334,7 +493,7 @@ function efectiva(r){
 const efDe=sets=>sets.reduce((a,r)=>a+efectiva(r),0);
 const ef1=x=>(Math.round(x*10)/10).toString().replace('.',',');
 // reparte la meta del grupo entre sus ejercicios con series (los vacíos no llevan meta)
-function repartir(g){const e=CAT[g].e,idx=e.map((x,i)=>x.levy?-1:i).filter(i=>i>=0),m=metas[g],out=e.map(()=>0);
+function repartir(g){const e=CAT[g].e,idx=e.map((x,i)=>x.levy?-1:i).filter(i=>i>=0),m=metaHoy(g),out=e.map(()=>0);
   idx.forEach((i,j)=>out[i]=Math.floor(m/idx.length)+(j<m%idx.length?1:0));return out}
 const faltaE=()=>S.metaE[S.sec]-S.efE>.05;
 // otra ronda del mismo ejercicio: descanso hasta recuperar ~85 % de la capacidad (60–180 s)
@@ -347,12 +506,13 @@ function siguienteEstacion(row){
   if(S.sec>=2)return {row,mode:'done',rest:0};
   S.sec++;S.nIn=0;S.R1=0;S.RTF=0;S.efE=0;S.ronda=1;S.esRonda=false;const E=est();
   if(E.levy){S.phase='vac';S.levyN=0;S.levyT=levy()}else S.phase='act';
+  prepEstacion();
   const r=E.levy?45:90;row.rest=r;return {row,mode:'trans',rest:r}}
 function avanzar(ev){
   const E=est(),ph=S.phase;
   if(ev.hold!=null){
     const sg=ev.hold;bump(sg/2.5,1,sg,false);S.iso+=sg;
-    const row={ex:ph==='vac'?'Vacío':E.s,k:ph==='vac'?`obj ${S.levyT} s`:'isom.',reps:Math.round(sg)+' s',rir:'—',P:S.P,rest:0};
+    const row={ex:ph==='vac'?'Vacío':E.s,ej:E.n,k:ph==='vac'?`obj ${S.levyT} s`:'isom.',reps:Math.round(sg)+' s',rir:'—',P:S.P,rest:0};
     const c=efectiva(row);S.efE+=c;S.ef+=c;
     if(ph==='vac'){S.levyN++;if(S.levyN<3){S.levyT=levy();const r=30+15*Math.random();row.rest=Math.round(r);return {row,mode:'rest',rest:r}}
       return siguienteEstacion(row)}
@@ -360,8 +520,10 @@ function avanzar(ev){
   const R=ev.R,rir=ev.rir,p=R/(R+rir+1e-9);
   if(ph==='act'){S.R1=R;S.RTF=R+rir}
   bump(R,p,ev.dur,ph==='ext');S.nIn++;
-  const row={ex:E.s,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir>=4?'4+':String(rir),P:S.P,rest:0};
+  const row={ex:E.s,ej:E.n,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir>=4?'4+':String(rir),
+    kg:ph==='ext'&&E.ext==='flat'?null:S.kg,P:S.P,rest:0};
   const c=efectiva(row);S.efE+=c;S.ef+=c;
+  if(ph==='act'&&row.kg!=null&&S.ronda===1){const rg=regla(E,row);if(rg.cambio)S.aviso=`Próxima vez en ${E.s}: ${rg.txt}`}
   if(ph==='ext')return cerrarEstacion(row);
   if(!faltaE())return siguienteEstacion(row);
   if(ph==='act'&&S.ronda>1&&c<1/3)return siguienteEstacion(row);
@@ -374,15 +536,19 @@ function avanzar(ev){
   S.phase='myo';S.target=Math.max(3,Math.round(pred*(.65+.25*Math.random())));row.rest=Math.round(ts);
   return {row,mode:'rest',rest:ts}}
 function aplicar(ev){
-  const o=avanzar(ev),t=now();S.sets.push(o.row);
+  const o=avanzar(ev),t=now(),pr=esRecord(o.row);if(pr)o.row.pr=true;S.sets.push(o.row);
   Object.assign(S,{P0:S.P,C0:S.C,t0:t,last:t,restDur:o.rest,lastSec:-1});
-  if(o.mode==='done'){S.st='done';beep(660,.2);setTimeout(()=>beep(990,.35),220)}
-  else{S.st=o.mode;S.label=etiqueta()}
-  guardar(o.mode==='done');render()}
+  if(pr){S.pr=t+6;S.prTxt=`${o.row.ex}: ${kgTxt(o.row.kg)} × ${o.row.reps}`;fanfarria()}
+  const yaPr=pr?'¡Récord personal! ':'';
+  if(o.mode==='done'){S.st='done';guardar(true);if(sigueRutina())return;
+    if(!pr){beep(660,.2);setTimeout(()=>beep(990,.35),220)}vibrar([200,100,200]);
+    decir(yaPr+(rutPos>0?`Rutina terminada. ${ef1(rutEf+S.ef)} series efectivas en total`:`Sesión terminada. ${ef1(S.ef)} series efectivas`));render();return}
+  S.st=o.mode;S.label=etiqueta();vibrar([80,60,80]);decir(yaPr+(S.aviso?S.aviso+'. ':'')+fraseDescanso(o.mode));
+  guardar(false);render()}
 function repsDe(sets){return sets.reduce((a,r)=>a+(r.rir!=='—'?parseInt(r.reps,10)||0:0),0)}
 function guardar(completa){
   if(!S.id||!S.sets.length)return;
-  const ent={id:S.id,start:S.start,grupo:CAT[grupo].n,series:S.sets.length,reps:repsDe(S.sets),tuc:Math.round(S.tuc),iso:Math.round(S.iso),completa:!!completa,sets:S.sets,
+  const ent={id:S.id,start:S.start,g:grupo,grupo:CAT[grupo].n,series:S.sets.length,reps:repsDe(S.sets),tuc:Math.round(S.tuc),iso:Math.round(S.iso),completa:!!completa,sets:S.sets,
     efectivas:Math.round(efDe(S.sets)*100)/100,meta:S.meta};
   hist=[ent].concat(hist.filter(h=>h.id!==S.id)).slice(0,200);
   try{localStorage.setItem(KEY,JSON.stringify(hist));$('save').textContent='Guardado ✓'}catch(e){$('save').textContent='No se pudo guardar'}
@@ -393,7 +559,7 @@ function tick(){
   const t=now(),dt=Math.min(1,Math.max(0,t-(S.last||t)));S.last=t;
   if(S.st!=='work'){
     const e=t-S.t0;S.P=S.P0*Math.exp(-e/TP);S.C=recC(S.C0,S.tauC,e);
-    const rem=Math.ceil(S.restDur-e);if(rem!==S.lastSec){S.lastSec=rem;if(rem>=1&&rem<=3)beep(660,.08)}
+    const rem=Math.ceil(S.restDur-e);if(rem!==S.lastSec){S.lastSec=rem;if(rem>=1&&rem<=3){beep(660,.08);vibrar(40)}if(rem===10&&S.restDur>=25)decir('Faltan diez segundos')}
     if(S.P>.5)S.tuc+=dt;
     if(e>=S.restDur){empezar();return}
   }else if(S.P>.5)S.tuc+=dt;
@@ -404,9 +570,7 @@ $('pad').onclick=async()=>{
   try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();audio.resume()}catch(e){}
   try{lock=lock||await navigator.wakeLock?.request('screen')}catch(e){}
   const t=now();
-  if(S.st==='idle'){const E0=CAT[grupo].e[0];
-    Object.assign(S,{id:'s'+Date.now(),start:new Date().toISOString(),phase:E0.levy?'vac':'act',levyT:E0.levy?levy():0,
-      meta:metas[grupo],metaE:repartir(grupo)});empezar()}
+  if(S.st==='idle'){$('editor').hidden=true;if(rutPos===0)rutEf=0;iniciarSesion();empezar()}
   else if(S.st==='work'){const dur=t-S.t0;
     if(S.phase==='hold'||S.phase==='vac'){aplicar({hold:dur});return}
     Object.assign(S,{st:'report',workDur:dur,hechas:S.phase==='act'?est().d:S.target});render()}
@@ -415,8 +579,60 @@ $('pad').onclick=async()=>{
 $('minus').onclick=()=>{S.hechas=Math.max(1,S.hechas-1);render()};
 $('plus').onclick=()=>{S.hechas=Math.min(80,S.hechas+1);render()};
 document.querySelectorAll('.rir button').forEach(b=>b.onclick=()=>{if(S.st==='report')aplicar({R:S.hechas,rir:+b.dataset.r,dur:S.workDur})});
-$('terminar').onclick=()=>{if(S.sets.length){S.st='done';guardar(true);render()}};
-$('nueva').onclick=()=>{S=fresh();$('save').textContent='Sin guardar aún';render()};
+$('terminar').onclick=()=>{if(S.sets.length&&S.st!=='done'){S.st='done';guardar(true);if(!sigueRutina())render()}};
+$('nueva').onclick=()=>{rutPos=0;rutEf=0;if(enRutina())grupo=rutLista()[0];S=fresh();$('save').textContent='Sin guardar aún';renderGrupos();render()};
+$('kgMas').onclick=()=>{S.kg=S.kg==null?5:Math.round((S.kg+incDe(S.kg))*10)/10;render()};
+$('kgMenos').onclick=()=>{if(S.kg==null)S.kg=0;else S.kg=Math.max(0,Math.round((S.kg-incDe(S.kg-.01))*10)/10);render()};
+$('tProg').onclick=()=>{tab='progreso';renderProg();render()};
+$('cVoz').onclick=()=>{CFG.voz=!CFG.voz;guardarCfg();if(CFG.voz)decir('Voz activada')};
+$('cVib').onclick=()=>{CFG.vibra=!CFG.vibra;guardarCfg();vibrar(200)};
+$('cProbar').onclick=()=>{vibrar([80,60,80]);decir(CFG.voz?'Descanso, noventa segundos. Faltan diez segundos.':'')};
+function guardarCfg(){try{localStorage.setItem(AKEY,JSON.stringify(CFG))}catch(e){}renderCfg()}
+function renderCfg(){$('cVoz').setAttribute('aria-pressed',CFG.voz);$('cVib').setAttribute('aria-pressed',CFG.vibra);
+  $('cVoz').textContent=CFG.voz?'Voz: sí':'Voz: no';$('cVib').textContent=CFG.vibra?'Vibración: sí':'Vibración: no'}
+/* ---------- editor de ejercicios ---------- */
+let edI=-1;
+function abrirEditor(i){const E=CAT[grupo].e[i];if(E.levy||enCurso())return;edI=i;
+  $('edT').textContent=`Cambiar ${E.s.toLowerCase()} (${CAT[grupo].n.toLowerCase()})`;
+  $('edN').value=E.n;$('edS').value=E.s;
+  $('edL').innerHTML=[BASE[grupo].e[i].n,...ALT[grupo]].map(n=>`<option value="${n}">`).join('');
+  const rs=RANGOS.includes(E.r)?RANGOS:[E.r,...RANGOS];$('edR').innerHTML=rs.map(r=>`<option${r===E.r?' selected':''}>${r}</option>`).join('');
+  $('editor').hidden=false;$('edN').focus()}
+function guardarEj(){try{localStorage.setItem(EJKEY,JSON.stringify(misEj))}catch(e){}aplicarEjercicios();$('editor').hidden=true;render()}
+$('edOk').onclick=()=>{const n=$('edN').value.trim();if(!n)return;
+  const s=($('edS').value.trim()||n.split(' ')[0]).slice(0,14),r=$('edR').value,b=BASE[grupo].e[edI];
+  misEj[grupo]=misEj[grupo]||{};
+  if(n===b.n&&s===b.s&&r===b.r)delete misEj[grupo][edI];else misEj[grupo][edI]={n,s,r};guardarEj()};
+$('edRes').onclick=()=>{if(misEj[grupo])delete misEj[grupo][edI];guardarEj()};
+$('edNo').onclick=()=>{$('editor').hidden=true};
+$('plan').onclick=e=>{const b=e.target.closest('[data-i]');if(b&&S.st==='idle')abrirEditor(+b.dataset.i)};
+/* ---------- descarga ---------- */
+const diaK=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const diasEntrenados=dias=>new Set(hist.filter(h=>Date.now()-Date.parse(h.start)<dias*864e5).map(h=>diaK(Date.parse(h.start)))).size;
+// Ejercicios cuyo 1RM estimado bajó en las 3 últimas sesiones (de las 4 últimas semanas y después de la última descarga).
+function estancados(){const desde=Math.max(descarga.fin?Date.parse(descarga.fin):0,Date.now()-28*864e5),out=[];
+  const vistos=new Set();
+  for(const h of hist){const g=gDe(h);for(const r of h.sets||[]){if(!r.ej||r.k!=='act.'||!(r.kg>0))continue;const k=g+'|'+r.ej;if(vistos.has(k))continue;vistos.add(k);
+    const p=previas(g,r.ej).filter(x=>Date.parse(x.fecha)>desde&&x.mejor>0).slice(0,3);if(p.length<3)continue;
+    const [c,b,a]=p.map(x=>x.mejor);if(b<=a&&c<b&&c<=a*.97)out.push(r.ej)}}
+  return out}
+function semanasSinDescarga(){if(!hist.length)return 0;
+  const desde=Math.max(descarga.fin?Date.parse(descarga.fin):0,Date.parse(hist[hist.length-1].start));return Math.floor((Date.now()-desde)/(7*864e5))}
+function consejoDescarga(){if(descargaActiva())return null;const e=estancados(),w=semanasSinDescarga();
+  if(e.length>=2)return `Rindes menos desde hace 3 sesiones en <b>${e.slice(0,3).join(', ')}</b>: es fatiga acumulada, no falta de ganas.`;
+  if(w>=8&&diasEntrenados(14)>=6)return `Llevas <b>${w} semanas</b> entrenando fuerte sin una semana suave.`;
+  return null}
+function bannerDesc(){
+  if(descargaActiva()){const f=new Date(descarga.hasta).toLocaleDateString('es-DO',{weekday:'long',day:'numeric',month:'short'});
+    return `<div class="aviso-d"><span><b>Semana de descarga</b> hasta el ${f}. Meta de series a la mitad, el mismo peso y deja 2–3 en reserva. Así se recupera el músculo y después vuelves más fuerte.</span><button type="button" data-desc="fin">Terminar la descarga</button></div>`}
+  const c=consejoDescarga();
+  return c?`<div class="aviso-d"><span>${c} Te sugiero una <b>semana de descarga</b>: la mitad de las series, el mismo peso y lejos del fallo.</span><button type="button" data-desc="ini">Empezar descarga de 7 días</button></div>`:''}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-desc]');if(!b)return;
+  const t=new Date().toISOString();
+  if(b.dataset.desc==='ini'){const h=new Date(Date.now()+7*864e5).toISOString();descarga={inicio:t,hasta:h,fin:h}}
+  else descarga={...descarga,hasta:t,fin:t};
+  try{localStorage.setItem(DKEY,JSON.stringify(descarga))}catch(err){}
+  if(S.st==='idle')S=fresh();renderGrupos();renderProg();render()});
 $('tReloj').onclick=()=>{tab='reloj';render()};
 $('tHist').onclick=()=>{tab='historial';render()};
 $('tEstilo').onclick=()=>{tab='estilo';renderEstilos();render()};
@@ -432,13 +648,24 @@ function renderEstilos(){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')lock=null});
 
 function renderGrupos(){
-  $('grupos').innerHTML=Object.keys(CAT).map(id=>`<button type="button" data-g="${id}" aria-pressed="${id===grupo}" ${enCurso()?'disabled':''}>${CAT[id].n}</button>`).join('');
-  $('grupos').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(enCurso())return;grupo=b.dataset.g;S=fresh();$('save').textContent='Sin guardar aún';render()});
+  const L=rutLista(),bloq=enCurso()||(S.st==='done'&&rutPos>0)?'disabled':'';
+  $('rutinas').innerHTML=RUTINAS.map((R,i)=>`<button type="button" data-r="${i}" aria-pressed="${i===rutI}" ${bloq}>${R.n}</button>`).join('');
+  $('grupos').innerHTML=Object.keys(CAT).map(id=>{const k=L.indexOf(id),on=L.length>1||RUTINAS[rutI].mia?k>=0:id===grupo;
+    return `<button type="button" data-g="${id}" aria-pressed="${on}" ${bloq}>${CAT[id].n}${on&&L.length>1?`<sup>${k+1}</sup>`:''}</button>`}).join('');
+  $('rutHint').hidden=!RUTINAS[rutI].mia||S.st!=='idle';
+  $('rutHint').textContent=miaLista.length?'Toca un grupo para quitarlo o agregarlo al final.':'Toca los grupos en el orden en que los quieres hacer.';
+  $('rutinas').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(enCurso())return;rutI=+b.dataset.r;rutPos=0;rutEf=0;guardarRut();
+    if(rutLista().length)grupo=rutLista()[0];S=fresh();$('save').textContent='Sin guardar aún';renderGrupos();render()});
+  $('grupos').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(enCurso())return;const g=b.dataset.g;
+    if(RUTINAS[rutI].mia){const k=miaLista.indexOf(g);if(k>=0)miaLista.splice(k,1);else miaLista.push(g);guardarRut();grupo=miaLista[0]||g}
+    else{if(enRutina()){rutI=0;guardarRut()}grupo=g}
+    rutPos=0;rutEf=0;S=fresh();$('save').textContent='Sin guardar aún';renderGrupos();render()});
   renderMeta()}
 function renderMeta(){
-  const m=metas[grupo],rep=repartir(grupo).filter(x=>x>0).join(' + ');
-  $('meta').hidden=S.st!=='idle';
-  $('meta').innerHTML=`<span>Meta de hoy</span><button id="mMenos" type="button" aria-label="Una serie efectiva menos">−</button><b>${m}</b><button id="mMas" type="button" aria-label="Una serie efectiva más">+</button><span>series efectivas (${rep})</span>`
+  const m=metas[grupo],mh=metaHoy(grupo),rep=repartir(grupo).filter(x=>x>0).join(' + ');
+  $('meta').hidden=S.st!=='idle';$('desc').hidden=S.st!=='idle';$('desc').innerHTML=bannerDesc();
+  $('meta').innerHTML=`<span>Meta${enRutina()?' de '+CAT[grupo].n.toLowerCase():' de hoy'}</span><button id="mMenos" type="button" aria-label="Una serie efectiva menos">−</button><b>${mh}</b><button id="mMas" type="button" aria-label="Una serie efectiva más">+</button><span>series efectivas (${rep})</span>`
+    +(mh!==m?`<span class="aviso">Descarga: la mitad de tu meta normal (${m}).</span>`:'')
     +(m>10?'<span class="aviso">Más de 10 en una sesión apenas suma músculo: sobre todo acumula fatiga.</span>':'');
   const fijar=d=>{metas[grupo]=Math.min(META_MAX,Math.max(META_MIN,metas[grupo]+d));
     try{localStorage.setItem(MKEY,JSON.stringify(metas))}catch(e){}renderMeta();render()};
@@ -447,37 +674,106 @@ function renderHist(){
   $('hist').innerHTML=hist.length?hist.map(h=>`<div class="card"><div class="top"><span class="g">${h.grupo}</span><span class="muted" style="font-family:var(--mono);font-size:12px">${new Date(h.start).toLocaleString('es-DO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
     <div class="meta"><span>${h.series} series</span><span>${ef1(h.efectivas!=null?h.efectivas:efDe(h.sets||[]))}${h.meta?' / '+h.meta:''} efectivas</span><span>${h.reps} reps</span><span>${fmt(h.tuc)} bajo congestión</span><span class="muted">${h.completa?'Completa':'Parcial'}</span></div></div>`).join('')
     :'<p class="muted" style="font-size:14px;margin:0">Aún no hay sesiones. Cada sesión se guarda sola al reportar la primera serie.</p>'}
-let lastG=null,lastEn=null;
+let lastG=null,lastEn=null,lastPlan='';
+function subInicio(E){const s=sugerir(grupo,E);
+  return s?`${E.n} · última vez ${kgTxt(s.prev.kg)} × ${s.prev.reps} (reserva ${s.prev.rir}) → ${s.txt}`:`${E.n} · peso con el que ${E.r} reps te dejen a 1 del fallo`}
 function render(){
   const G=CAT[grupo],E=est(),e=Math.max(0,now()-S.t0),pad=$('pad');
-  [['vReloj','tReloj','reloj'],['vHist','tHist','historial'],['vEstilo','tEstilo','estilo']].forEach(([v,t,k])=>{
+  [['vReloj','tReloj','reloj'],['vProg','tProg','progreso'],['vHist','tHist','historial'],['vEstilo','tEstilo','estilo']].forEach(([v,t,k])=>{
     $(v).hidden=tab!==k;$(v).style.display=tab===k?'flex':'none';$(t).setAttribute('aria-current',tab===k?'page':'false')});
-  $('gnom').textContent=G.n;
+  $('gnom').textContent=G.n+(enRutina()?` ${rutPos+1}/${rutLista().length}`:'');
   $('blk').textContent=S.st==='idle'?'3 estaciones':S.st==='done'?'Completa':`Estación ${S.sec+1}/3 · ${E.s}`
     +(S.metaE[S.sec]?` · ${ef1(S.efE)}/${S.metaE[S.sec]} ef.`:'')+(S.ronda>1?` · ronda ${S.ronda}`:'');
-  $('meta').hidden=S.st!=='idle';
+  $('meta').hidden=S.st!=='idle';$('desc').hidden=S.st!=='idle';$('planHint').hidden=S.st!=='idle';if(S.st!=='idle')$('editor').hidden=true;
+  $('terminar').textContent=enRutina()&&rutPos<rutLista().length-1&&enCurso()?'Terminar grupo y seguir':'Terminar y guardar';
   if(lastG!==grupo||lastEn!==enCurso()){renderGrupos();lastG=grupo;lastEn=enCurso()}
-  $('plan').innerHTML=G.e.map((x,i)=>`<div class="pb${S.st==='done'||(enCurso()&&i<S.sec)?' ok':enCurso()&&i===S.sec?' on':''}"><b>${x.s}</b><span>${x.levy?'3 vacíos · 15–50 s':x.n}</span></div>`).join('');
-  let kind='Toca para empezar',big='—',sub=G.e[0].levy?'':`${G.e[0].n} · peso con el que ${G.e[0].r} reps te dejen a 1 del fallo`,cls='',bar=0;
+  const planKey=S.st+'|'+S.sec+'|'+grupo+'|'+JSON.stringify(misEj[grupo]||{});
+  if(planKey!==lastPlan){lastPlan=planKey;const tag=S.st==='idle'?'button':'div';
+    $('plan').innerHTML=G.e.map((x,i)=>`<${tag} ${tag==='button'?`type="button" data-i="${i}"`:''} class="pb${S.st==='done'||(enCurso()&&i<S.sec)?' ok':enCurso()&&i===S.sec?' on':''}"><b>${x.s}</b><span>${x.levy?'3 vacíos · 15–50 s':x.n} · ${x.r}${misEj[grupo]&&misEj[grupo][i]?' · propio':''}</span></${tag}>`).join('')}
+  let kind=enRutina()?`Rutina ${RUTINAS[rutI].mia?'propia':RUTINAS[rutI].n} · toca para empezar`:'Toca para empezar',big='—',sub=G.e[0].levy?'':subInicio(G.e[0]),cls='',bar=0;
   if(S.st==='work'){cls='work';
-    if(S.phase==='act'){kind=`${E.s} · activación · ${fmt(e)}`;big=E.r;sub=`${E.n} · ${E.tempo} · deja 1 en reserva`}
+    if(S.phase==='act'){kind=`${E.s} · activación · ${fmt(e)}`;big=E.r;sub=`${E.n} · ${E.tempo} · deja 1 en reserva`
+      +(S.kg!=null?` · ${kgTxt(S.kg)}`:'')+(S.sug&&S.ronda===1?` (última vez ${kgTxt(S.sug.prev.kg)} × ${S.sug.prev.reps})`:'')}
     else if(S.phase==='myo'){kind=`Mini-serie ${S.nIn} · ${E.s} · ${fmt(e)}`;big=S.target;sub=`${E.tempo} · toca al terminar`}
     else if(S.phase==='ext'){kind=`${E.extN} · ${fmt(e)}`;big=S.target;sub=`${E.extH} · llega a 0–1 en reserva`}
     else if(S.phase==='hold'){kind=E.extN;big=Math.floor(e);sub=`${E.extH} · toca al soltar`}
     else{kind=`Vacío ${S.levyN+1}/3 · objetivo ${S.levyT} s`;big=Math.floor(e);sub=e>=S.levyT?'Objetivo cumplido · suelta cuando quieras y toca':'Exhala todo, ombligo a la columna · toca al soltar'}}
   else if(S.st==='report'){cls='report';kind=`Serie terminada · ${fmt(S.workDur)}`;big='?';sub='Reporta reps y reserva abajo'}
   else if(['rest','shift','trans'].indexOf(S.st)>=0){cls=S.st;big=Math.max(0,Math.ceil(S.restDur-e));bar=Math.min(100,100*e/Math.max(1,S.restDur));
-    kind=S.st==='rest'?`Descanso óptimo · t* = ${Math.round(S.restDur)} s`:S.st==='shift'?'Cambio mecánico · ya':S.esRonda?`Otra ronda · faltan ${ef1(S.metaE[S.sec]-S.efE)} efectivas`:'Cambio de estación';sub=S.label+' · toca para saltar'}
-  else if(S.st==='done'){cls='done';kind='Sesión terminada · bajo congestión';big=fmt(S.tuc);sub=`${ef1(S.ef)} de ${S.meta} series efectivas${S.ef<S.meta-.05?' (no alcanzada)':' ✓'} · ${S.sets.length} series · ${Math.round(S.iso)} s de isometría · guardada`}
+    kind=S.st==='rest'?`Descanso óptimo · t* = ${Math.round(S.restDur)} s`:S.st==='shift'?'Cambio mecánico · ya':S.rutTrans?`Rutina · sigue ${G.n}`:S.esRonda?`Otra ronda · faltan ${ef1(S.metaE[S.sec]-S.efE)} efectivas`:'Cambio de estación';
+    sub=(S.aviso?S.aviso+' · ':'')+S.label+' · toca para saltar'}
+  else if(S.st==='done'){cls='done';kind='Sesión terminada · bajo congestión';big=fmt(S.tuc);sub=(rutPos>0?`Rutina: ${ef1(rutEf+S.ef)} efectivas en total · `:'')+`${ef1(S.ef)} de ${S.meta} series efectivas${S.ef<S.meta-.05?' (no alcanzada)':' ✓'} · ${S.sets.length} series · ${Math.round(S.iso)} s de isometría · guardada`}
+  if(S.pr&&now()<S.pr){cls+=' record';kind='¡Récord personal! · '+S.prTxt}
   pad.className=cls;pad.dataset.fase=S.st==='work'?S.phase:'';$('kind').textContent=kind;$('big').textContent=big;$('sub').textContent=sub;$('bar').style.width=bar+'%';
   $('report').hidden=S.st!=='report';$('done').textContent=S.hechas;
+  $('kgFila').hidden=S.phase==='ext'&&E&&E.ext==='flat';$('kgv').textContent=kgTxt(S.kg);
   $('fP').style.width=(S.P*100)+'%';$('vP').textContent=S.P.toFixed(2);
   $('fC').style.width=(S.C*100)+'%';$('vC').textContent=S.C.toFixed(2);
   $('tuc').textContent=fmt(S.tuc);$('tot').textContent=repsDe(S.sets);$('iso').textContent=Math.round(S.iso)+' s';
-  $('efv').textContent=S.st==='idle'?`meta ${metas[grupo]}`:`${ef1(S.ef)} / ${S.meta}`;
-  const rows=S.sets.slice().reverse().map(r=>`<tr><td>${r.ex} <span class="muted">${r.k}</span></td><td>${r.reps}</td><td>${r.rir}</td><td>${r.P.toFixed(2)}</td><td>${r.rest?r.rest+' s':'—'}</td><td>${ef1(efectiva(r))}</td></tr>`).join('');
-  $('rows').innerHTML=rows||'<tr><td colspan="6" class="muted" style="text-align:left">Las series aparecen aquí al reportarlas.</td></tr>';
+  $('efv').textContent=S.st==='idle'?`meta ${metaHoy(grupo)}`:`${ef1(S.ef)} / ${S.meta}`;
+  const rows=S.sets.slice().reverse().map(r=>`<tr><td>${r.pr?'★ ':''}${r.ex} <span class="muted">${r.k}</span></td><td>${r.reps}</td><td>${r.kg!=null?(r.kg>0?num(r.kg):'c'):'—'}</td><td>${r.rir}</td><td>${r.P.toFixed(2)}</td><td>${r.rest?r.rest+' s':'—'}</td><td>${ef1(efectiva(r))}</td></tr>`).join('');
+  $('rows').innerHTML=rows||'<tr><td colspan="7" class="muted" style="text-align:left">Las series aparecen aquí al reportarlas.</td></tr>';
 }
+/* ---------- progreso ---------- */
+const SEM={abdominales:[8,16]},semRango=g=>SEM[g]||[12,20];   // series efectivas por semana para hipertrofia
+const CORTO={biceps:'Bí',triceps:'Tr',espalda:'Es',pecho:'Pe',hombros:'Ho',abdominales:'Ab',piernas:'Pi'};
+const lunes=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
+const efH=h=>h.efectivas!=null?h.efectivas:efDe(h.sets||[]);
+function semana(off){const a=lunes(Date.now())-off*7*864e5,b=a+7*864e5,o={};
+  hist.forEach(h=>{const t=Date.parse(h.start),g=gDe(h);if(g&&t>=a&&t<b)o[g]=(o[g]||0)+efH(h)});return o}
+function porDia(){const m={};hist.forEach(h=>{const k=diaK(Date.parse(h.start));(m[k]=m[k]||new Set()).add(gDe(h))});return m}
+const nDia=k=>Math.round(Date.parse(k+'T12:00:00')/864e5);
+// Racha: días entrenados seguidos sin descansar más de 2 días entre uno y otro.
+function racha(){const d=Object.keys(porDia()).sort().reverse();if(!d.length||nDia(diaK(Date.now()))-nDia(d[0])>2)return 0;
+  let n=1;for(let i=1;i<d.length&&nDia(d[i-1])-nDia(d[i])<=3;i++)n++;return n}
+let calOff=0,grafSel='';
+function renderProg(){
+  $('pDesc').innerHTML=bannerDesc();
+  const w=semana(0),w1=semana(1),dias=new Set(hist.filter(h=>Date.parse(h.start)>=lunes(Date.now())).map(h=>diaK(Date.parse(h.start)))).size;
+  $('pSem').innerHTML=`<p class="hint">Series efectivas desde el lunes · ${dias} ${dias===1?'día':'días'} entrenados. Para ganar músculo: ${semRango('pecho').join('–')} por grupo (abdomen ${semRango('abdominales').join('–')}). La raya marca ese rango.</p>`
+    +Object.keys(CAT).map(g=>{const v=w[g]||0,[lo,hi]=semRango(g),tope=hi*1.3,col=v<lo?'var(--amb)':v<=hi?'var(--cap)':'var(--art)';
+      return `<div class="sem"><span>${CAT[g].n}</span><div class="track"><span class="banda" style="left:${100*lo/tope}%;width:${100*(hi-lo)/tope}%"></span><div class="fill" style="width:${Math.min(100,100*v/tope)}%;background:${col}"></div></div>
+        <span class="val">${ef1(v)} <small>/ ${lo}–${hi}</small></span></div>`}).join('')
+    +`<p class="hint">Semana pasada: ${Object.keys(CAT).filter(g=>w1[g]).map(g=>`${CAT[g].n.toLowerCase()} ${ef1(w1[g])}`).join(' · ')||'sin entrenos'}.</p>`;
+  // constancia
+  const pd=porDia(),r=racha(),base=new Date();base.setDate(1);base.setMonth(base.getMonth()+calOff);
+  const y=base.getFullYear(),m=base.getMonth(),n=new Date(y,m+1,0).getDate(),ini=(new Date(y,m,1).getDay()+6)%7,hoyK=diaK(Date.now());
+  let mes=0,celdas='';for(let i=0;i<ini;i++)celdas+='<span></span>';
+  for(let d=1;d<=n;d++){const k=diaK(new Date(y,m,d)),gs=pd[k];if(gs)mes++;
+    celdas+=`<span class="d${gs?' on':''}${k===hoyK?' hoy':''}">${d}${gs?`<small>${[...gs].filter(Boolean).map(g=>CORTO[g]).join(' ')}</small>`:''}</span>`}
+  $('pCal').innerHTML=`<div style="display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap"><div><div class="big2">${r}</div><span class="hint">${r===1?'día':'días'} de racha</span></div>
+      <div><div class="big2">${mes}</div><span class="hint">entrenados en el mes</span></div></div>
+    <p class="hint">La racha cuenta los días entrenados sin descansar más de 2 días seguidos.</p>
+    <div class="calnav"><button type="button" data-cal="-1" aria-label="Mes anterior">‹</button><b>${base.toLocaleDateString('es-DO',{month:'long',year:'numeric'})}</b><button type="button" data-cal="1" aria-label="Mes siguiente" ${calOff>=0?'disabled':''}>›</button></div>
+    <div class="cal">${['L','M','X','J','V','S','D'].map(x=>`<span class="h">${x}</span>`).join('')}${celdas}</div>`;
+  $('pCal').querySelectorAll('[data-cal]').forEach(b=>b.onclick=()=>{calOff=Math.min(0,calOff+ +b.dataset.cal);renderProg()});
+  // récords
+  const rec={};
+  hist.forEach(h=>{const g=gDe(h);(h.sets||[]).forEach(x=>{if(!x.ej||x.k!=='act.'||!(x.kg>0))return;const k=g+'|'+x.ej;
+    if(!rec[k]||e1(x)>e1(rec[k].r))rec[k]={g,r:x,f:h.start}})});
+  const rs=Object.values(rec).sort((a,b)=>(a.g||'').localeCompare(b.g||'')||e1(b.r)-e1(a.r));
+  $('pRec').innerHTML=rs.length?`<div class="tbl"><table><thead><tr><th>Ejercicio</th><th>Mejor serie</th><th>1RM est.</th><th>Fecha</th></tr></thead><tbody>`
+    +rs.map(x=>`<tr><td style="white-space:normal">${x.r.ej} <span class="muted">${CAT[x.g]?CAT[x.g].n.toLowerCase():''}</span></td><td>${num(x.r.kg)} × ${x.r.reps}</td><td>${num(e1(x.r))}</td><td>${new Date(x.f).toLocaleDateString('es-DO',{day:'2-digit',month:'short'})}</td></tr>`).join('')
+    +'</tbody></table></div>':'<p class="hint">Aún no hay récords: aparecen cuando anotas el peso de la primera serie de cada ejercicio.</p>';
+  // gráfica
+  const ks=Object.keys(rec);if(!ks.includes(grafSel))grafSel=ks[0]||'';
+  $('pGraf').innerHTML=ks.length?`<select id="gSel" aria-label="Ejercicio">${ks.map(k=>`<option value="${k}"${k===grafSel?' selected':''}>${k.split('|')[1]}</option>`).join('')}</select><div id="graf"></div>
+    <div class="leg"><span><i style="background:var(--art)"></i>1RM estimado</span><span><i style="background:var(--ven)"></i>peso de la primera serie</span></div>`
+    :'<p class="hint">La gráfica aparece cuando tengas el peso anotado en al menos una sesión.</p>';
+  if(ks.length){$('gSel').onchange=e=>{grafSel=e.target.value;renderProg()};dibujarGraf(grafSel)}}
+function dibujarGraf(k){const [g,n]=k.split('|'),pts=previas(g,n).filter(p=>p.kg>0).reverse().slice(-24);
+  if(!pts.length){$('graf').innerHTML='<p class="hint">Sin datos de peso en la primera serie.</p>';return}
+  if(pts.length<2){$('graf').innerHTML=`<p class="hint">Una sola sesión: ${kgTxt(pts[0].kg)} × ${pts[0].reps}. La línea aparece desde la segunda.</p>`;return}
+  const W=340,H=180,L=34,R=8,T=10,B=24,ys=pts.flatMap(p=>[p.mejor,+p.kg]),lo=Math.floor(Math.min(...ys)*.92),hi=Math.ceil(Math.max(...ys)*1.05);
+  const X=i=>L+(W-L-R)*i/(pts.length-1),Y=v=>T+(H-T-B)*(1-(v-lo)/Math.max(1,hi-lo));
+  const linea=(f,c)=>`<polyline fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p,i)=>X(i).toFixed(1)+','+Y(f(p)).toFixed(1)).join(' ')}"/>`
+    +pts.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(f(p)).toFixed(1)}" r="3.2" fill="${c}"/>`).join('');
+  let grid='';for(let j=0;j<=3;j++){const v=lo+(hi-lo)*j/3;grid+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">${Math.round(v)}</text>`}
+  const f=p=>new Date(p.fecha).toLocaleDateString('es-DO',{day:'2-digit',month:'2-digit'});
+  const ult=pts[pts.length-1],pri=pts[0],dif=ult.mejor-pri.mejor;
+  $('graf').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Progreso de ${n}">${grid}${linea(p=>p.mejor,'var(--art)')}${linea(p=>+p.kg,'var(--ven)')}
+    <text x="${L}" y="${H-6}" font-size="10" fill="var(--muted)" font-family="var(--mono)">${f(pri)}</text><text x="${W-R}" y="${H-6}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">${f(ult)}</text></svg>
+    <p class="hint">${pts.length} sesiones · 1RM estimado ${dif>=0?'+':''}${num(dif)} kg (${dif>=0?'+':''}${Math.round(100*dif/pri.mejor)} %) desde ${f(pri)}.</p>`}
 /* ---------- exportar / importar ---------- */
 const hoy=()=>new Date().toISOString().slice(0,10);
 async function entregar(nombre,texto,tipo){
@@ -495,8 +791,8 @@ $('expJson').onclick=()=>{
 $('expCsv').onclick=()=>{
   if(!hist.length){$('ioMsg').textContent='No hay sesiones que exportar.';return}
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
-  const filas=[['fecha','grupo','sesion','serie_n','estacion','tipo','reps_o_segundos','rir','congestion_P','descanso_s','efectiva'].join(',')];
-  hist.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>filas.push([q(new Date(h.start).toLocaleString('es-DO')),q(h.grupo),q(h.id),i+1,q(r.ex),q(r.k),q(r.reps),q(r.rir),(+r.P).toFixed(3),r.rest||0,efectiva(r).toFixed(2)].join(','))));
+  const filas=[['fecha','grupo','sesion','serie_n','estacion','ejercicio','tipo','reps_o_segundos','kg','rir','congestion_P','descanso_s','efectiva'].join(',')];
+  hist.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>filas.push([q(new Date(h.start).toLocaleString('es-DO')),q(h.grupo),q(h.id),i+1,q(r.ex),q(r.ej||''),q(r.k),q(r.reps),r.kg!=null?r.kg:'',q(r.rir),(+r.P).toFixed(3),r.rest||0,efectiva(r).toFixed(2)].join(','))));
   entregar(`series-${hoy()}.csv`,'﻿'+filas.join('\n'),'text/csv');
 };
 $('impJson').onclick=()=>$('impFile').click();
@@ -521,7 +817,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   navigator.serviceWorker.register('sw.js').then(r=>{document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})})}).catch(()=>{});
 }
 
-renderHist();render();
+if(enRutina())grupo=rutLista()[0];renderHist();renderGrupos();renderCfg();render();
+if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>{vozEs=null};
 </script>
 </body>
 </html>

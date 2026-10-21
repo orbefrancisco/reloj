@@ -1,6 +1,6 @@
 // Copia local de la app para que funcione sin internet.
 // Al cambiar cualquier archivo de la app, sube VERSION para que el celular descargue la nueva.
-const VERSION = 'reloj-anomalo-v8';
+const VERSION = 'reloj-anomalo-v9';
 const ARCHIVOS = ['./', './index.html', './manifest.json', './icono.svg', './icono-192.png', './icono-512.png', './icono-maskable-512.png'];
 
 self.addEventListener('install', e => {
