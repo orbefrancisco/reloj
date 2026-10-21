@@ -37,6 +37,10 @@ h2{font-family:var(--disp);font-weight:600;font-size:18px;letter-spacing:.04em;t
 #grupos button{height:40px;padding:0 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-family:var(--mono);font-size:13px}
 #grupos button[aria-pressed="true"]{background:var(--art);border-color:var(--art);color:var(--bg)}
 #grupos button:disabled{opacity:.5;cursor:default}
+#meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px}
+#meta button{width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:18px}
+#meta b{font-family:var(--mono);font-size:18px;min-width:2ch;text-align:center}
+#meta .aviso{flex-basis:100%;font-size:12px;color:var(--muted, #888)}
 #plan{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .pb{border:1px solid var(--line);border-radius:12px;padding:8px;font-size:11.5px;line-height:1.3;background:var(--surface);min-width:0}
 .pb b{display:block;font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.03em;text-transform:uppercase}
@@ -90,6 +94,7 @@ nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
 
   <section id="vReloj" style="display:flex;flex-direction:column;gap:14px">
     <div id="grupos"></div>
+    <div id="meta"></div>
     <div id="plan"></div>
     <button id="pad" type="button">
       <span id="kind">Toca para empezar</span>
@@ -113,13 +118,14 @@ nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
       <div class="m"><span class="lbl">Congestión P</span><div class="track"><div class="fill" id="fP"></div></div><span class="val" id="vP">0.00</span></div>
       <div class="m"><span class="lbl">Capacidad C</span><div class="track"><div class="fill" id="fC"></div></div><span class="val" id="vC">1.00</span></div>
     </div>
-    <div class="stats"><span>Bajo congestión: <b id="tuc">0:00</b></span><span>Reps: <b id="tot">0</b></span><span>Isometría: <b id="iso">0 s</b></span><span id="save">Sin guardar aún</span></div>
+    <div class="stats"><span>Bajo congestión: <b id="tuc">0:00</b></span><span>Reps: <b id="tot">0</b></span><span>Isometría: <b id="iso">0 s</b></span><span>Efectivas: <b id="efv">0</b></span><span id="save">Sin guardar aún</span></div>
     <div class="tbl"><table>
-      <thead><tr><th>Serie</th><th>Reps</th><th>RIR</th><th>P</th><th>Desc.</th></tr></thead>
+      <thead><tr><th>Serie</th><th>Reps</th><th>RIR</th><th>P</th><th>Desc.</th><th>Ef.</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <div class="acc"><button id="terminar" type="button">Terminar y guardar</button><button id="nueva" type="button">Nueva sesión</button></div>
     <p class="nota"><b>Cómo decide.</b> La congestión decae como e^(−t/110 s) y la capacidad se recupera como 1 − A·e^(−t/τ_C). El descanso es el que maximiza C·P: t* = τ_C·ln[A(τ_C+τ_P)/τ_C], con un ruido log-normal pequeño. Las mini-series tienen objetivo aleatorio entre 65 y 90 % de RTF·C. Cuando ya no da, el reloj no te deja parar: cambia a una variante más fácil en 10 s. El core cierra con 3 vacíos de duración sorteada por una ley de potencias entre 15 y 50 s.</p>
+    <p class="nota"><b>Series efectivas.</b> Cada sesión tiene una meta de series efectivas que se reparte entre los ejercicios. Una serie completa con 5 reps o más a 0–2 en reserva vale 1; con 3+ en reserva vale ½. Una mini-serie vale ½ (con 4 reps o más). Una isometría hasta el fallo vale ½ si dura 30 s. Los vacíos no cuentan. Si al cerrar un ejercicio falta meta, el reloj te da un descanso largo y otra ronda (hasta 3); si en una ronda nueva ya no logras ni ⅓ de serie efectiva, pasa al siguiente.</p>
   </section>
 
   <section id="vHist" hidden style="display:flex;flex-direction:column;gap:10px">
@@ -177,6 +183,8 @@ const CAT={
   {s:'Gemelo',n:'Elevación de talones',r:'12–20',d:15,tempo:'pausa abajo en estiramiento',ext:'part',k:1.6,extN:'Parciales en estiramiento',extH:'mitad baja, sin rebote'}]}
 };
 const TP=110,MAXMYO=5,SHIFT=10,KEY='reloj-anomalo-sesiones';
+// Meta de series efectivas por sesión (hipertrofia, cada grupo 2–3 veces por semana); más de 10 por sesión apenas suma.
+const META_DEF={biceps:6,triceps:6,espalda:8,pecho:8,hombros:8,abdominales:6,piernas:9},META_MIN=4,META_MAX=12,MAXRONDA=3,MKEY='reloj-anomalo-metas';
 const now=()=>Date.now()/1000;
 const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
@@ -189,8 +197,11 @@ function beep(f,d){try{audio=audio||new(window.AudioContext||window.webkitAudioC
 
 let grupo='biceps',tab='reloj',hist=[],S;
 try{hist=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){hist=[]}
+let metas={...META_DEF};
+try{Object.assign(metas,JSON.parse(localStorage.getItem(MKEY)||'{}'))}catch(e){}
 function fresh(){return {st:'idle',P:0,C:1,tauC:35,P0:0,C0:1,sec:0,nIn:0,R1:0,RTF:0,target:0,phase:'act',levyN:0,levyT:0,
-  t0:0,last:0,restDur:0,lastSec:-1,workDur:0,hechas:0,label:'',sets:[],tuc:0,iso:0,id:null,start:null}}
+  t0:0,last:0,restDur:0,lastSec:-1,workDur:0,hechas:0,label:'',sets:[],tuc:0,iso:0,id:null,start:null,
+  meta:0,metaE:[],ef:0,efE:0,ronda:1,esRonda:false}}
 S=fresh();
 const est=()=>CAT[grupo].e[S.sec];
 const enCurso=()=>S.st!=='idle'&&S.st!=='done';
@@ -207,9 +218,27 @@ function etiqueta(){const E=est();
 
 function empezar(){const t=now();beep(1320,.25);try{navigator.vibrate&&navigator.vibrate(250)}catch(e){}
   Object.assign(S,{st:'work',t0:t,last:t});render()}
+/* Serie efectiva (modelo de reps efectivas): serie completa con 5+ reps a RIR 0–2 = 1, con RIR 3+ = ½;
+   mini-serie = ½ (con 4+ reps); isometría hasta el fallo = ½ si dura 30 s; los vacíos no cuentan. */
+function efectiva(r){
+  if(r.rir==='—')return r.k==='isom.'?.5*Math.min(1,(parseInt(r.reps,10)||0)/30):0;
+  const R=parseInt(r.reps,10)||0,q=r.rir==='3+'?.5:1;
+  return r.k==='myo'?q*.5*Math.min(1,R/4):q*Math.min(1,R/5)}
+const efDe=sets=>sets.reduce((a,r)=>a+efectiva(r),0);
+const ef1=x=>(Math.round(x*10)/10).toString().replace('.',',');
+// reparte la meta del grupo entre sus ejercicios con series (los vacíos no llevan meta)
+function repartir(g){const e=CAT[g].e,idx=e.map((x,i)=>x.levy?-1:i).filter(i=>i>=0),m=metas[g],out=e.map(()=>0);
+  idx.forEach((i,j)=>out[i]=Math.floor(m/idx.length)+(j<m%idx.length?1:0));return out}
+const faltaE=()=>S.metaE[S.sec]-S.efE>.05;
+// otra ronda del mismo ejercicio: descanso hasta recuperar ~85 % de la capacidad (60–180 s)
+function otraRonda(row){
+  S.ronda++;S.nIn=0;S.phase='act';S.esRonda=true;
+  const r=Math.min(180,Math.max(60,S.tauC*Math.log(Math.max(1.01,(1-S.C)/.15))));row.rest=Math.round(r);
+  return {row,mode:'trans',rest:r}}
+const cerrarEstacion=row=>faltaE()&&S.ronda<MAXRONDA?otraRonda(row):siguienteEstacion(row);
 function siguienteEstacion(row){
   if(S.sec>=2)return {row,mode:'done',rest:0};
-  S.sec++;S.nIn=0;S.R1=0;S.RTF=0;const E=est();
+  S.sec++;S.nIn=0;S.R1=0;S.RTF=0;S.efE=0;S.ronda=1;S.esRonda=false;const E=est();
   if(E.levy){S.phase='vac';S.levyN=0;S.levyT=levy()}else S.phase='act';
   const r=E.levy?45:90;row.rest=r;return {row,mode:'trans',rest:r}}
 function avanzar(ev){
@@ -217,13 +246,18 @@ function avanzar(ev){
   if(ev.hold!=null){
     const sg=ev.hold;bump(sg/2.5,1,sg,false);S.iso+=sg;
     const row={ex:ph==='vac'?'Vacío':E.s,k:ph==='vac'?`obj ${S.levyT} s`:'isom.',reps:Math.round(sg)+' s',rir:'—',P:S.P,rest:0};
-    if(ph==='vac'){S.levyN++;if(S.levyN<3){S.levyT=levy();const r=30+15*Math.random();row.rest=Math.round(r);return {row,mode:'rest',rest:r}}}
-    return siguienteEstacion(row)}
+    const c=efectiva(row);S.efE+=c;S.ef+=c;
+    if(ph==='vac'){S.levyN++;if(S.levyN<3){S.levyT=levy();const r=30+15*Math.random();row.rest=Math.round(r);return {row,mode:'rest',rest:r}}
+      return siguienteEstacion(row)}
+    return cerrarEstacion(row)}
   const R=ev.R,rir=ev.rir,p=R/(R+rir+1e-9);
   if(ph==='act'){S.R1=R;S.RTF=R+rir}
   bump(R,p,ev.dur,ph==='ext');S.nIn++;
   const row={ex:E.s,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir===3?'3+':String(rir),P:S.P,rest:0};
-  if(ph==='ext')return siguienteEstacion(row);
+  const c=efectiva(row);S.efE+=c;S.ef+=c;
+  if(ph==='ext')return cerrarEstacion(row);
+  if(!faltaE())return siguienteEstacion(row);
+  if(ph==='act'&&S.ronda>1&&c<1/3)return siguienteEstacion(row);
   const ts=restStar(),pred=S.RTF*recC(S.C,S.tauC,ts);
   if((ph==='myo'&&R<.5*S.R1)||pred*.65<3||S.nIn>MAXMYO){
     row.rest=SHIFT;
@@ -241,7 +275,8 @@ function aplicar(ev){
 function repsDe(sets){return sets.reduce((a,r)=>a+(r.rir!=='—'?parseInt(r.reps,10)||0:0),0)}
 function guardar(completa){
   if(!S.id||!S.sets.length)return;
-  const ent={id:S.id,start:S.start,grupo:CAT[grupo].n,series:S.sets.length,reps:repsDe(S.sets),tuc:Math.round(S.tuc),iso:Math.round(S.iso),completa:!!completa,sets:S.sets};
+  const ent={id:S.id,start:S.start,grupo:CAT[grupo].n,series:S.sets.length,reps:repsDe(S.sets),tuc:Math.round(S.tuc),iso:Math.round(S.iso),completa:!!completa,sets:S.sets,
+    efectivas:Math.round(efDe(S.sets)*100)/100,meta:S.meta};
   hist=[ent].concat(hist.filter(h=>h.id!==S.id)).slice(0,200);
   try{localStorage.setItem(KEY,JSON.stringify(hist));$('save').textContent='Guardado ✓'}catch(e){$('save').textContent='No se pudo guardar'}
   renderHist()}
@@ -263,7 +298,8 @@ $('pad').onclick=async()=>{
   try{lock=lock||await navigator.wakeLock?.request('screen')}catch(e){}
   const t=now();
   if(S.st==='idle'){const E0=CAT[grupo].e[0];
-    Object.assign(S,{id:'s'+Date.now(),start:new Date().toISOString(),phase:E0.levy?'vac':'act',levyT:E0.levy?levy():0});empezar()}
+    Object.assign(S,{id:'s'+Date.now(),start:new Date().toISOString(),phase:E0.levy?'vac':'act',levyT:E0.levy?levy():0,
+      meta:metas[grupo],metaE:repartir(grupo)});empezar()}
   else if(S.st==='work'){const dur=t-S.t0;
     if(S.phase==='hold'||S.phase==='vac'){aplicar({hold:dur});return}
     Object.assign(S,{st:'report',workDur:dur,hechas:S.phase==='act'?est().d:S.target});render()}
@@ -280,10 +316,19 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 function renderGrupos(){
   $('grupos').innerHTML=Object.keys(CAT).map(id=>`<button type="button" data-g="${id}" aria-pressed="${id===grupo}" ${enCurso()?'disabled':''}>${CAT[id].n}</button>`).join('');
-  $('grupos').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(enCurso())return;grupo=b.dataset.g;S=fresh();$('save').textContent='Sin guardar aún';render()})}
+  $('grupos').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(enCurso())return;grupo=b.dataset.g;S=fresh();$('save').textContent='Sin guardar aún';render()});
+  renderMeta()}
+function renderMeta(){
+  const m=metas[grupo],rep=repartir(grupo).filter(x=>x>0).join(' + ');
+  $('meta').hidden=S.st!=='idle';
+  $('meta').innerHTML=`<span>Meta de hoy</span><button id="mMenos" type="button" aria-label="Una serie efectiva menos">−</button><b>${m}</b><button id="mMas" type="button" aria-label="Una serie efectiva más">+</button><span>series efectivas (${rep})</span>`
+    +(m>10?'<span class="aviso">Más de 10 en una sesión apenas suma músculo: sobre todo acumula fatiga.</span>':'');
+  const fijar=d=>{metas[grupo]=Math.min(META_MAX,Math.max(META_MIN,metas[grupo]+d));
+    try{localStorage.setItem(MKEY,JSON.stringify(metas))}catch(e){}renderMeta();render()};
+  $('mMenos').onclick=()=>fijar(-1);$('mMas').onclick=()=>fijar(1)}
 function renderHist(){
   $('hist').innerHTML=hist.length?hist.map(h=>`<div class="card"><div class="top"><span class="g">${h.grupo}</span><span class="muted" style="font-family:var(--mono);font-size:12px">${new Date(h.start).toLocaleString('es-DO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
-    <div class="meta"><span>${h.series} series</span><span>${h.reps} reps</span><span>${fmt(h.tuc)} bajo congestión</span><span class="muted">${h.completa?'Completa':'Parcial'}</span></div></div>`).join('')
+    <div class="meta"><span>${h.series} series</span><span>${ef1(h.efectivas!=null?h.efectivas:efDe(h.sets||[]))}${h.meta?' / '+h.meta:''} efectivas</span><span>${h.reps} reps</span><span>${fmt(h.tuc)} bajo congestión</span><span class="muted">${h.completa?'Completa':'Parcial'}</span></div></div>`).join('')
     :'<p class="muted" style="font-size:14px;margin:0">Aún no hay sesiones. Cada sesión se guarda sola al reportar la primera serie.</p>'}
 let lastG=null,lastEn=null;
 function render(){
@@ -292,7 +337,9 @@ function render(){
   $('vReloj').style.display=tab==='reloj'?'flex':'none';$('vHist').style.display=tab==='historial'?'flex':'none';
   $('tReloj').setAttribute('aria-current',tab==='reloj'?'page':'false');$('tHist').setAttribute('aria-current',tab==='historial'?'page':'false');
   $('gnom').textContent=G.n;
-  $('blk').textContent=S.st==='idle'?'3 estaciones':S.st==='done'?'Completa':`Estación ${S.sec+1}/3 · ${E.s}`;
+  $('blk').textContent=S.st==='idle'?'3 estaciones':S.st==='done'?'Completa':`Estación ${S.sec+1}/3 · ${E.s}`
+    +(S.metaE[S.sec]?` · ${ef1(S.efE)}/${S.metaE[S.sec]} ef.`:'')+(S.ronda>1?` · ronda ${S.ronda}`:'');
+  $('meta').hidden=S.st!=='idle';
   if(lastG!==grupo||lastEn!==enCurso()){renderGrupos();lastG=grupo;lastEn=enCurso()}
   $('plan').innerHTML=G.e.map((x,i)=>`<div class="pb${S.st==='done'||(enCurso()&&i<S.sec)?' ok':enCurso()&&i===S.sec?' on':''}"><b>${x.s}</b><span>${x.levy?'3 vacíos · 15–50 s':x.n}</span></div>`).join('');
   let kind='Toca para empezar',big='—',sub=G.e[0].levy?'':`${G.e[0].n} · peso con el que ${G.e[0].r} reps te dejen a 1 del fallo`,cls='',bar=0;
@@ -304,15 +351,16 @@ function render(){
     else{kind=`Vacío ${S.levyN+1}/3 · objetivo ${S.levyT} s`;big=Math.floor(e);sub=e>=S.levyT?'Objetivo cumplido · suelta cuando quieras y toca':'Exhala todo, ombligo a la columna · toca al soltar'}}
   else if(S.st==='report'){cls='report';kind=`Serie terminada · ${fmt(S.workDur)}`;big='?';sub='Reporta reps y reserva abajo'}
   else if(['rest','shift','trans'].indexOf(S.st)>=0){cls=S.st;big=Math.max(0,Math.ceil(S.restDur-e));bar=Math.min(100,100*e/Math.max(1,S.restDur));
-    kind=S.st==='rest'?`Descanso óptimo · t* = ${Math.round(S.restDur)} s`:S.st==='shift'?'Cambio mecánico · ya':'Cambio de estación';sub=S.label+' · toca para saltar'}
-  else if(S.st==='done'){cls='done';kind='Sesión terminada · bajo congestión';big=fmt(S.tuc);sub=`${S.sets.length} series · ${Math.round(S.iso)} s de isometría · guardada en el historial`}
+    kind=S.st==='rest'?`Descanso óptimo · t* = ${Math.round(S.restDur)} s`:S.st==='shift'?'Cambio mecánico · ya':S.esRonda?`Otra ronda · faltan ${ef1(S.metaE[S.sec]-S.efE)} efectivas`:'Cambio de estación';sub=S.label+' · toca para saltar'}
+  else if(S.st==='done'){cls='done';kind='Sesión terminada · bajo congestión';big=fmt(S.tuc);sub=`${ef1(S.ef)} de ${S.meta} series efectivas${S.ef<S.meta-.05?' (no alcanzada)':' ✓'} · ${S.sets.length} series · ${Math.round(S.iso)} s de isometría · guardada`}
   pad.className=cls;$('kind').textContent=kind;$('big').textContent=big;$('sub').textContent=sub;$('bar').style.width=bar+'%';
   $('report').hidden=S.st!=='report';$('done').textContent=S.hechas;
   $('fP').style.width=(S.P*100)+'%';$('vP').textContent=S.P.toFixed(2);
   $('fC').style.width=(S.C*100)+'%';$('vC').textContent=S.C.toFixed(2);
   $('tuc').textContent=fmt(S.tuc);$('tot').textContent=repsDe(S.sets);$('iso').textContent=Math.round(S.iso)+' s';
-  const rows=S.sets.slice().reverse().map(r=>`<tr><td>${r.ex} <span class="muted">${r.k}</span></td><td>${r.reps}</td><td>${r.rir}</td><td>${r.P.toFixed(2)}</td><td>${r.rest?r.rest+' s':'—'}</td></tr>`).join('');
-  $('rows').innerHTML=rows||'<tr><td colspan="5" class="muted" style="text-align:left">Las series aparecen aquí al reportarlas.</td></tr>';
+  $('efv').textContent=S.st==='idle'?`meta ${metas[grupo]}`:`${ef1(S.ef)} / ${S.meta}`;
+  const rows=S.sets.slice().reverse().map(r=>`<tr><td>${r.ex} <span class="muted">${r.k}</span></td><td>${r.reps}</td><td>${r.rir}</td><td>${r.P.toFixed(2)}</td><td>${r.rest?r.rest+' s':'—'}</td><td>${ef1(efectiva(r))}</td></tr>`).join('');
+  $('rows').innerHTML=rows||'<tr><td colspan="6" class="muted" style="text-align:left">Las series aparecen aquí al reportarlas.</td></tr>';
 }
 /* ---------- exportar / importar ---------- */
 const hoy=()=>new Date().toISOString().slice(0,10);
@@ -331,8 +379,8 @@ $('expJson').onclick=()=>{
 $('expCsv').onclick=()=>{
   if(!hist.length){$('ioMsg').textContent='No hay sesiones que exportar.';return}
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
-  const filas=[['fecha','grupo','sesion','serie_n','estacion','tipo','reps_o_segundos','rir','congestion_P','descanso_s'].join(',')];
-  hist.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>filas.push([q(new Date(h.start).toLocaleString('es-DO')),q(h.grupo),q(h.id),i+1,q(r.ex),q(r.k),q(r.reps),q(r.rir),(+r.P).toFixed(3),r.rest||0].join(','))));
+  const filas=[['fecha','grupo','sesion','serie_n','estacion','tipo','reps_o_segundos','rir','congestion_P','descanso_s','efectiva'].join(',')];
+  hist.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>filas.push([q(new Date(h.start).toLocaleString('es-DO')),q(h.grupo),q(h.id),i+1,q(r.ex),q(r.k),q(r.reps),q(r.rir),(+r.P).toFixed(3),r.rest||0,efectiva(r).toFixed(2)].join(','))));
   entregar(`series-${hoy()}.csv`,'﻿'+filas.join('\n'),'text/csv');
 };
 $('impJson').onclick=()=>$('impFile').click();
