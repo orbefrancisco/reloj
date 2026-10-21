@@ -58,7 +58,7 @@ h2{font-family:var(--disp);font-weight:600;font-size:18px;letter-spacing:.04em;t
 .step{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .step button{width:56px;height:56px;border:1px solid var(--line);border-radius:14px;font-size:26px}
 #done{font-family:var(--disp);font-weight:800;font-size:52px;font-variant-numeric:tabular-nums}
-.rir{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.rir{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .rir button{height:56px;border:1px solid var(--line);border-radius:12px;font-family:var(--mono);font-size:18px;background:var(--bg)}
 .rir button:active{background:var(--art);color:var(--bg)}
 .m{display:grid;grid-template-columns:96px 1fr 44px;align-items:center;gap:10px}
@@ -111,7 +111,7 @@ nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
       <div class="lbl">Reps en reserva (RIR)</div>
       <div class="rir">
         <button type="button" data-r="0">0</button><button type="button" data-r="1">1</button>
-        <button type="button" data-r="2">2</button><button type="button" data-r="3">3+</button>
+        <button type="button" data-r="2">2</button><button type="button" data-r="3">3</button><button type="button" data-r="4">4+</button>
       </div>
     </section>
     <div style="display:grid;gap:10px">
@@ -125,7 +125,7 @@ nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
     </table></div>
     <div class="acc"><button id="terminar" type="button">Terminar y guardar</button><button id="nueva" type="button">Nueva sesión</button></div>
     <p class="nota"><b>Cómo decide.</b> La congestión decae como e^(−t/110 s) y la capacidad se recupera como 1 − A·e^(−t/τ_C). El descanso es el que maximiza C·P: t* = τ_C·ln[A(τ_C+τ_P)/τ_C], con un ruido log-normal pequeño. Las mini-series tienen objetivo aleatorio entre 65 y 90 % de RTF·C. Cuando ya no da, el reloj no te deja parar: cambia a una variante más fácil en 10 s. El core cierra con 3 vacíos de duración sorteada por una ley de potencias entre 15 y 50 s.</p>
-    <p class="nota"><b>Series efectivas.</b> Cada sesión tiene una meta de series efectivas que se reparte entre los ejercicios. Una serie completa con 5 reps o más a 0–2 en reserva vale 1; con 3+ en reserva vale ½. Una mini-serie vale ½ (con 4 reps o más). Una isometría hasta el fallo vale ½ si dura 30 s. Los vacíos no cuentan. Si al cerrar un ejercicio falta meta, el reloj te da un descanso largo y otra ronda (hasta 3); si en una ronda nueva ya no logras ni ⅓ de serie efectiva, pasa al siguiente.</p>
+    <p class="nota"><b>Series efectivas.</b> Cada sesión tiene una meta de series efectivas que se reparte entre los ejercicios. Una serie completa con 5 reps o más vale 1 si te quedaban 0–1 en reserva, ¾ con 2, ¼ con 3 y nada con 4 o más: una serie suave no suma. Una mini-serie vale la mitad (con 4 reps o más). Una isometría hasta el fallo vale ½ si dura 30 s. Los vacíos no cuentan. Si al cerrar un ejercicio falta meta, el reloj te da un descanso largo y otra ronda (hasta 3); si en una ronda nueva ya no logras ni ⅓ de serie efectiva, pasa al siguiente.</p>
   </section>
 
   <section id="vHist" hidden style="display:flex;flex-direction:column;gap:10px">
@@ -218,11 +218,13 @@ function etiqueta(){const E=est();
 
 function empezar(){const t=now();beep(1320,.25);try{navigator.vibrate&&navigator.vibrate(250)}catch(e){}
   Object.assign(S,{st:'work',t0:t,last:t});render()}
-/* Serie efectiva (modelo de reps efectivas): serie completa con 5+ reps a RIR 0–2 = 1, con RIR 3+ = ½;
-   mini-serie = ½ (con 4+ reps); isometría hasta el fallo = ½ si dura 30 s; los vacíos no cuentan. */
+/* Serie efectiva (modelo de reps efectivas): serie completa con 5+ reps vale 1 a RIR 0–1, ¾ a RIR 2, ¼ a RIR 3 y 0 a RIR 4+
+   (una serie suave no suma); mini-serie = la mitad; isometría hasta el fallo = ½ si dura 30 s; los vacíos no cuentan.
+   El historial anterior guardaba «3+»: se cuenta como RIR 3. */
+const PESO_RIR={'0':1,'1':1,'2':.75,'3':.25,'3+':.25,'4+':0};
 function efectiva(r){
   if(r.rir==='—')return r.k==='isom.'?.5*Math.min(1,(parseInt(r.reps,10)||0)/30):0;
-  const R=parseInt(r.reps,10)||0,q=r.rir==='3+'?.5:1;
+  const R=parseInt(r.reps,10)||0,q=PESO_RIR[r.rir]??0;
   return r.k==='myo'?q*.5*Math.min(1,R/4):q*Math.min(1,R/5)}
 const efDe=sets=>sets.reduce((a,r)=>a+efectiva(r),0);
 const ef1=x=>(Math.round(x*10)/10).toString().replace('.',',');
@@ -253,7 +255,7 @@ function avanzar(ev){
   const R=ev.R,rir=ev.rir,p=R/(R+rir+1e-9);
   if(ph==='act'){S.R1=R;S.RTF=R+rir}
   bump(R,p,ev.dur,ph==='ext');S.nIn++;
-  const row={ex:E.s,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir===3?'3+':String(rir),P:S.P,rest:0};
+  const row={ex:E.s,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir>=4?'4+':String(rir),P:S.P,rest:0};
   const c=efectiva(row);S.efE+=c;S.ef+=c;
   if(ph==='ext')return cerrarEstacion(row);
   if(!faltaE())return siguienteEstacion(row);
