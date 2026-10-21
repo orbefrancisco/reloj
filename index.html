@@ -227,7 +227,11 @@ html[data-recto] *{border-radius:3px!important}
 #pad.work.cal{border-color:var(--amb)} #pad.work.cal #big,#pad.work.cal #mono{color:var(--amb)}
 #calSalta{align-self:center;margin-top:-6px}
 /* Mapa muscular, medallas, medidas, fotos */
-#mapa{width:100%;max-width:340px;height:auto;display:block;margin:0 auto}
+#mapa{width:100%;max-width:380px;height:auto;display:block;margin:0 auto}
+.musl{display:grid;gap:6px}.musf{display:grid;grid-template-columns:72px 1fr;gap:6px;align-items:start;font-size:12.5px}
+.musf>span:last-child{display:flex;flex-wrap:wrap;gap:4px}
+.musc{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);font-family:var(--mono);font-size:11.5px}
+.musc.on{border-color:var(--fg)}.musc i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .leg i.sq{width:12px;height:12px;border-radius:3px}
 .meds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .med{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;font-size:11.5px;line-height:1.25;min-width:0}
@@ -1057,27 +1061,76 @@ function renderProg(){
     <div class="leg"><span><i style="background:var(--art)"></i>1RM estimado</span><span><i style="background:var(--ven)"></i>peso de la primera serie</span></div>`
     :'<p class="hint">La gráfica aparece cuando tengas el peso anotado en al menos una sesión.</p>';
   if(ks.length){$('gSel').onchange=e=>{grafSel=e.target.value;renderProg()};dibujarGraf(grafSel)}
-  $('pMapa').innerHTML=mapaSVG(w);renderMedallas();renderMedidas();renderFotos()}
-/* ---------- mapa muscular: cada zona con el color de sus series efectivas de la semana ---------- */
-function mapaSVG(w){
-  const col=g=>{const v=w[g]||0,[lo,hi]=semRango(g);return v<=0?'var(--muted)':v<lo?'var(--amb)':v<=hi?'var(--cap)':'var(--art)'};
-  const z=(g,d)=>`<path d="${d}" fill="${col(g)}" fill-opacity="${(w[g]||0)>0?.9:.3}" stroke="var(--bg)" stroke-width="1"><title>${CAT[g].n}: ${ef1(w[g]||0)} de ${semRango(g).join('–')}</title></path>`;
-  const par=(g,d)=>z(g,d)+`<g transform="matrix(-1 0 0 1 100 0)">${z(g,d)}</g>`;   // lado izquierdo y su espejo
+  renderMapa();renderMedallas();renderMedidas();renderFotos()}
+/* ---------- mapa muscular por zonas: cada serie efectiva suma 1 al músculo principal del ejercicio y una fracción a los secundarios ---------- */
+// zona: [nombre, grupo, rango semanal de series efectivas (contando fracciones), nombre corto]
+const MUS={del_ant:['Deltoide anterior','hombros',[6,12],'anterior'],del_lat:['Deltoide lateral','hombros',[8,16],'lateral'],del_post:['Deltoide posterior','hombros',[6,12],'posterior'],
+ pecho_sup:['Pecho superior','pecho',[6,12],'superior'],pecho_med:['Pecho medio e inferior','pecho',[6,12],'medio'],
+ dorsal:['Dorsal ancho','espalda',[10,18],'dorsal'],esp_media:['Espalda media y trapecio','espalda',[6,12],'media'],lumbar:['Lumbar','espalda',[2,8],'lumbar'],
+ biceps:['Bíceps','biceps',[8,16],'bíceps'],antebrazo:['Braquial y antebrazo','biceps',[4,10],'antebrazo'],triceps:['Tríceps','triceps',[8,16],'tríceps'],
+ recto:['Recto abdominal','abdominales',[6,12],'recto'],oblicuos:['Oblicuos','abdominales',[3,8],'oblicuos'],
+ cuads:['Cuádriceps','piernas',[10,18],'cuádriceps'],isquios:['Isquiotibiales','piernas',[6,12],'isquios'],gluteos:['Glúteos','piernas',[6,12],'glúteos'],gemelos:['Gemelos','piernas',[6,12],'gemelos']};
+// Reglas por nombre del ejercicio (sin tildes, en orden: gana la primera). Una función recibe el grupo.
+const REGLAS_MUS=[
+ [/pallof|oblicu|rotaci|lenador/,{oblicuos:1,recto:.25}],[/femoral/,{isquios:1}],[/cuadriceps/,{cuads:1}],[/peso muerto|rumano/,{isquios:1,gluteos:.5,lumbar:.5}],
+ [/hip thrust|gluteo/,{gluteos:1,isquios:.25}],[/zancada|bulgara|estocada/,{cuads:1,gluteos:.75}],
+ [/sentadilla|prensa|hack|goblet/,{cuads:1,gluteos:.5}],[/talon|gemelo|pantorrilla/,{gemelos:1}],
+ [/martillo/,{antebrazo:1,biceps:.5}],[/curl/,{biceps:1,antebrazo:.25}],
+ [/press frances|extension|pushdown|patada|triceps/,{triceps:1}],[/press cerrado/,{triceps:1,pecho_med:.5,del_ant:.25}],
+ [/fondos/,g=>g==='triceps'?{triceps:1,pecho_med:.5,del_ant:.25}:{pecho_med:1,triceps:.5,del_ant:.25}],
+ [/flexiones? (diamante|cerrad)/,{triceps:1,pecho_med:.5}],
+ [/face pull|pajaro|posterior|cruce inverso/,{del_post:1,esp_media:.5}],[/menton/,{del_lat:1,esp_media:.5}],[/lateral/,{del_lat:1}],
+ [/jalon|dominada|pullover/,{dorsal:1,biceps:.5}],[/remo/,{esp_media:1,dorsal:.5,del_post:.5,biceps:.5}],
+ [/inclinad.*(press|banca)|(press|banca).*inclinad/,{pecho_sup:1,del_ant:.5,triceps:.5}],
+ [/militar|press.*(hombro|sentado)|arnold/,{del_ant:1,del_lat:.5,triceps:.5}],
+ [/press|banca|flexion|declinad/,g=>g==='hombros'?{del_ant:1,del_lat:.5,triceps:.5}:{pecho_med:1,del_ant:.5,triceps:.5}],
+ [/apertura|pec deck|cruce|contractora/,{pecho_med:1,pecho_sup:.25}],
+ [/crunch|rueda|elevaci.*pierna|colgad|rodillas al pecho|plancha/,{recto:1,oblicuos:.25}]];
+const MUS_DEF={biceps:{biceps:1},triceps:{triceps:1},espalda:{dorsal:1},pecho:{pecho_med:1},hombros:{del_lat:1},abdominales:{recto:1},piernas:{cuads:1}};
+function musculos(n,g){const t=sinTilde(n);if(/(^|\s)vacio(\s|$)/.test(t))return {};   // ojo: «elevaciones» contiene «vacio»
+  for(const [re,m] of REGLAS_MUS)if(re.test(t))return typeof m==='function'?m(g):m;return MUS_DEF[g]||{}}
+// Series efectivas por zona en la semana (off = semanas atrás) y de qué ejercicio vino cada aporte.
+function volMus(off){const a=lunes(Date.now())-off*7*864e5,b=a+7*864e5,v={},de={};
+  hist.forEach(h=>{const t=Date.parse(h.start),g=gDe(h);if(!g||!CAT[g]||t<a||t>=b)return;
+    (h.sets||[]).forEach(r=>{const c=efectiva(r);if(!c)return;const n=r.ej||(CAT[g].e.find(e=>e.s===r.ex)||{}).n||'';
+      for(const [m,f] of Object.entries(musculos(n,g))){v[m]=(v[m]||0)+c*f;(de[m]=de[m]||{})[n]=(de[m][n]||0)+c*f}})});
+  return {v,de}}
+let mapaOff=0,mapaSel='';
+const colMus=(m,v)=>{const x=v[m]||0,[lo,hi]=MUS[m][2];return x<=0?'var(--muted)':x<lo?'var(--amb)':x<=hi?'var(--cap)':'var(--art)'};
+function mapaSVG(){
+  const {v,de}=volMus(mapaOff);
+  const z=(m,d)=>`<path d="${d}" data-m="${m}" fill="${colMus(m,v)}" fill-opacity="${(v[m]||0)>0?.9:.3}" stroke="${m===mapaSel?'var(--fg)':'var(--bg)'}" stroke-width="${m===mapaSel?1.6:.8}" style="cursor:pointer"><title>${MUS[m][0]}: ${ef1(v[m]||0)} de ${MUS[m][2].join('–')}</title></path>`;
+  const par=(m,d)=>z(m,d)+`<g transform="matrix(-1 0 0 1 100 0)">${z(m,d)}</g>`;   // lado izquierdo y su espejo
   const neu=d=>`<path d="${d}" fill="var(--soft)" stroke="var(--line)" stroke-width="1"/>`;
   const base=`<circle cx="50" cy="17" r="11" fill="var(--soft)" stroke="var(--line)"/>${neu('M46 27h8v8h-8z')}${neu('M34 35Q50 30 66 35L65 62L62 98H38L35 62Z')}
     ${neu('M23 74L17 103L24 104L31 75Z')}${neu('M77 74L83 103L76 104L69 75Z')}<circle cx="20" cy="109" r="4.5" fill="var(--soft)" stroke="var(--line)"/><circle cx="80" cy="109" r="4.5" fill="var(--soft)" stroke="var(--line)"/>
     ${neu('M37 96H63L64 104H36Z')}${neu('M40 184H48L49 191H37Z')}${neu('M60 184H52L51 191H63Z')}`;
-  const hom='M25 47Q25 35 36 34L37 46Q31 50 25 47Z',brazo='M25 50Q31 52 36 50L34 71Q29 74 23 72Q22 60 25 50Z',
-    muslo='M37 105H49L48 146Q42 149 39 146Q34 125 37 105Z',gemelo='M39 150H48L47 181H41Q36 166 39 150Z';
-  const frente=base+par('hombros',hom)+par('pecho','M38 37Q44 35 49 37V55Q42 58 37 53Z')+z('abdominales','M39 59Q50 62 61 59L60 93Q50 97 40 93Z')
-    +par('biceps',brazo)+par('piernas',muslo)+par('piernas',gemelo);
-  const atras=base+par('hombros',hom)+z('espalda','M37 35Q50 31 63 35L66 46L61 70Q50 78 39 70L34 46Z')+par('triceps',brazo)
-    +par('piernas','M37 99Q43 97 49 99V113Q42 116 37 111Z')+par('piernas','M37 117H49L48 146Q42 149 39 146Q35 130 37 117Z')+par('piernas',gemelo);
+  const lat='M25 47Q24 37 31 34.5L30 48Q27 48.5 25 47Z',brazo='M25 50Q31 52 36 50L34 71Q29 74 23 72Q22 60 25 50Z',
+    ante='M23 74L17 103L24 104L31 75Z',gemelo='M39 150H48L47 181H41Q36 166 39 150Z';
+  const frente=base+par('del_lat',lat)+par('del_ant','M31 34.5Q34 33.8 36 34L37 46Q33 49 30 48Z')
+    +par('pecho_sup','M38 37Q44 35 49 37V45Q43 46 38 44Z')+par('pecho_med','M38 45.5Q43 47.5 49 46.5V55Q42 58 37 53Z')
+    +z('recto','M43.5 60Q50 62 56.5 60L56.5 93Q50 96 43.5 93Z')+par('oblicuos','M39 59.5Q41.5 60.2 43 60.2L43 93Q41 93 40 92Z')
+    +par('biceps',brazo)+par('antebrazo',ante)+par('cuads','M37 105H49L48 146Q42 149 39 146Q34 125 37 105Z')+par('gemelos',gemelo);
+  const atras=base+par('del_lat',lat)+par('del_post','M31 34.5Q34 33.8 36 34L37 46Q33 49 30 48Z')
+    +z('esp_media','M38.5 35Q50 30.5 61.5 35L58 50Q50 54 42 50Z')+par('dorsal','M34.5 45L38 36.5L42.5 50.5Q46 53.5 50 54V73Q44 76 39.5 70.5Z')
+    +z('lumbar','M41 74.5Q50 78.5 59 74.5L60 94Q50 97 40 94Z')+par('triceps',brazo)
+    +par('gluteos','M37 99Q43 97 49 99V113Q42 116 37 111Z')+par('isquios','M37 117H49L48 146Q42 149 39 146Q35 130 37 117Z')+par('gemelos',gemelo);
   const t=(x,s)=>`<text x="${x}" y="203" text-anchor="middle" font-size="9" fill="var(--muted)" font-family="var(--mono)">${s}</text>`;
-  return `<svg id="mapa" viewBox="0 0 212 206" role="img" aria-label="Mapa muscular de la semana">${frente}<g transform="translate(112 0)">${atras}</g>${t(50,'FRENTE')}${t(162,'ESPALDA')}</svg>
+  let det='<p class="hint" style="text-align:center">Toca una zona para ver de qué ejercicios vienen sus series.</p>';
+  if(mapaSel&&MUS[mapaSel]){const [n,,r]=MUS[mapaSel],x=v[mapaSel]||0,ap=Object.entries(de[mapaSel]||{}).sort((a,b)=>b[1]-a[1]);
+    det=`<p style="margin:0;font-size:14px"><b>${n}</b>: ${ef1(x)} de ${r.join('–')} series efectivas · ${x<=0?'sin series':x<r[0]?`faltan ${ef1(r[0]-x)}`:x<=r[1]?'en rango':'te pasaste'}</p>
+      <p class="hint">${ap.length?'Vienen de: '+ap.map(([e,c])=>`${esc(e)} ${ef1(c)}`).join(' · '):'Ningún ejercicio de esta semana la trabajó.'}</p>`}
+  const lista=Object.keys(CAT).map(g=>{const ms=Object.keys(MUS).filter(m=>MUS[m][1]===g);
+    return `<div class="musf"><span>${CAT[g].n}</span><span>${ms.map(m=>`<button type="button" data-m="${m}" class="musc${m===mapaSel?' on':''}"><i style="background:${colMus(m,v)}"></i>${MUS[m][3]} ${ef1(v[m]||0)}</button>`).join('')}</span></div>`}).join('');
+  return `<div class="calnav"><button type="button" data-moff="1" aria-label="Semana anterior" ${mapaOff>=8?'disabled':''}>‹</button><b>${mapaOff===0?'Esta semana':mapaOff===1?'Semana pasada':`Hace ${mapaOff} semanas`}</b><button type="button" data-moff="-1" aria-label="Semana siguiente" ${mapaOff<=0?'disabled':''}>›</button></div>
+    <svg id="mapa" viewBox="0 0 212 206" role="img" aria-label="Mapa muscular por zonas">${frente}<g transform="translate(112 0)">${atras}</g>${t(50,'FRENTE')}${t(162,'ESPALDA')}</svg>
     <div class="leg" style="justify-content:center"><span><i class="sq" style="background:var(--muted);opacity:.4"></i>sin series</span><span><i class="sq" style="background:var(--amb)"></i>por debajo</span>
     <span><i class="sq" style="background:var(--cap)"></i>en rango</span><span><i class="sq" style="background:var(--art)"></i>te pasaste</span></div>
-    <p class="hint" style="text-align:center">Series efectivas de la semana frente al rango para ganar músculo.</p>`}
+    ${det}<div class="musl">${lista}</div>
+    <p class="hint">Cada serie efectiva suma 1 al músculo principal del ejercicio y una fracción a los que ayudan (por ejemplo, el press inclinado suma ½ al deltoide anterior y ½ al tríceps). Las barras por grupo de arriba cuentan solo el grupo que elegiste.</p>`}
+function renderMapa(){$('pMapa').innerHTML=mapaSVG()}
+$('pMapa').addEventListener('click',e=>{const o=e.target.closest('[data-moff]');if(o){mapaOff=Math.max(0,Math.min(8,mapaOff+ +o.dataset.moff));renderMapa();return}
+  const m=e.target.closest('[data-m]');if(m){mapaSel=mapaSel===m.dataset.m?'':m.dataset.m;renderMapa()}});
 /* ---------- medallas: se calculan del historial; las ya vistas se recuerdan para avisar solo las nuevas ---------- */
 const MEDKEY='reloj-anomalo-medallas';
 const MEDALLAS=[
