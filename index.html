@@ -45,7 +45,7 @@ h2{font-family:var(--disp);font-weight:600;font-size:18px;letter-spacing:.04em;t
 .pb{border:1px solid var(--line);border-radius:12px;padding:8px;font-size:11.5px;line-height:1.3;background:var(--surface);min-width:0}
 .pb b{display:block;font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.03em;text-transform:uppercase}
 .pb span{color:var(--muted)} .pb.on{border-color:var(--fg)} .pb.ok{opacity:.5}
-#pad{width:100%;min-height:260px;border:2px solid var(--art);border-radius:20px;padding:22px 16px 26px;display:flex;flex-direction:column;
+#pad{width:100%;min-height:300px;border:2px solid var(--art);border-radius:20px;padding:22px 16px 26px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:4px;position:relative;overflow:hidden;user-select:none}
 #pad.rest{border-color:var(--ven)} #pad.trans,#pad.shift{border-color:var(--cap)} #pad.report,#pad.done{border-color:var(--line)}
 #kind{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center}
@@ -86,6 +86,40 @@ th:first-child,td:first-child{text-align:left} th{color:var(--muted);font-weight
 nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px 14px;border-top:1px solid var(--line);background:var(--surface)}
 nav button{height:54px;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:500;color:var(--muted)}
 nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
+/* Muñeco: una pose por estado del reloj. Trabajo = curl alterno (isometría: brazos a 90° temblando; vacío: respira),
+   descanso = sentado en el banco, cambio = camina, terminada = celebra. Las articulaciones giran en coordenadas del viewBox. */
+#mono{width:96px;height:96px;color:var(--muted);overflow:visible;flex:none;margin-bottom:2px}
+#mono g{transform-box:view-box}
+#pad.work #mono{color:var(--art)} #pad.rest #mono{color:var(--ven)} #pad.trans #mono,#pad.shift #mono{color:var(--cap)} #pad.done #mono{color:var(--cap)}
+#mono .sentado{display:none} #pad.rest #mono .sentado{display:inline} #pad.rest #mono .pie{display:none}
+#mono .pie{transform-origin:50px 88px} #mono .resp{transform-origin:47px 72px}
+#mono .bl,#mono .br{transform-origin:50px 31px} #mono .al{transform-origin:40px 49px} #mono .ar{transform-origin:60px 49px}
+#mono .pl,#mono .pr{transform-origin:50px 58px}
+#mono .z{opacity:0}
+@keyframes curlL{0%,100%{transform:rotate(0)}50%{transform:rotate(150deg)}}
+@keyframes curlR{0%,100%{transform:rotate(0)}50%{transform:rotate(-150deg)}}
+@keyframes holdL{0%,100%{transform:rotate(88deg)}50%{transform:rotate(93deg)}}
+@keyframes holdR{0%,100%{transform:rotate(-88deg)}50%{transform:rotate(-93deg)}}
+@keyframes respira{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.035)}}
+@keyframes pasoA{0%,100%{transform:rotate(10deg)}50%{transform:rotate(-6deg)}}
+@keyframes pasoB{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(6deg)}}
+@keyframes bota{0%,50%,100%{transform:translateY(0)}25%,75%{transform:translateY(-3px)}}
+@keyframes salta{0%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+@keyframes zz{0%{opacity:0;transform:translate(0,0)}25%{opacity:1}100%{opacity:0;transform:translate(6px,-14px)}}
+#mono .pie{animation:respira 3s ease-in-out infinite}
+#pad.work:not([data-fase=hold]):not([data-fase=vac]) #mono .al{animation:curlL 1.8s ease-in-out infinite}
+#pad.work:not([data-fase=hold]):not([data-fase=vac]) #mono .ar{animation:curlR 1.8s ease-in-out -.9s infinite}
+#pad.work[data-fase=hold] #mono .al{transform:rotate(90deg);animation:holdL .14s linear infinite}
+#pad.work[data-fase=hold] #mono .ar{transform:rotate(-90deg);animation:holdR .14s linear infinite}
+#pad.work[data-fase=vac] #mono .pie{animation:respira 1.6s ease-in-out infinite}
+#pad.trans #mono .pl,#pad.shift #mono .pl{animation:pasoA .8s ease-in-out infinite}
+#pad.trans #mono .pr,#pad.shift #mono .pr{animation:pasoB .8s ease-in-out infinite}
+#pad.done #mono .bl{transform:rotate(115deg)} #pad.done #mono .br{transform:rotate(-115deg)}
+#pad.trans #mono .pie,#pad.shift #mono .pie{animation:bota .8s ease-in-out infinite}
+#pad.done #mono .pie{animation:salta .9s ease-in-out infinite}
+#pad.rest #mono .resp{animation:respira 3.2s ease-in-out infinite}
+#pad.rest #mono .z{animation:zz 2.4s ease-out infinite} #pad.rest #mono .z2{animation-delay:1.2s}
+@media (prefers-reduced-motion: reduce){#mono *{animation:none!important}}
 /* Estilos visuales: cada uno redefine las variables de color y letra (ver ESTILOS abajo). */
 html[data-recto] *{border-radius:3px!important}
 #estilos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -139,6 +173,26 @@ aplicarEstilo(estilo);
     <div id="meta"></div>
     <div id="plan"></div>
     <button id="pad" type="button">
+      <svg id="mono" viewBox="0 0 100 100" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+        <g class="pie">
+          <circle cx="50" cy="16" r="8" fill="currentColor" stroke="none"/>
+          <path d="M50 26V58"/>
+          <g class="pl"><path d="M50 58L42 88"/></g><g class="pr"><path d="M50 58L58 88"/></g>
+          <g class="bl"><path d="M50 31L40 49"/><g class="al"><path d="M40 49V67"/><path d="M34 69h12" stroke-width="3"/><path d="M34 64v10M46 64v10" stroke-width="4"/></g></g>
+          <g class="br"><path d="M50 31L60 49"/><g class="ar"><path d="M60 49V67"/><path d="M54 69h12" stroke-width="3"/><path d="M54 64v10M66 64v10" stroke-width="4"/></g></g>
+        </g>
+        <g class="sentado">
+          <path d="M16 76h66M22 76v16M76 76v16" stroke-width="4" opacity=".45"/>
+          <path d="M14 94h14" stroke-width="3" opacity=".6"/><path d="M14 89v10M28 89v10" stroke-width="4" opacity=".6"/>
+          <g class="resp">
+            <circle cx="44" cy="38" r="8" fill="currentColor" stroke="none"/>
+            <path d="M46 47L48 72"/><path d="M47 52L60 68"/>
+            <path d="M48 72H66V94"/><path d="M48 72L60 76L58 94"/>
+          </g>
+          <text class="z" x="58" y="30" font-size="12" fill="currentColor" stroke="none" font-family="var(--mono)">z</text>
+          <text class="z z2" x="64" y="22" font-size="15" fill="currentColor" stroke="none" font-family="var(--mono)">z</text>
+        </g>
+      </svg>
       <span id="kind">Toca para empezar</span>
       <span id="big">—</span>
       <span id="sub"></span>
@@ -415,7 +469,7 @@ function render(){
   else if(['rest','shift','trans'].indexOf(S.st)>=0){cls=S.st;big=Math.max(0,Math.ceil(S.restDur-e));bar=Math.min(100,100*e/Math.max(1,S.restDur));
     kind=S.st==='rest'?`Descanso óptimo · t* = ${Math.round(S.restDur)} s`:S.st==='shift'?'Cambio mecánico · ya':S.esRonda?`Otra ronda · faltan ${ef1(S.metaE[S.sec]-S.efE)} efectivas`:'Cambio de estación';sub=S.label+' · toca para saltar'}
   else if(S.st==='done'){cls='done';kind='Sesión terminada · bajo congestión';big=fmt(S.tuc);sub=`${ef1(S.ef)} de ${S.meta} series efectivas${S.ef<S.meta-.05?' (no alcanzada)':' ✓'} · ${S.sets.length} series · ${Math.round(S.iso)} s de isometría · guardada`}
-  pad.className=cls;$('kind').textContent=kind;$('big').textContent=big;$('sub').textContent=sub;$('bar').style.width=bar+'%';
+  pad.className=cls;pad.dataset.fase=S.st==='work'?S.phase:'';$('kind').textContent=kind;$('big').textContent=big;$('sub').textContent=sub;$('bar').style.width=bar+'%';
   $('report').hidden=S.st!=='report';$('done').textContent=S.hechas;
   $('fP').style.width=(S.P*100)+'%';$('vP').textContent=S.P.toFixed(2);
   $('fC').style.width=(S.C*100)+'%';$('vC').textContent=S.C.toFixed(2);
