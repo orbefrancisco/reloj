@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="icono-192.png">
 <meta name="theme-color" content="#140d0f">
 <meta name="robots" content="noindex, nofollow">
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Reloj anómalo de congestión: mismo motor que los relojes de Bíceps y Brazo y Core, para 7 grupos.
    Color = estado: arterial (trabajo), venoso (descanso), verde (cambio de fase). */
@@ -83,10 +83,52 @@ th:first-child,td:first-child{text-align:left} th{color:var(--muted);font-weight
 .card .g{font-family:var(--disp);font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.03em}
 .card .meta{display:flex;flex-wrap:wrap;gap:14px;font-family:var(--mono);font-size:12px}
 .muted{color:var(--muted)}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 12px 14px;border-top:1px solid var(--line);background:var(--surface)}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px 14px;border-top:1px solid var(--line);background:var(--surface)}
 nav button{height:54px;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:500;color:var(--muted)}
 nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
+/* Estilos visuales: cada uno redefine las variables de color y letra (ver ESTILOS abajo). */
+html[data-recto] *{border-radius:3px!important}
+#estilos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.est{border:2px solid var(--e-line);border-radius:16px;padding:12px;background:var(--e-bg);color:var(--e-fg);text-align:left;display:flex;flex-direction:column;gap:6px;min-width:0}
+.est[aria-pressed="true"]{outline:3px solid var(--art);outline-offset:2px}
+.est .en{font-family:var(--e-disp);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.03em;line-height:1}
+.est .eb{font-family:var(--e-disp);font-weight:800;font-size:44px;line-height:.9;color:var(--e-art);font-variant-numeric:tabular-nums}
+.est .ed{display:flex;gap:6px} .est .ed i{width:16px;height:16px;border-radius:50%;display:block}
+.est .ex{font-family:var(--e-body);font-size:12px;color:var(--e-muted);line-height:1.35}
 </style>
+<script>
+// Estilos visuales. art = trabajo, ven = descanso, cap = cambio de fase; tienen que distinguirse bien entre sí.
+const ESTILOS={
+ arterial:{n:'Arterial',d:'El original. Claro u oscuro según el teléfono.'},
+ medianoche:{n:'Medianoche',d:'Negro puro, colores neón. Ahorra batería en pantallas OLED.',oscuro:1,
+  v:{bg:'#000000',surface:'#0b0b0f',fg:'#f5f5f7',muted:'#8e8e9c',line:'#23232d',soft:'#17171f',art:'#ff2d55',ven:'#5ac8fa',cap:'#30d158'}},
+ hierro:{n:'Hierro',d:'Acero y amarillo de advertencia, esquinas rectas.',oscuro:1,recto:1,
+  v:{bg:'#1b1d20',surface:'#24272b',fg:'#ece8df',muted:'#9d998f',line:'#3a3e44',soft:'#2f3337',art:'#ffb800',ven:'#8fa8c4',cap:'#62d394'}},
+ oceano:{n:'Océano',d:'Azul profundo con coral.',oscuro:1,
+  v:{bg:'#04151f',surface:'#082231',fg:'#e2f3f8',muted:'#80a7b6',line:'#13394b',soft:'#0d2e40',art:'#ff7a59',ven:'#3fb8e0',cap:'#7ee0b5',
+     disp:'"Space Grotesk",system-ui,sans-serif'}},
+ terminal:{n:'Terminal',d:'Fósforo verde y todo en letra de máquina.',oscuro:1,recto:1,
+  v:{bg:'#050805',surface:'#0a110a',fg:'#b9f5b1',muted:'#64935e',line:'#1a331a',soft:'#102010',art:'#39ff14',ven:'#00d1ff',cap:'#ffd23f',
+     disp:'"IBM Plex Mono",ui-monospace,monospace',body:'"IBM Plex Mono",ui-monospace,monospace'}},
+ papel:{n:'Papel',d:'Crema y tinta, letra con serifa.',
+  v:{bg:'#f3ecdf',surface:'#faf6ee',fg:'#2a2420',muted:'#7a6f63',line:'#dccfbc',soft:'#ebe1cf',art:'#a3352a',ven:'#2f5d73',cap:'#55752f',
+     disp:'Fraunces,Georgia,serif'}},
+ sol:{n:'Pleno sol',d:'Contraste máximo para leer al aire libre.',
+  v:{bg:'#ffffff',surface:'#ffffff',fg:'#000000',muted:'#3a3a3a',line:'#1a1a1a',soft:'#ffe600',art:'#d10000',ven:'#0033cc',cap:'#00703a'}}
+};
+const EKEY='reloj-anomalo-estilo';
+let estilo='arterial';try{estilo=localStorage.getItem(EKEY)||'arterial'}catch(e){}
+function aplicarEstilo(id){
+  if(!ESTILOS[id])id='arterial';estilo=id;
+  const E=ESTILOS[id],r=document.documentElement;
+  ['bg','surface','fg','muted','line','soft','art','ven','cap','disp','body'].forEach(k=>r.style.removeProperty('--'+k));
+  Object.entries(E.v||{}).forEach(([k,x])=>r.style.setProperty('--'+k,x));
+  r.style.colorScheme=E.v?(E.oscuro?'dark':'light'):'';
+  r.toggleAttribute('data-recto',!!E.recto);
+  const osc=E.v?E.oscuro:matchMedia('(prefers-color-scheme: dark)').matches;
+  document.querySelector('meta[name="theme-color"]').content=E.v?E.v.bg:(osc?'#140d0f':'#f4efef')}
+aplicarEstilo(estilo);
+</script>
 </head>
 <body>
 <main>
@@ -139,6 +181,12 @@ nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
     <p id="ioMsg" class="muted" style="font-size:13px;margin:0" aria-live="polite"></p>
     <div id="hist"></div>
   </section>
+
+  <section id="vEstilo" hidden style="display:flex;flex-direction:column;gap:10px">
+    <h2>Estilo visual</h2>
+    <p class="muted" style="font-size:13px;margin:0">Solo cambia el aspecto; el reloj funciona igual. Rojo, azul y verde siguen significando trabajo, descanso y cambio de fase en cada estilo, con sus propios tonos.</p>
+    <div id="estilos"></div>
+  </section>
 </main>
 
 <nav aria-label="Secciones">
@@ -147,6 +195,9 @@ nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
   </button>
   <button id="tHist" type="button">
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span>Historial</span>
+  </button>
+  <button id="tEstilo" type="button">
+    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2l-.3-.8c-.4-1.1.4-2.2 1.6-2.2H17a4 4 0 0 0 4-4c0-5-4-9-9-9z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="8" r="1.2"/></svg><span>Estilo</span>
   </button>
 </nav>
 
@@ -314,6 +365,16 @@ $('terminar').onclick=()=>{if(S.sets.length){S.st='done';guardar(true);render()}
 $('nueva').onclick=()=>{S=fresh();$('save').textContent='Sin guardar aún';render()};
 $('tReloj').onclick=()=>{tab='reloj';render()};
 $('tHist').onclick=()=>{tab='historial';render()};
+$('tEstilo').onclick=()=>{tab='estilo';renderEstilos();render()};
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>aplicarEstilo(estilo));
+function renderEstilos(){
+  const fb={bg:'#f4efef',fg:'#1d1416',muted:'#78676b',line:'#e3d8d9',art:'#b3172c',ven:'#2e4a8c',cap:'#1d7658'};
+  const osc=matchMedia('(prefers-color-scheme: dark)').matches?{bg:'#140d0f',fg:'#f2e7e9',muted:'#a8959a',line:'#2e2225',art:'#f0435a',ven:'#7f9be2',cap:'#4fc99d'}:fb;
+  $('estilos').innerHTML=Object.entries(ESTILOS).map(([id,E])=>{const v={...osc,...(E.v||{})};
+    const st=`--e-bg:${v.bg};--e-fg:${v.fg};--e-muted:${v.muted};--e-line:${v.line};--e-art:${v.art};--e-disp:${v.disp||'"Big Shoulders Display",Impact,sans-serif'};--e-body:${v.body||'"IBM Plex Sans",system-ui,sans-serif'}${E.recto?';border-radius:3px':''}`;
+    return `<button type="button" class="est" data-e="${id}" aria-pressed="${id===estilo}" style='${st}'><span class="en">${E.n}</span><span class="eb">1:24</span>
+      <span class="ed"><i style="background:${v.art}"></i><i style="background:${v.ven}"></i><i style="background:${v.cap}"></i></span><span class="ex">${E.d}</span></button>`}).join('');
+  $('estilos').querySelectorAll('.est').forEach(b=>b.onclick=()=>{aplicarEstilo(b.dataset.e);try{localStorage.setItem(EKEY,estilo)}catch(e){}renderEstilos()})}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')lock=null});
 
 function renderGrupos(){
@@ -335,9 +396,8 @@ function renderHist(){
 let lastG=null,lastEn=null;
 function render(){
   const G=CAT[grupo],E=est(),e=Math.max(0,now()-S.t0),pad=$('pad');
-  $('vReloj').hidden=tab!=='reloj';$('vHist').hidden=tab!=='historial';
-  $('vReloj').style.display=tab==='reloj'?'flex':'none';$('vHist').style.display=tab==='historial'?'flex':'none';
-  $('tReloj').setAttribute('aria-current',tab==='reloj'?'page':'false');$('tHist').setAttribute('aria-current',tab==='historial'?'page':'false');
+  [['vReloj','tReloj','reloj'],['vHist','tHist','historial'],['vEstilo','tEstilo','estilo']].forEach(([v,t,k])=>{
+    $(v).hidden=tab!==k;$(v).style.display=tab===k?'flex':'none';$(t).setAttribute('aria-current',tab===k?'page':'false')});
   $('gnom').textContent=G.n;
   $('blk').textContent=S.st==='idle'?'3 estaciones':S.st==='done'?'Completa':`Estación ${S.sec+1}/3 · ${E.s}`
     +(S.metaE[S.sec]?` · ${ef1(S.efE)}/${S.metaE[S.sec]} ef.`:'')+(S.ronda>1?` · ronda ${S.ronda}`:'');
