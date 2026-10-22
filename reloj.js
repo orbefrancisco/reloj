@@ -1248,7 +1248,11 @@ $('bien').onclick=e=>{const t=e.target.closest('button');if(!t)return;const a=t.
     if(pideBien){pideBien=false;render();$('pad').onclick();return}}
   render()};
 /* ---------- progreso ---------- */
-const SEM={abdominales:[8,16]},semRango=g=>SEM[g]||[12,20];   // series efectivas por semana para hipertrofia
+const SEM={abdominales:[8,16]},semRango=g=>SEM[g]||[12,20];   // series efectivas por semana para hipertrofia (por GRUPO)
+/* Estado de un volumen frente a su rango → clase y color, el MISMO en el mapa, las barras de Progreso y el resumen en imagen
+   (variables --m0/--mlo/--mok/--mhi de cada estilo, ver estilo.js). Rangos: semRango(g) para grupos, MUS[m][2] para zonas. */
+const estadoVol=(x,[lo,hi])=>x<=0?'z0':x<lo?'zlo':x<=hi?'zok':'zhi';
+const EST_MUS={z0:'sin series',zlo:'por debajo',zok:'en rango',zhi:'te pasaste'},EST_VAR={z0:'m0',zlo:'mlo',zok:'mok',zhi:'mhi'};
 const CORTO={biceps:'Bí',triceps:'Tr',espalda:'Es',pecho:'Pe',hombros:'Ho',abdominales:'Ab',piernas:'Pi'};
 const lunes=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
 const efH=h=>h.efectivas!=null?h.efectivas:efDe(h.sets||[]);
@@ -1262,12 +1266,16 @@ function racha(){const d=Object.keys(porDia()).sort().reverse();if(!d.length||nD
 let calOff=0,grafSel='';
 function renderProg(){
   $('pDesc').innerHTML=bannerDesc();
-  const w=semana(0),w1=semana(1),dias=new Set(hist.filter(h=>Date.parse(h.start)>=lunes(Date.now())).map(h=>diaK(Date.parse(h.start)))).size;
-  $('pSem').innerHTML=`<p class="hint">Series efectivas desde el lunes · ${dias} ${dias===1?'día':'días'} entrenados. Para ganar músculo: ${semRango('pecho').join('–')} por grupo (abdomen ${semRango('abdominales').join('–')}). La raya marca ese rango.</p>
-    <p class="hint"><b>Cómo se cuenta:</b> cada serie suma al grupo del músculo principal y la fracción de los que ayudan, como en el mapa (press inclinado: pecho 1, hombros ½, tríceps ½).</p>`
-    +Object.keys(CAT).map(g=>{const v=w[g]||0,[lo,hi]=semRango(g),tope=hi*1.3,col=v<lo?'var(--amb)':v<=hi?'var(--cap)':'var(--art)';
-      return `<div class="sem"><span>${CAT[g].n}</span><div class="track"><span class="banda" style="left:${100*lo/tope}%;width:${100*(hi-lo)/tope}%"></span><div class="fill" style="width:${Math.min(100,100*v/tope)}%;background:${col}"></div></div>
-        <span class="val">${ef1(v)} <small>/ ${lo}–${hi}</small></span></div>`}).join('')
+  const V=volSemana(0),w1=semana(1),dias=new Set(hist.filter(h=>Date.parse(h.start)>=lunes(Date.now())).map(h=>diaK(Date.parse(h.start)))).size;
+  $('pSem').innerHTML=`<p class="hint">Series efectivas desde el lunes · ${dias} ${dias===1?'día':'días'} entrenados. Rango por grupo para ganar músculo: ${semRango('pecho').join('–')} (abdomen ${semRango('abdominales').join('–')}); la raya lo marca. Las zonas del mapa tienen rangos propios.</p>
+    <p class="hint"><b>Cómo se cuenta:</b> <b>directas</b> = series de ejercicios cuyo músculo principal es del grupo; <b>indirectas</b> = fracción de los que ayudan (press inclinado: hombros ½, tríceps ½). Cada serie cuenta una sola vez por grupo; en el mapa, una serie puede sumar a dos zonas del mismo grupo, por eso las zonas pueden sumar más.</p>`
+    +Object.keys(CAT).map(g=>{const o=V.grupos[g]||{dir:0,ind:0,solape:0,sinDetalle:0},v=V.grupo(g),[lo,hi]=semRango(g),tope=hi*1.3,est=estadoVol(v,[lo,hi]),zs=zonasDe(g);
+      const zTxt=zs.map(m=>`${esc(MUS[m][3])} ${ef1(V.zona(m))}`).join(' + '),sz=zs.reduce((s,m)=>s+V.zona(m),0);
+      const det=[`directas ${ef1(o.dir)} · indirectas ${ef1(o.ind)}`];
+      if(zs.length>1||o.solape>.05)det.push(`zonas: ${zTxt}${o.solape>.05?` = ${ef1(sz)} (${ef1(o.solape)} es la misma serie en dos zonas)`:''}`);
+      if(o.sinDetalle>.05)det.push(`${ef1(o.sinDetalle)} de sesiones sin detalle por ejercicio (no salen en el mapa)`);
+      return `<div class="sem" data-g="${g}" data-v="${v}" data-est="${est}"><span>${CAT[g].n}</span><div class="track"><span class="banda" style="left:${100*lo/tope}%;width:${100*(hi-lo)/tope}%"></span><div class="fill" style="width:${Math.min(100,100*v/tope)}%;background:var(--${EST_VAR[est]})"></div></div>
+        <span class="val">${ef1(v)} <small>/ ${lo}–${hi}</small></span></div><p class="semd">${det.join(' · ')}</p>`}).join('')
     +`<p class="hint">Semana pasada: ${Object.keys(CAT).filter(g=>w1[g]).map(g=>`${CAT[g].n.toLowerCase()} ${ef1(w1[g])}`).join(' · ')||'sin entrenos'}.</p>`;
   // constancia
   const pd=porDia(),r=racha(),base=new Date();base.setDate(1);base.setMonth(base.getMonth()+calOff);
@@ -1388,26 +1396,37 @@ function musculos(n,g){const t=sinTilde(n);if(/(^|\s)vacio(\s|$)/.test(t))return
   for(const [re,m] of REGLAS_MUS)if(re.test(t))return typeof m==='function'?m(g):m;return MUS_DEF[g]||{}}
 // Nombre del ejercicio de una fila (las sesiones viejas sin «ej» se reconocen por el nombre corto de la estación).
 const nomFila=(r,g)=>r.ej||(CAT[g].e.find(e=>e.s===r.ex)||BASE[g].e.find(e=>e.s===r.ex)||{}).n||'';
-// Series efectivas por zona en [a, b) y de qué ejercicio vino cada aporte; volMus(off) = la semana off.
-function volMusR(a,b){const v={},de={};
+/* ---------- volumen efectivo: UNA sola cuenta para todas las vistas (v19) ----------
+   Cada serie vale efectiva(r) (0–1). musculos() dice a qué zonas va y con qué factor: 1 = zona principal → serie DIRECTA;
+   ½, ¼… = zonas que ayudan → volumen INDIRECTO ponderado. Coeficientes y reglas no cambian; solo se cuentan en un único sitio.
+   · Zona (mapa): suma c × f de todas las series (directas + indirectas).
+   · Grupo (barras de Progreso, «qué toca», resumen en imagen, medallas, comparar): cada serie cuenta UNA vez por grupo, con el
+     MAYOR factor entre sus zonas de ese grupo; es directa si su zona principal es de ese grupo.
+   · Por eso las zonas de un grupo pueden sumar MÁS que el grupo. solape = lo que una misma serie aporta a una segunda zona del
+     mismo grupo (aperturas: pecho medio 1 + pecho superior ¼ → zonas 1,25, grupo 1; press sentado: deltoide anterior 1 + lateral ½).
+   · Sesión sin series detalladas (registros viejos o importados): su total va al grupo como directas y a sinDetalle, pero a
+     ninguna zona, porque no se sabe qué ejercicios fueron.
+   Identidad (la comprueban las pruebas): Σ zonas del grupo = grupo − sinDetalle + solape.
+   [a, b) en milisegundos; las vistas semanales usan a = lunes 00:00 de la semana. */
+function volumen(a,b){const Z={},G={};
+  const zona=m=>Z[m]||(Z[m]={dir:0,ind:0,de:{}}),grupo=g=>G[g]||(G[g]={dir:0,ind:0,solape:0,sinDetalle:0});
   hist.forEach(h=>{const t=Date.parse(h.start),g=gDe(h);if(!g||!CAT[g]||t<a||t>=b)return;
-    (h.sets||[]).forEach(r=>{const c=efectiva(r);if(!c)return;const n=nomFila(r,g);
-      for(const [m,f] of Object.entries(musculos(n,g))){v[m]=(v[m]||0)+c*f;(de[m]=de[m]||{})[n]=(de[m][n]||0)+c*f}})});
-  return {v,de}}
+    if(!(h.sets||[]).length){const x=efH(h),o=grupo(g);o.dir+=x;o.sinDetalle+=x;return}
+    h.sets.forEach(r=>{const c=efectiva(r);if(!c)return;const n=nomFila(r,g),porG={};
+      for(const [m,f] of Object.entries(musculos(n,g))){const z=zona(m);if(f>=1)z.dir+=c*f;else z.ind+=c*f;z.de[n]=(z.de[n]||0)+c*f;
+        if(MUS[m])(porG[MUS[m][1]]=porG[MUS[m][1]]||[]).push(f)}
+      for(const k in porG){const fs=porG[k],mx=Math.max(...fs),o=grupo(k);if(mx>=1)o.dir+=c*mx;else o.ind+=c*mx;o.solape+=c*(fs.reduce((s,x)=>s+x,0)-mx)}})});
+  const tot=o=>o?o.dir+o.ind:0;
+  return {zonas:Z,grupos:G,zona:m=>tot(Z[m]),grupo:g=>tot(G[g])}}
+const volSemana=off=>{const a=lunes(Date.now())-off*7*864e5;return volumen(a,a+7*864e5)};
+// Vistas antiguas, ahora sobre volumen(): por zona (con de qué ejercicio vino cada aporte) y por grupo.
+function volMusR(a,b){const V=volumen(a,b),v={},de={};for(const m in V.zonas){v[m]=V.zona(m);de[m]=V.zonas[m].de}return {v,de,V}}
 function volMus(off){const a=lunes(Date.now())-off*7*864e5;return volMusR(a,a+7*864e5)}
-/* Series por grupo con secundarios: cada serie suma su efectiva × el MAYOR factor entre las zonas de cada grupo que trabaja
-   (press inclinado: pecho 1, hombros ½, tríceps ½; remo: espalda 1, hombros ½, bíceps ½). Así barras, «qué toca», resumen y medallas cuadran con el mapa. */
-const factGrupo=(n,g)=>{const o={};for(const [m,f] of Object.entries(musculos(n,g)))if(MUS[m]){const G=MUS[m][1];o[G]=Math.max(o[G]||0,f)}return o};
-function volRango(a,b){const o={};
-  hist.forEach(h=>{const t=Date.parse(h.start),g=gDe(h);if(!g||!CAT[g]||t<a||t>=b)return;
-    if(!(h.sets||[]).length){o[g]=(o[g]||0)+efH(h);return}   // sesión sin series detalladas: solo su total
-    h.sets.forEach(r=>{const c=efectiva(r);if(!c)return;const f=factGrupo(nomFila(r,g),g);for(const G in f)o[G]=(o[G]||0)+c*f[G]})});
-  return o}
+function volRango(a,b){const V=volumen(a,b),o={};for(const g in V.grupos)o[g]=V.grupo(g);return o}
 function volGrupo(off){const a=lunes(Date.now())-off*7*864e5;return volRango(a,a+7*864e5)}
+const zonasDe=g=>Object.keys(MUS).filter(m=>MUS[m][1]===g);
 let mapaOff=0,mapaSel='',figD=null;
-// estado de una zona → clase de color (variables --m0/--mlo/--mok/--mhi de cada estilo, ver estilo.js)
-const estMus=(m,v)=>{const x=v[m]||0,[lo,hi]=MUS[m][2];return x<=0?'z0':x<lo?'zlo':x<=hi?'zok':'zhi'};
-const EST_MUS={z0:'sin series',zlo:'por debajo',zok:'en rango',zhi:'te pasaste'};
+const estMus=(m,v)=>estadoVol(v[m]||0,MUS[m][2]);
 /* Figura (dibujada a mano, frente y espalda): cada forma es una lista de puntos «x,y» de la mitad izquierda (eje en x = 60) que se une con curvas
    suaves (Catmull-Rom → Bézier) y se refleja (x → 120 − x); una «c» delante = forma centrada, sin reflejo. FIG_B = cuerpo base (cabeza, cuello,
    tronco, brazos, manos, piernas, pies), FIG_D = dedos. En FIG cada forma es [zona, puntos]; zona '' = parte neutra que no se cuenta. */
@@ -1470,7 +1489,7 @@ const figTr=()=>figD||(figD={b:FIG_B.split('|').map(trazo).join(''),d:FIG_D.spli
   fF:FIG_FIB.F.split('|').map(fibra).join(''),fE:FIG_FIB.E.split('|').map(fibra).join('')});
 const semNom=o=>o===0?'Esta semana':o===1?'Semana pasada':'Semana del '+new Date(lunes(Date.now())-o*7*864e5).toLocaleDateString('es-DO',{day:'numeric',month:'short'});
 function mapaSVG(){
-  const {v,de}=volMus(mapaOff),T=figTr();
+  const {v,de,V}=volMus(mapaOff),T=figTr();
   const zona=(m,d)=>`<path d="${d}" data-m="${m}" class="${estMus(m,v)}${m===mapaSel?' sel':''}"><title>${esc(MUS[m][0])}: ${ef1(v[m]||0)} de ${MUS[m][2].join('–')}</title></path>`;
   // capas: cuerpo (contorno + relleno + luz), músculos (clicables), volumen por músculo, fibras y, encima, el borde de la zona elegida; lo decorativo no captura toques
   const fig=(V,dx,lab)=>`<g transform="translate(${dx} 0)"><path class="cb" d="${T.b}"/><path class="cf" d="${T.b}"/><path class="mluz" d="${T.b}"/><path class="zn" d="${T.d}"/>`
@@ -1479,10 +1498,11 @@ function mapaSVG(){
     +T[V].filter(([m])=>m&&m===mapaSel).map(([,d])=>`<path class="selb" d="${d}"/>`).join('')
     +`<text x="60" y="247" text-anchor="middle">${lab}</text></g>`;
   let det='<p class="hint" style="text-align:center">Toca una zona para ver de qué ejercicios vienen sus series.</p>';
-  if(mapaSel&&MUS[mapaSel]){const [n,,r]=MUS[mapaSel],x=v[mapaSel]||0,ap=Object.entries(de[mapaSel]||{}).sort((a,b)=>b[1]-a[1]);
-    det=`<p style="margin:0;font-size:14px"><b>${esc(n)}</b>: ${ef1(x)} de ${r.join('–')} series efectivas · ${x<=0?'sin series':x<r[0]?`faltan ${ef1(r[0]-x)}`:x<=r[1]?'en rango':'te pasaste'}</p>
-      <p class="hint">${ap.length?'Vienen de: '+ap.map(([e,c])=>`${esc(e)} ${ef1(c)}`).join(' · '):'Ningún ejercicio de esta semana la trabajó.'}</p>`}
-  const ks=Object.keys(MUS),fila=m=>`<button type="button" data-m="${m}" class="musr${m===mapaSel?' on':''}" aria-pressed="${m===mapaSel}"><i class="mpt ${estMus(m,v)}"></i><span>${esc(MUS[m][3])}</span><b>${ef1(v[m]||0)}</b><span class="chev" aria-hidden="true">›</span></button>`;
+  if(mapaSel&&MUS[mapaSel]){const [n,G,r]=MUS[mapaSel],x=v[mapaSel]||0,zo=V.zonas[mapaSel]||{dir:0,ind:0},ap=Object.entries(de[mapaSel]||{}).sort((a,b)=>b[1]-a[1]);
+    det=`<p style="margin:0;font-size:14px"><b>${esc(n)}</b>: ${ef1(x)} de ${r.join('–')} series efectivas (rango de esta zona) · ${x<=0?'sin series':x<r[0]?`faltan ${ef1(r[0]-x)}`:x<=r[1]?'en rango':'te pasaste'}</p>
+      <p class="hint" data-desg="${mapaSel}">${ef1(zo.dir)} directas + ${ef1(zo.ind)} indirectas (ponderadas). ${ap.length?'Vienen de: '+ap.map(([e,c])=>`${esc(e)} ${ef1(c)}`).join(' · '):'Ningún ejercicio de esta semana la trabajó.'}</p>
+      <p class="hint">Grupo ${esc(CAT[G].n.toLowerCase())}: ${ef1(V.grupo(G))} de ${semRango(G).join('–')} (cuenta cada serie una vez; ver Progreso).</p>`}
+  const ks=Object.keys(MUS),fila=m=>`<button type="button" data-m="${m}" data-v="${v[m]||0}" data-est="${estMus(m,v)}" class="musr${m===mapaSel?' on':''}" aria-pressed="${m===mapaSel}"><i class="mpt ${estMus(m,v)}"></i><span>${esc(MUS[m][3])}<small class="mr">${MUS[m][2].join('–')}</small></span><b>${ef1(v[m]||0)}</b><span class="chev" aria-hidden="true">›</span></button>`;
   return `<div class="calnav mnav"><button type="button" data-moff="1" aria-label="Semana anterior" ${mapaOff>=8?'disabled':''}>‹</button>
     <span class="msel"><span class="mlab" aria-hidden="true">${esc(semNom(mapaOff))}<i>▾</i></span><select id="mSem" aria-label="Semana del mapa">${Array.from({length:9},(_,o)=>`<option value="${o}"${o===mapaOff?' selected':''}>${esc(semNom(o))}</option>`).join('')}</select></span>
     <button type="button" data-moff="-1" aria-label="Semana siguiente" ${mapaOff<=0?'disabled':''}>›</button></div>
@@ -1490,7 +1510,7 @@ function mapaSVG(){
     <div class="mleg">${Object.entries(EST_MUS).map(([k,t])=>`<span><i class="mpt ${k}"></i>${t}</span>`).join('')}</div>
     ${det}<p class="lbl" style="margin:6px 0 0">Volumen semanal por grupo muscular</p>
     <div class="musl"><div>${ks.slice(0,8).map(fila).join('')}</div><div>${ks.slice(8).map(fila).join('')}</div></div>
-    <p class="hint">Cada serie efectiva suma 1 al músculo principal del ejercicio y una fracción a los que ayudan (por ejemplo, el press inclinado suma ½ al deltoide anterior y ½ al tríceps). Las barras por grupo de arriba usan la misma cuenta.</p>`}
+    <p class="hint">Cada serie efectiva suma 1 al músculo principal del ejercicio (directa) y una fracción a los que ayudan (indirecta: el press inclinado suma ½ al deltoide anterior y ½ al tríceps). Debajo de cada zona, su rango semanal propio. Las barras por grupo usan las mismas series y coeficientes, pero cuentan cada serie una sola vez por grupo: por eso, si un ejercicio toca dos zonas del mismo grupo (aperturas: pecho medio y superior), las zonas suman más que el grupo.</p>`}
 function renderMapa(){$('pMapa').innerHTML=mapaSVG()}
 $('pMapa').addEventListener('click',e=>{const o=e.target.closest('[data-moff]');if(o){mapaOff=Math.max(0,Math.min(8,mapaOff+ +o.dataset.moff));renderMapa();return}
   const m=e.target.closest('[data-m]');if(m){mapaSel=mapaSel===m.dataset.m?'':m.dataset.m;renderMapa()}});
@@ -1627,7 +1647,8 @@ async function resumenImagen(){const W=1080,H=1350,cv=document.createElement('ca
   hs.forEach(h=>(h.sets||[]).forEach(r=>{if(r.pr&&r.kg>0)recs.push(r)}));
   const mejores=[...new Map(recs.sort((p,q)=>e1(q)-e1(p)).map(r=>[r.ej,r])).values()].slice(0,comida?2:4);
   const fila=comida?50:62,X0=M+230,X1=W-M-225;
-  Object.keys(CAT).forEach(g=>{const val=w[g]||0,[lo,hi]=semRango(g),tope=hi*1.3,c=val<lo?C.amb:val<=hi?C.cap:C.art;y+=fila;
+  const CE={z0:v('m0')||C.muted,zlo:v('mlo')||C.amb,zok:v('mok')||C.cap,zhi:v('mhi')||C.art};   // mismos colores de estado que el mapa y Progreso
+  Object.keys(CAT).forEach(g=>{const val=w[g]||0,[lo,hi]=semRango(g),tope=hi*1.3,c=CE[estadoVol(val,[lo,hi])];y+=fila;
     txt(CAT[g].n,M,y,`600 34px ${fB}`,C.fg);rr(X0,y-24,X1-X0,24,12,C.soft);
     x.strokeStyle=C.muted;x.lineWidth=3;[lo,hi].forEach(q=>{const X=X0+(X1-X0)*q/tope;x.beginPath();x.moveTo(X,y-32);x.lineTo(X,y+8);x.stroke()});
     if(val>0)rr(X0,y-24,Math.max(24,(X1-X0)*Math.min(1,val/tope)),24,12,c);
