@@ -234,6 +234,21 @@ html[data-recto] *{border-radius:3px!important}
 .discos button{height:34px;padding:0 10px;border:1px solid var(--line);border-radius:10px;font-size:12px;background:var(--bg)}
 #pad.work.cal{border-color:var(--amb)} #pad.work.cal #big,#pad.work.cal #mono{color:var(--amb)}
 #calSalta{align-self:center;margin-top:-6px}
+/* v18: superseries, días de fuerza y cuidar una zona */
+.sspar{display:flex;flex-direction:column;gap:6px}
+.sspar .chips button[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+#ssB{font-family:var(--mono);font-size:12.5px;text-align:center;max-width:36ch;line-height:1.35;color:var(--ven);border:1px solid var(--line);border-radius:999px;padding:4px 12px;margin-top:4px}
+#meta .tipo{flex-basis:100%} #meta .tipo button{width:auto;height:44px;padding:0 14px;font-size:14px}
+#meta .tipo button[aria-pressed="true"]{background:var(--cap);border-color:var(--cap);color:var(--bg);font-weight:600}
+#meta .aviso b,#meta .fzs b{font-family:inherit;font-size:inherit;min-width:0;text-align:left}
+#meta .tipo button:disabled{opacity:.45;cursor:default}
+#meta .aviso.fza{color:var(--fg);font-size:13px}
+.fzs{flex-basis:100%;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface)}
+.fzs i{font-style:normal;color:var(--muted)} .fzs b{font-weight:500} .fzs small{grid-column:1/-1;color:var(--muted);font-size:11.5px}
+.pb.les{border-style:dashed;border-color:var(--amb)}
+#plan.n1{grid-template-columns:minmax(0,1fr)}
+.aviso-d.les{border-color:var(--ven)} .aviso-d.les b{color:var(--ven)} .aviso-d small{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.lest td.lc{text-align:left;white-space:normal} .lest th:nth-child(n+2){text-align:left}
 /* Mapa muscular, medallas, medidas, fotos */
 #mapa{width:100%;max-width:420px;height:auto;display:block;margin:0 auto}
 #mapa .cb{fill:var(--cuerpo);stroke:var(--cborde);stroke-width:1.8;stroke-linejoin:round} #mapa .cf{fill:var(--cuerpo)}
@@ -346,12 +361,14 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <div id="cuotaAv" class="aviso-d" hidden></div>
     <button id="hoyCard" type="button" class="hoy" hidden></button>
     <div id="rutinas" role="group" aria-label="Rutina"></div>
+    <div id="ssPar" class="sspar" hidden></div>
     <div id="grupos"></div>
     <p id="rutHint" class="hint" hidden></p>
     <div id="copiaAv" class="aviso-c" hidden></div>
     <div id="bloqueR" class="card blq" hidden></div>
     <div id="meta"></div>
     <div id="desc"></div>
+    <div id="lesR" hidden></div>
     <div id="plan"></div>
     <p id="planHint" class="hint">Toca un ejercicio para cambiarlo por otro o quitarlo.</p>
     <div id="planX"></div>
@@ -439,6 +456,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
       <span id="sub"></span>
       <span id="disc" hidden></span>
       <span id="pav" hidden></span>
+      <span id="ssB" hidden></span>
       <span id="bar"></span>
     </button>
     <button id="calSalta" type="button" class="btn2" hidden>Saltar calentamiento</button>
@@ -480,6 +498,9 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <p class="nota"><b>Cómo decide.</b> La congestión decae como e^(−t/110 s) y la capacidad se recupera como 1 − A·e^(−t/τ_C). El descanso es el que maximiza C·P: t* = τ_C·ln[A(τ_C+τ_P)/τ_C], con un ruido log-normal pequeño. Las mini-series tienen objetivo aleatorio entre 65 y 90 % de RTF·C. Cuando ya no da, el reloj no te deja parar: cambia a una variante más fácil en 10 s. El core cierra con 3 vacíos de duración sorteada por una ley de potencias entre 15 y 50 s. Con 8 mini-series o más de un grupo, el reloj aprende cómo te recuperas: si sueles hacer menos reps de las previstas alarga el descanso (×1/k) y baja el objetivo (×k); si haces más, al revés (Ajustes → Recuperación aprendida).</p>
     <p class="nota"><b>Peso y progresión.</b> Al reportar la primera serie de cada ejercicio, anota el peso: toca el número y escríbelo, o usa − y +. Con mancuernas, el peso de una. La próxima vez el reloj te dice con cuánto empezar: si hiciste el tope del rango con 1 o más en reserva, o te sobraron 4 o más, sube (1 kg si usas menos de 10 kg, 2 kg hasta 40 kg, 2,5 kg por encima; en libras, 2,5 lb por debajo de 25 lb y 5 lb de ahí en adelante; con barra, un par de los discos más pequeños); si no llegaste al mínimo del rango al fallo, baja. Un récord es superar tu mejor 1RM estimado: peso × (1 + (reps + reserva)/30).</p>
     <p class="nota"><b>Series efectivas.</b> Cada sesión tiene una meta de series efectivas que se reparte entre los ejercicios. Una serie completa con 5 reps o más vale 1 si te quedaban 0–1 en reserva, ¾ con 2, ¼ con 3 y nada con 4 o más: una serie suave no suma. Una mini-serie vale la mitad (con 4 reps o más). Los parciales y la variante fácil del final de cada ejercicio cuentan como una serie más, con la misma regla que una serie completa (hasta 1). Una isometría hasta el fallo vale ½ si dura 30 s. Los vacíos y el calentamiento no cuentan. Si al cerrar un ejercicio falta meta, el reloj te da un descanso largo y otra ronda (hasta 3); si en una ronda nueva ya no logras ni ⅓ de serie efectiva, pasa al siguiente.</p>
+    <p class="nota"><b>Superseries.</b> Eliges un par (bíceps + tríceps, pecho + espalda, las estaciones de piernas entre sí, hombros + abdomen o el tuyo) y el reloj alterna una serie de cada lado con ~20 s para cambiar de máquina. Cada lado tiene su propio modelo de congestión y capacidad, su meta y su descanso, contado desde SU última serie: mientras trabajas B, A se recupera. Las mini-series se alternan igual (su objetivo se ajusta al descanso real que tuvieron); el paso a parciales, isometría o variante va seguido, sin alternar, porque aprovecha la congestión. Se guardan dos sesiones, una por grupo, y al final ves el tiempo que ahorraste frente a hacerlas por separado.</p>
+    <p class="nota"><b>Día de fuerza.</b> Un compuesto pesado del grupo (4–5 series de 3–6 reps al 80–88 % de tu 1RM estimado, con 1–2 en reserva y descanso fijo de 3–3,5 min, sin mini-series ni fallo) y, si quieres, un accesorio. Calentamiento más largo: 40, 60, 75 y 85 %. Si completas todas las series con 2 o más en reserva, la próxima vez sube 2 puntos el %. Como mucho uno por grupo a la semana; en descarga no hay.</p>
+    <p class="nota"><b>Cuidar una zona.</b> En Ajustes (o cuando marcas la misma molestia en 2 de 3 sesiones) puedes cuidar hombro, codo, muñeca, espalda baja, rodilla o cadera 7, 14 o 28 días: los ejercicios que más la cargan se cambian por otro del mismo grupo y en los que la cargan algo haces series rectas con 2–3 en reserva. No es consejo médico: si el dolor es agudo, sigue o empeora, consulta a un profesional.</p>
     <p class="nota"><b>Semana de descarga.</b> Mientras dura (la que empiezas tú o la última semana de un bloque), el reloj cambia de modo: cada ejercicio son series rectas, sin mini-series, parciales, variante ni isometría al fallo, con 2 min de descanso y dejando 2–3 en reserva. La meta es la mitad de la normal y se cuenta en <b>series completas</b> (5 reps o más, con cualquier reserva), no en efectivas, así que no te pide rondas extra. Las series se guardan igual y sus efectivas reales cuentan en Progreso.</p>
   </section>
 
@@ -547,6 +568,9 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <div class="chips" id="cDiscos"></div>
     <div style="display:flex;gap:8px"><input id="cDiscoN" class="in" inputmode="decimal" placeholder="Otro disco (kg)" style="flex:1" autocomplete="off"><button id="cDiscoAdd" type="button" class="btn2">Agregar</button></div>
     <p class="muted" style="font-size:13px;margin:0">Con barra, el reloj te dice qué discos poner en cada lado. Se activa sola si el ejercicio dice «barra»; en el reporte de peso puedes marcar cualquier otro.</p>
+    <h2 style="margin-top:8px">Cuidar una zona</h2>
+    <p class="muted" style="font-size:13px;margin:0">Si tienes una lesión o una molestia, el reloj puede cuidarla unos días: cambia los ejercicios que más cargan esa articulación y suaviza los que la cargan algo.</p>
+    <div id="cLes" style="display:flex;flex-direction:column;gap:8px"></div>
     <h2 style="margin-top:8px">Ejercicios</h2>
     <button id="cCatalogo" type="button" class="btn2" style="align-self:stretch">Catálogo de ejercicios</button>
     <p class="muted" style="font-size:13px;margin:0">Todos los ejercicios que el muñeco sabe hacer, por grupo, con el equipo que necesitas y tres claves de técnica. Sirve para ver qué máquina es o para elegir un sustituto.</p>
