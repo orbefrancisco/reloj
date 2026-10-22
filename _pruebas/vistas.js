@@ -85,12 +85,12 @@
       return !el || !casi(+el.dataset.v, V.zona(m)) || el.querySelector('b').textContent !== ef1(V.zona(m)); });
     return { ok: !malos.length, d: malos.join(', ') };
   });
-  prueba('Detalle de una zona: directas + indirectas = valor de la fila', () => {
+  prueba('Detalle de una zona: directas + indirectas = valor de la fila, mostradas por separado', () => {
     mapaSel = 'biceps'; renderMapa();
-    const p = document.querySelector('#pMapa [data-desg="biceps"]'), z = V.zonas.biceps;
-    const ok = p && p.textContent.startsWith(`${ef1(z.dir)} directas + ${ef1(z.ind)} indirectas`) && casi(z.dir + z.ind, V.zona('biceps'));
+    const p = document.querySelector('#pMapa [data-desg="biceps"]'), q = document.querySelector('#pMapa [data-desgi="biceps"]'), z = V.zonas.biceps;
+    const ok = p && q && p.textContent.startsWith(`Directas ${ef1(z.dir)}`) && q.textContent.startsWith(`Indirectas ${ef1(z.ind)}`) && /estimación/.test(q.textContent) && casi(z.dir + z.ind, V.zona('biceps'));
     mapaSel = ''; renderMapa();
-    return { ok: !!ok, d: p ? p.textContent.slice(0, 60) : 'sin detalle' };
+    return { ok: !!ok, d: p ? p.textContent.slice(0, 40) + ' | ' + q.textContent.slice(0, 40) : 'sin detalle' };
   });
   prueba('«Qué toca», resumen en imagen y medallas usan el mismo número de grupo (semana())', () => {
     const w = semana(0), malos = Object.keys(CAT).filter(g => !casi(w[g] || 0, V.grupo(g)));
@@ -119,15 +119,43 @@
   });
   prueba('Filas del mapa: estado según el rango propio de cada zona', () => {
     const malos = Object.keys(MUS).filter(m => { const el = document.querySelector(`#pMapa .musr[data-m="${m}"]`);
-      return el.dataset.est !== estadoVol(V.zona(m), MUS[m][2]) || !el.querySelector('.mr') || el.querySelector('.mr').textContent !== MUS[m][2].join('–'); });
+      return el.dataset.est !== estadoVol(V.zona(m), rangoZona(m)) || !el.querySelector('.mr') || el.querySelector('.mr').textContent !== rangoZona(m).join('–'); });
     return { ok: !malos.length, d: malos.join(', ') };
   });
   prueba('Misma magnitud → mismo rango: grupos de una sola zona (tríceps, abdomen) frente a su zona del mapa', () => {
     const conflictos = Object.keys(CAT).filter(g => zonasDe(g).length === 1).map(g => {
-      const m = zonasDe(g)[0], rg = semRango(g), rz = MUS[m][2];
-      return rg[0] === rz[0] && rg[1] === rz[1] ? null : `${CAT[g].n}: grupo ${rg.join('–')} vs zona ${rz.join('–')} (con ${ef1(V.grupo(g))} serían «${EST_MUS[estadoVol(V.grupo(g), rg)]}» y «${EST_MUS[estadoVol(V.zona(m), rz)]}»)`;
+      const m = zonasDe(g)[0], rg = rangoGrupo(g), rz = rangoZona(m);
+      const pg = document.querySelector(`#pSem .sem[data-g="${g}"]`), pm = document.querySelector(`#pMapa .musr[data-m="${m}"]`);
+      if (rg[0] !== rz[0] || rg[1] !== rz[1]) return `${CAT[g].n}: grupo ${rg.join('–')} vs zona ${rz.join('–')}`;
+      if (pg.dataset.est !== pm.dataset.est) return `${CAT[g].n}: Progreso «${EST_MUS[pg.dataset.est]}» vs mapa «${EST_MUS[pm.dataset.est]}»`;
+      return null;
     }).filter(Boolean);
-    return { ok: !conflictos.length, d: conflictos.length ? 'PENDIENTE DE DECISIÓN — ' + conflictos.join('; ') : '' };
+    return { ok: !conflictos.length, d: conflictos.join('; ') || `tríceps ${ef1(V.grupo('triceps'))} → «${EST_MUS[estadoVol(V.grupo('triceps'), rangoGrupo('triceps'))]}» en las dos vistas` };
+  });
+
+  // ---------- 6b. Objetivos: fuente única, preparada para configurarse por músculo ----------
+  prueba('Objetivos personales: se aplican por grupo y por zona, la zona única sigue a su grupo y lo inválido se ignora', () => {
+    const g0 = rangoGrupo('pecho'), z0 = rangoZona('del_lat');
+    RANGO_PERSONAL.g.pecho = [10, 18]; RANGO_PERSONAL.z.del_lat = [6, 14]; RANGO_PERSONAL.g.triceps = [9, 15];
+    RANGO_PERSONAL.z.biceps = [20, 5]; RANGO_PERSONAL.z.antebrazo = ['4', 10]; RANGO_PERSONAL.g.constructor = [1, 2];
+    const r = [rangoGrupo('pecho'), rangoZona('del_lat'), rangoZona('triceps'), rangoZona('biceps'), rangoZona('antebrazo')].map(x => x.join('–'));
+    for (const k of ['pecho', 'triceps', 'constructor']) delete RANGO_PERSONAL.g[k];
+    for (const k of ['del_lat', 'biceps', 'antebrazo']) delete RANGO_PERSONAL.z[k];
+    const ok = r.join('|') === `10–18|6–14|9–15|${MUS.biceps[2].join('–')}|${MUS.antebrazo[2].join('–')}` && rangoGrupo('pecho').join() === g0.join() && rangoZona('del_lat').join() === z0.join();
+    return { ok, d: r.join(' · ') };
+  });
+  prueba('Directas = solo aportes de músculo principal (factor 1); indirectas = el resto; cada lista suma su total', () => {
+    const malos = [];
+    for (const m in V.zonas) { const z = V.zonas[m], s = o => Object.values(o).reduce((a, b) => a + b, 0);
+      if (!casi(s(z.deDir), z.dir) || !casi(s(z.deInd), z.ind)) malos.push(m);
+      Object.keys(z.deDir).forEach(e => { const g = hist.find(h => (h.sets || []).some(r => r.ej === e)); if ((musculos(e, gDe(g))[m] || 0) !== 1) malos.push(`${m}:${e}`); }); }
+    return { ok: !malos.length, d: malos.join(', ') };
+  });
+  prueba('Se ven los cuatro estados y ninguna etiqueta presenta el objetivo como límite rígido', () => {
+    const est = new Set([...document.querySelectorAll('#pMapa .musr')].map(e => e.dataset.est));
+    const txt = document.getElementById('pSem').textContent + document.getElementById('pMapa').textContent;
+    const ok = ['z0', 'zlo', 'zok', 'zhi'].every(e => est.has(e)) && !/te pasaste|en rango/.test(txt) && /orientativ/.test(txt) && /estimaci/.test(txt);
+    return { ok, d: `estados en el mapa: ${[...est].map(e => EST_MUS[e]).join(', ')}` };
   });
 
   // ---------- 7. Los datos originales no se tocan ----------

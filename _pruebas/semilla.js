@@ -29,6 +29,7 @@
       ...rep(4, () => serie('Laterales', 'Elevaciones laterales', 15, 1)),
       ...rep(4, () => serie('Press', 'Press con mancuernas sentado', 9, 1)),
       ...rep(3, () => serie('Pájaros', 'Pájaros en polea', 15, 3))]),
+    ses('hombros', 'Hombros', L + 68 * H, rep(12, () => serie('Laterales', 'Elevaciones laterales', 15, 0))),   // deltoide lateral por encima del objetivo
     ses('espalda', 'Espalda', L + 70 * H, [
       ...rep(3, () => serie('Jalón', 'Jalón al pecho', 10, 1)),
       ...rep(3, () => serie('Remo', 'Remo con mancuerna', 10, 1))]),
