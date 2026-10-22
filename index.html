@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- Política de seguridad (CSP). GitHub Pages no deja poner cabeceras, por eso va en <meta>. Sin scripts en línea ni eval: todo el JS está en estilo.js y reloj.js.
+<!-- Política de seguridad (CSP). GitHub Pages no deja poner cabeceras, por eso va en <meta>. Sin scripts en línea ni eval: todo el JS está en estilo.js, anim.js y reloj.js.
      frame-ancestors (impedir que otra página la meta en un marco) NO funciona en <meta>: solo como cabecera HTTP. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob:; media-src 'none'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
@@ -300,6 +300,40 @@ label.btn2{display:inline-flex;align-items:center;cursor:pointer}
 .cmp td.up{color:var(--cap)} .cmp td.dn{color:var(--amb)} .cmp td.eq{color:var(--muted)}
 .cmpf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px} .cmpf label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted);min-width:0} .cmpf .in{width:100%}
 .cmp h3{font-size:12px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 0;font-weight:500}
+/* v17: animaciones por ejercicio (anim.js). Figura en currentColor con contorno del color de fondo; equipo en tinta y gris. */
+.anim{display:block;overflow:visible;color:var(--art);--afondo:var(--bg)}
+.anim .ab-o{fill:var(--afondo);stroke:var(--afondo);stroke-width:2.2;stroke-linejoin:round}
+.anim .ab-f{fill:currentColor}
+.anim .lejos .ab-f{fill:color-mix(in srgb,currentColor 52%,var(--afondo))}
+.anim .eq-m{fill:var(--fg)} .anim .eq-h{fill:var(--afondo)}
+.anim .eq-b{fill:var(--line);stroke:var(--muted);stroke-width:.8}
+.anim .eq-t{fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.anim .eq-c{fill:none;stroke:var(--muted);stroke-width:1.1}
+.anim .eq-l{fill:none;stroke:var(--fg);stroke-width:2.4;stroke-linecap:round}
+.anim .eq-p{fill:var(--muted)}
+.anim .eq-s{fill:none;stroke:var(--line);stroke-width:1.6}
+/* v17: el muñeco del pad durante la serie, botón «Ver cómo se hace», panel y catálogo */
+#animPad{display:block;width:176px;height:146px;flex:none;color:var(--art);margin-bottom:2px}
+#animPad .anim{width:100%;height:100%;color:inherit}
+#pad.work.cal #animPad{color:var(--amb)}
+.pbw{display:flex;flex-direction:column;gap:4px;min-width:0} .pbw .pb{flex:1}
+.ver{border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:12px;line-height:1.2;padding:6px 4px;min-height:34px;color:var(--fg)}
+.edver{display:flex;flex-wrap:wrap;gap:4px 16px}
+dialog.hoja{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--fg);padding:0;width:min(440px,calc(100vw - 24px));max-height:calc(100dvh - 24px);box-sizing:border-box;overflow:auto}
+dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
+.hoja-top{display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:0;z-index:1;background:var(--surface);padding:12px 14px 8px;border-bottom:1px solid var(--line)}
+.hoja-c{padding:10px 14px 16px;display:flex;flex-direction:column;gap:8px}
+.cerrar{width:40px;height:40px;flex:none;border:1px solid var(--line);border-radius:10px;font-size:22px;line-height:1}
+.ver-anim{border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.ver-anim .anim{width:100%;height:auto;max-height:44vh;margin:0 auto}
+.ver-eq{margin:0;font-size:14px} #verTips{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.35}
+.aviso-v{margin:0;font-size:13px;color:var(--amb)}
+#verUsar{border:2px solid var(--cap);color:var(--cap);font-weight:600} #verCat{border:1px solid var(--line)}
+.catg h3{font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:.04em;text-transform:uppercase;margin:6px 0 4px}
+.catl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.catl button{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:4px 4px 6px;font-size:11.5px;line-height:1.25;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;text-align:center;color:var(--fg)}
+.catl .anim{width:100%;height:auto;color:var(--art)}
+@media (prefers-reduced-motion: reduce){.anim *{animation:none!important}}
 </style>
 <script src="estilo.js"></script>
 </head>
@@ -325,6 +359,7 @@ label.btn2{display:inline-flex;align-items:center;cursor:pointer}
       <h2 id="edT">Cambiar ejercicio</h2>
       <div id="edCampos" style="display:contents">
       <label class="lbl" for="edN">Nombre</label><input id="edN" list="edL" maxlength="60" autocomplete="off">
+      <div class="edver"><button id="edVer" type="button" class="lnk">▶ Ver cómo se hace</button><button id="edCat" type="button" class="lnk">Catálogo de ejercicios</button></div>
       <datalist id="edL"></datalist>
       <label class="lbl" for="edS">Nombre corto</label><input id="edS" maxlength="14" autocomplete="off">
       <label class="lbl" for="edR">Repeticiones por serie</label><select id="edR"></select>
@@ -398,6 +433,7 @@ label.btn2{display:inline-flex;align-items:center;cursor:pointer}
         <!-- elevación de talones: el cuerpo de pie sube y baja sobre el suelo -->
         <g class="mv mv-tal"><path d="M30 91H70" stroke-width="3" opacity=".45"/></g>
       </svg>
+      <span id="animPad" hidden></span>
       <span id="kind">Toca para empezar</span>
       <span id="big">—</span>
       <span id="sub"></span>
@@ -511,6 +547,9 @@ label.btn2{display:inline-flex;align-items:center;cursor:pointer}
     <div class="chips" id="cDiscos"></div>
     <div style="display:flex;gap:8px"><input id="cDiscoN" class="in" inputmode="decimal" placeholder="Otro disco (kg)" style="flex:1" autocomplete="off"><button id="cDiscoAdd" type="button" class="btn2">Agregar</button></div>
     <p class="muted" style="font-size:13px;margin:0">Con barra, el reloj te dice qué discos poner en cada lado. Se activa sola si el ejercicio dice «barra»; en el reporte de peso puedes marcar cualquier otro.</p>
+    <h2 style="margin-top:8px">Ejercicios</h2>
+    <button id="cCatalogo" type="button" class="btn2" style="align-self:stretch">Catálogo de ejercicios</button>
+    <p class="muted" style="font-size:13px;margin:0">Todos los ejercicios que el muñeco sabe hacer, por grupo, con el equipo que necesitas y tres claves de técnica. Sirve para ver qué máquina es o para elegir un sustituto.</p>
     <h2 style="margin-top:8px">Voz y vibración</h2>
     <div class="tog"><button id="cVoz" type="button" aria-pressed="true">Voz</button><button id="cVib" type="button" aria-pressed="true">Vibración</button><button id="cProbar" type="button">Probar</button></div>
     <p class="muted" style="font-size:13px;margin:0">La voz anuncia cada serie, el descanso, los últimos 10 segundos, las sugerencias de peso y los récords. Usa la voz en español del teléfono; mantén el volumen multimedia alto. La vibración avisa al empezar y al terminar cada descanso.</p>
@@ -527,6 +566,27 @@ label.btn2{display:inline-flex;align-items:center;cursor:pointer}
   </section>
 </main>
 
+<!-- v17: «Ver cómo se hace» y catálogo de ejercicios (animaciones de anim.js) -->
+<dialog id="verDlg" class="hoja" aria-labelledby="verT">
+  <div class="hoja-top"><h2 id="verT">Cómo se hace</h2><button id="verX" type="button" class="cerrar" aria-label="Cerrar">×</button></div>
+  <div class="hoja-c">
+    <div id="verAnim" class="ver-anim"></div>
+    <p id="verVista" class="hint"></p>
+    <p id="verAprox" class="aviso-v" hidden></p>
+    <p id="verEq" class="ver-eq"></p>
+    <ul id="verTips"></ul>
+    <p class="hint">Orientativo: si algo duele, para y ajusta el peso o el ejercicio.</p>
+    <div class="acc"><button id="verUsar" type="button" hidden>Usar este ejercicio</button><button id="verCat" type="button">Ver el catálogo</button></div>
+  </div>
+</dialog>
+<dialog id="catDlg" class="hoja" aria-labelledby="catT">
+  <div class="hoja-top"><h2 id="catT">Catálogo de ejercicios</h2><button id="catX" type="button" class="cerrar" aria-label="Cerrar">×</button></div>
+  <div class="hoja-c">
+    <p class="hint" id="catHint">Toca uno para verlo en movimiento.</p>
+    <div id="catL"></div>
+  </div>
+</dialog>
+
 <nav aria-label="Secciones">
   <button id="tReloj" type="button" aria-current="page">
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><span>Reloj</span>
@@ -542,6 +602,7 @@ label.btn2{display:inline-flex;align-items:center;cursor:pointer}
   </button>
 </nav>
 
+<script src="anim.js"></script>
 <script src="reloj.js"></script>
 </body>
 </html>

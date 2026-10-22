@@ -624,7 +624,8 @@ $('edRes').onclick=()=>{const E=CAT[grupo].e[edI];if(misEj[grupo]&&E)delete misE
 $('edQu').onclick=()=>{const E=CAT[grupo].e[edI];if(!E||CAT[grupo].e.length<=EST_MIN)return;const M=edMi();
   if(E.xi!=null)M.x.splice(E.xi,1);else M.q=[...new Set([...(M.q||[]),E.b])];guardarEj()};
 $('edNo').onclick=()=>{$('editor').hidden=true};
-$('plan').onclick=e=>{const b=e.target.closest('[data-i]');if(b&&S.st==='idle')abrirEditor(+b.dataset.i)};
+$('plan').onclick=e=>{const v=e.target.closest('[data-ver]');if(v){const x=CAT[grupo].e[+v.dataset.ver];if(x)verComo(x.n,grupo);return}
+  const b=e.target.closest('[data-i]');if(b&&S.st==='idle')abrirEditor(+b.dataset.i)};
 // Debajo del plan: agregar y recuperar las originales que quitaste.
 function renderPlanX(){const el=$('planX');if(S.st!=='idle'){el.innerHTML='';el.hidden=true;return}
   const M=misEj[grupo]||{},N=CAT[grupo].e.length,q=(M.q||[]).filter(b=>BASE[grupo].e[b]&&!CAT[grupo].e.some(x=>x.b===b));
@@ -803,7 +804,8 @@ function render(){
   const planKey=S.st+'|'+S.sec+'|'+grupo+'|'+JSON.stringify(misEj[grupo]||{});
   if(planKey!==lastPlan){lastPlan=planKey;const tag=S.st==='idle'?'button':'div';
     $('plan').className=NE===2||NE===4?'n'+NE:'';
-    $('plan').innerHTML=G.e.map((x,i)=>`<${tag} ${tag==='button'?`type="button" data-i="${i}"`:''} class="pb${S.st==='done'||(enCurso()&&i<S.sec)?' ok':enCurso()&&i===S.sec?' on':''}"><b>${esc(x.s)}</b><span>${x.levy?'3 vacíos · 15–50 s':esc(x.n)} · ${esc(x.r)}${x.xi!=null?' · agregado':misEj[grupo]&&misEj[grupo][x.b]?' · propio':''}</span></${tag}>`).join('');
+    $('plan').innerHTML=G.e.map((x,i)=>{const pb=`<${tag} ${tag==='button'?`type="button" data-i="${i}"`:''} class="pb${S.st==='done'||(enCurso()&&i<S.sec)?' ok':enCurso()&&i===S.sec?' on':''}"><b>${esc(x.s)}</b><span>${x.levy?'3 vacíos · 15–50 s':esc(x.n)} · ${esc(x.r)}${x.xi!=null?' · agregado':misEj[grupo]&&misEj[grupo][x.b]?' · propio':''}</span></${tag}>`;
+      return S.st==='idle'?`<div class="pbw">${pb}<button type="button" class="ver" data-ver="${i}">▶ Ver cómo se hace</button></div>`:pb}).join('');
     renderPlanX()}
   let kind=enRutina()?`Rutina ${RUTINAS[rutI].mia?'propia':RUTINAS[rutI].n} · toca para empezar`:'Toca para empezar',big='—',sub=G.e[0].levy?'':subInicio(G.e[0]),cls='',bar=0,disc='',pav='';
   if(S.st==='idle'){if(!G.e[0].levy){const p=sugerir(grupo,G.e[0]);disc=p?discTxt(p.kg,G.e[0]):'';pav=avisoMolestia(grupo,G.e[0])}
@@ -834,6 +836,7 @@ function render(){
   if(S.pr&&now()<S.pr){cls+=' record';kind=(S.prK||'¡Récord personal!')+' · '+S.prTxt}
   pad.className=cls;pad.dataset.fase=S.st==='work'?S.phase:'';$('kind').textContent=kind;$('big').textContent=big;$('sub').textContent=sub;$('bar').style.width=bar+'%';
   pad.dataset.mov=(S.st==='work'&&S.phase!=='hold'&&S.phase!=='vac')||S.st==='cal'?tipoMov(E.n):'';
+  animPad((S.st==='work'&&['act','myo','ext'].includes(S.phase))||S.st==='cal'?E:null,S.st==='work'?S.phase:'cal');
   $('disc').hidden=!disc;$('disc').textContent=disc;$('pav').hidden=!pav;$('pav').textContent=pav?'⚠ '+pav:'';
   $('calSalta').hidden=!(S.cal&&S.calI<S.cal.length&&['cal','rest','trans'].includes(S.st));
   const pu=pila[pila.length-1],du=!!pu&&['rest','shift','trans','done','report','work'].includes(S.st);$('deshacer').hidden=!du;
@@ -861,6 +864,46 @@ function render(){
   if(rh!==lastRows){lastRows=rh;$('rows').innerHTML=rh}   // la tabla solo se reescribe cuando cambia
   renderRetomar();guardarEnCurso();
 }
+/* ---------- v17: animación del ejercicio (anim.js) en el pad, en «Ver cómo se hace» y en el catálogo ----------
+   El SVG del pad solo se reconstruye cuando cambia lo que muestra (ejercicio, parte del recorrido o grupo), no en cada tic. */
+let animKey='',animConstruidas=0;
+// parciales: mitad estirada (por defecto) o mitad contraída, según lo que diga el nombre o la pista
+const rangoParcial=E=>/arriba|superior|cerrad|contraid|corto arriba/.test(sinTilde((E.extN||'')+' '+(E.extH||'')))?[.5,1]:[0,.55];
+function animPad(E,fase){const record=S.pr&&now()<S.pr;let n='',r=null;
+  if(E&&!E.levy&&!record){n=fase==='ext'&&E.ext==='flat'?E.extN:E.n;if(fase==='ext'&&E.ext==='part')r=rangoParcial(E)}
+  const k=n?grupo+'|'+n+'|'+(r?r.join('-'):''):'';
+  if(k===animKey)return;animKey=k;const el=$('animPad');
+  $('mono').toggleAttribute('hidden',!!k);el.hidden=!k;
+  if(!k){el.innerHTML='';return}
+  const b=ANIM.buscar(n,grupo);el.innerHTML=ANIM.svg(b.d,{rango:r||undefined}).html;el.dataset.anim=b.d.id;animConstruidas++}
+let verDef=null;
+const cerrarVer=()=>{if($('verDlg').open)$('verDlg').close();$('verAnim').innerHTML=''};
+function verComo(nombre,g,desdeCat){const b=desdeCat?{d:ANIM.porId[nombre],aprox:false}:ANIM.buscar(nombre,g);if(!b.d)return;const d=b.d;verDef=d;
+  $('verT').textContent=desdeCat?d.n:nombre||d.n;
+  $('verAnim').innerHTML=ANIM.svg(d,{}).html;
+  $('verVista').textContent=d.n+(d.vista?` · vista ${d.vista}`:d.v==='fr'?' · vista de frente':' · vista de lado');
+  $('verAprox').hidden=!b.aprox;
+  $('verAprox').textContent=b.aprox?(d.generica?'No reconozco este nombre: el muñeco hace un movimiento genérico.':`No reconozco este nombre: te muestro un ejercicio típico de ${CAT[g]?CAT[g].n.toLowerCase():'este grupo'}. Puedes buscar el tuyo en el catálogo.`):'';
+  $('verEq').innerHTML=`<b>Necesitas:</b> ${esc(d.eq==='nada'||d.eq==='solo el suelo'?'nada más que tu cuerpo':d.eq)}`;
+  $('verTips').innerHTML=d.tips.map(t=>`<li>${esc(t)}</li>`).join('');
+  $('verUsar').hidden=!(desdeCat&&!$('editor').hidden&&edModo!=='vacio'&&!enCurso());
+  const dl=$('verDlg');if(!dl.open)dl.showModal()}
+let catHecho=false;
+function abrirCatalogo(){if(!catHecho){catHecho=true;
+    $('catL').innerHTML=Object.keys(CAT).map(g=>{const L=ANIM.lista.filter(d=>d.g===g);
+      return L.length?`<section class="catg"><h3>${esc(CAT[g].n)}</h3><div class="catl">${L.map(d=>`<button type="button" data-cat="${esc(d.id)}">${ANIM.svg(d,{u:.5}).html}<span>${esc(d.n)}</span></button>`).join('')}</div></section>`:''}).join('')}
+  $('catHint').textContent=!$('editor').hidden&&edModo!=='vacio'?'Toca uno para verlo; desde ahí puedes usarlo en el editor.':'Toca uno para verlo en movimiento.';
+  const dl=$('catDlg');if(!dl.open)dl.showModal()}
+$('catL').onclick=e=>{const b=e.target.closest('[data-cat]');if(b)verComo(b.dataset.cat,null,true)};
+$('verX').onclick=()=>cerrarVer();$('catX').onclick=()=>$('catDlg').close();
+$('verDlg').addEventListener('close',()=>{$('verAnim').innerHTML=''});   // sin animación oculta corriendo
+$('verCat').onclick=()=>{cerrarVer();abrirCatalogo()};
+$('verUsar').onclick=()=>{if(!verDef||$('editor').hidden)return;$('edN').value=verDef.n;$('edN').dispatchEvent(new Event('change'));
+  cerrarVer();if($('catDlg').open)$('catDlg').close();$('edN').focus()};
+// tocar fuera del panel lo cierra
+['verDlg','catDlg'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target===$(id))id==='verDlg'?cerrarVer():$(id).close()}));
+$('cCatalogo').onclick=abrirCatalogo;$('edCat').onclick=abrirCatalogo;
+$('edVer').onclick=()=>{const n=$('edN').value.trim();if(n)verComo(n,grupo);else abrirCatalogo()};
 /* ---------- el muñeco hace tu ejercicio: tipo de movimiento por palabras del nombre (el primero que encaja; si ninguno, curl) ---------- */
 const MOVS=[[/fondo/,'fon'],[/talon|gemelo|pantorrilla/,'tal'],[/femoral|isquio|nordico|curl (de |con )?piernas?/,'fem'],
  [/crunch|abdominal|rueda|colgad|rodillas al pecho|elevacion(es)? de piernas|pallof|plancha/,'cru'],
