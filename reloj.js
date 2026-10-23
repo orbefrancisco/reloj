@@ -73,8 +73,9 @@ function normSet(r){if(!esObj(r))return null;const o={ex:vTxt(r.ex)??'',k:vTxt(r
   const ej=vTxt(r.ej);if(ej!=null)o.ej=ej;
   if('kg' in r)o.kg=r.kg==null||r.kg===''?null:vNum(r.kg,0,1000);
   o.P=vNum(r.P,0,10)??0;o.rest=vNum(r.rest,0,36000)??0;
-  for(const [k,hi] of [['obj',1000],['Cpre',10],['kc',10]]){const v=vNum(r[k],0,hi);if(v!=null)o[k]=v}
-  if(r.pr===true)o.pr=true;const mol=r.mol?vTxt(r.mol,40):null;if(mol){o.mol=mol;if(LES_P[mol]&&LES_P[mol].includes(r.molP))o.molP=r.molP}
+  for(const [k,hi] of [['obj',1000],['Cpre',10],['kc',10],['predF',1000]]){const v=vNum(r[k],0,hi);if(v!=null)o[k]=v}
+  {const m=vTxt(r.mod,20);if(m)o.mod=m}
+  if(r.pr===true){o.pr=true;if(r.prT==='reps')o.prT='reps'}const mol=r.mol?vTxt(r.mol,40):null;if(mol){o.mol=mol;if(LES_P[mol]&&LES_P[mol].includes(r.molP))o.molP=r.molP}
   if(r.recta===true)o.recta=true;   // v18: serie recta por cuidar una zona
   return o}
 // una sesión del historial: hace falta id y fecha válidos; las series raras se descartan
@@ -90,6 +91,8 @@ function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha
   // v18: día de fuerza, superserie ('biceps+triceps', mismo superId en sus dos sesiones, lado A o B) y zona cuidada
   if(s.fza===true)o.fza=true;
   if(typeof s.super==='string'&&s.super.length<=40){const p=s.super.split('+');if(p.length===2&&p.every(esG)){o.super=s.super;const si=vTxt(s.superId,80);if(si)o.superId=si;if(s.lado==='A'||s.lado==='B')o.lado=s.lado}}
+  // v26: versión de esquema y fechas de registro (creada) y de última edición (editada), distintas de la del entrenamiento (start)
+  {const e=vEnt(s.esq,1,99);if(e!=null)o.esq=e;const c=vFecha(s.creada),ed=vFecha(s.editada);if(c)o.creada=c;if(ed)o.editada=ed}
   if(LES_Z.includes(s.cuida)){o.cuida=s.cuida;if(LES_P[s.cuida].includes(s.cuidaP))o.cuidaP=s.cuidaP;if(LES_N.includes(s.cuidaN))o.cuidaN=s.cuidaN;
     const cl=normLesL(s.cuidaL);if(cl.length>1)o.cuidaL=cl}   // v25: varias zonas a la vez
   return o}
@@ -214,7 +217,7 @@ function aplicarEjercicios(){for(const g in BASE){const M=misEj[g]||{},q=new Set
     // dolor extremo: fuera lo que no tiene alternativa segura; sin ningún ejercicio con series, el grupo queda en pausa (se conserva la lista)
     if(q.some(x=>!x.levy))CAT[g].e=q;else{CAT[g].e=L;CAT[g].pausa=true}}}
   lesAplicada=v18listo&&lesOn()?lesKey():''}
-function lesKey(){return lesAct().map(x=>[x.z,x.p,x.n,x.hasta].join('|')).join(';')}
+function lesKey(){return lesAct().map(x=>[x.z,x.p,x.n,x.hasta].join('|')).join(';')+'#'+[...lesGatillos()].map(([e,s])=>e+':'+[...s].join(',')).join(';')}   // + desencadenantes
 function enPausa(g){return !!(CAT[g]&&CAT[g].pausa)}
 aplicarEjercicios();
 const DISCOS_STD=[25,20,15,10,5,2.5,1.25],BARRAS=[20,15,10,7],DISCOS_LB=[45,35,25,10,5,2.5],BARRAS_LB=[45,35,25,15];
@@ -405,10 +408,19 @@ function avisoMolestia(g,E){if(!E||E.levy)return '';const ses=[];
   const con=ses.filter(r=>r.some(x=>x.mol));if(con.length<2)return '';
   const z=[...new Set(con.flatMap(r=>r.filter(x=>x.mol).map(x=>x.mol)).filter(z=>z!=='sin zona'&&z!=='otra'))];
   return `Ojo: molestia${z.length?' en '+z.join(' y '):''} en ${con.length} de tus últimas ${ses.length} sesiones de ${E.s.toLowerCase()}. Baja el peso o cámbialo en el editor`}
-function esRecord(row){if(row.k!=='act.'||!(row.kg>0))return false;
+// récord: de 1RM estimado (con peso) o, v26, de repeticiones con la MISMA carga (también peso corporal) frente a series anteriores
+// de ese ejercicio con esa carga y un esfuerzo igual o mayor (misma reserva o menos). Sin peso anotado no hay carga con qué comparar.
+// La primera vez que haces un ejercicio (o una carga) no hay récord: no hay línea base.
+function esRecord(row){if(row.k!=='act.')return false;return recordE1(row)||recordReps(row)}
+function recordE1(row){if(!(row.kg>0))return false;
   const antes=previas(grupo,row.ej,S.id).map(p=>p.mejor);if(!antes.length)return false;
   const hoy=S.sets.filter(r=>r.ej===row.ej&&r.k==='act.'&&r.kg>0).map(e1);
   return e1(row)>Math.max(...antes,...hoy)*1.005}
+function recordReps(row){if(row.kg==null)return false;const R=parseInt(row.reps,10)||0,n=rirN(row.rir);
+  const comp=r=>r.ej===row.ej&&r.k==='act.'&&r.kg!=null&&Math.abs(r.kg-row.kg)<1e-6&&rirN(r.rir)<=n;
+  const prev=[];hist.forEach(h=>{if(h.id!==S.id&&gDe(h)===grupo)(h.sets||[]).forEach(r=>{if(comp(r))prev.push(parseInt(r.reps,10)||0)})});
+  if(!prev.length)return false;S.sets.forEach(r=>{if(comp(r))prev.push(parseInt(r.reps,10)||0)});
+  if(R>Math.max(...prev)){row.prT='reps';return true}return false}
 function fanfarria(){beep(880,.12);setTimeout(()=>beep(1175,.12),140);setTimeout(()=>beep(1568,.35),280);vibrar([60,40,60,40,200])}
 // Primero el bloque (multiplicador de la semana, dentro de META_MIN–META_MAX; descarga = la mitad), luego el ajuste por cómo llegas.
 const metaBase=g=>{if(descargaActiva())return Math.max(2,Math.ceil(metas[g]/2));const b=bloqueSem();
@@ -419,7 +431,7 @@ const metaHoy=g=>bajaHoy()?Math.max(2,Math.round(metaBase(g)*.75)):metaBase(g);
 function iniciarSesion(x){x=x||{};if(x.fza)S.fza=x.fza;if(x.ests)S.ests=x.ests;
   const s0=x.ests?x.ests[0]:0,E0=estsDe()[s0],b=bienDia();
   Object.assign(S,{id:'s'+Date.now()+Math.random().toString(36).slice(2,6),start:new Date().toISOString(),phase:E0.levy?'vac':'act',levyT:E0.levy?levy():0,
-    meta:metaHoy(grupo),metaE:repartir(grupo),bien:bienDe(b),kRec:kDe(grupo),desc:descargaActiva()});
+    meta:metaHoy(grupo),metaE:repartir(grupo),bien:bienDe(b),kRec:kDe(grupo),modRec:modDe(grupo),desc:descargaActiva()});
   if(x.ests){S.sec=s0;S.meta=x.ests.reduce((a,i)=>a+(S.metaE[i]||0),0)}   // la meta del grupo se reparte entre los dos lados
   if(x.fza){S.desc=false;S.meta=x.fza.nP+x.fza.nA;S.metaE=x.fza.e.map(e=>e.fz==='p'?x.fza.nP:x.fza.nA)}   // en fuerza la meta son series pesadas
   if(lesOn()){const A=lesAct();S.les=A[0].z;S.lesP=A[0].p;S.lesN=A[0].n;S.lesL=A.map(({z,p,n})=>({z,p,n}));S.lesAv=lesAvisoSesion(grupo,x.ests)}
@@ -476,7 +488,9 @@ function avanzar(ev){
   const row={ex:E.s,ej:E.n,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir>=4?'4+':String(rir),
     kg:ph==='ext'&&E.ext==='flat'?null:S.kg,P:S.P,rest:0};
   // para calibrar: objetivo que dio el motor, capacidad prevista y factor de recuperación usado
-  if(ph==='myo'&&S.Cpre!=null){row.obj=S.target;row.Cpre=Math.round(S.Cpre*1000)/1000;row.kc=S.kRec||1}
+  // v26: + predF (reps hasta el fallo que predijo el modelo antes de la serie, RTF × capacidad) y mod (versión del modelo):
+  // con R + RIR se puede medir el error sin la censura del objetivo (la mini-serie se reporta por defecto con el objetivo)
+  if(ph==='myo'&&S.Cpre!=null){row.obj=S.target;row.Cpre=Math.round(S.Cpre*1000)/1000;row.kc=S.kRec||1;row.predF=Math.round(S.RTF*S.Cpre*10)/10;row.mod=S.modRec||'fijo'}
   const c=efectiva(row);S.efE+=c;S.ef+=c;
   if(ph==='act'&&row.kg>0)S.calHecho=true;   // ya se trabajó con peso: los ejercicios siguientes no vuelven a calentar (la fila aún no está en S.sets)
   if(ph==='act'&&row.kg!=null&&S.ronda===1&&!S.fza){const rg=regla(E,row);if(rg.cambio)S.aviso=`Próxima vez en ${E.s}: ${rg.txt}`}
@@ -709,9 +723,18 @@ function lesCarga(n,g,z,p){const T=lesTab(z,p);if(!T)return 'b';const b=ANIM.bus
 /* v25 · varias zonas a la vez: cada zona pide una acción sobre el ejercicio según su nivel y la carga; manda la más prudente.
    0 nada · 1 avisar del ángulo · 2 serie recta con 2–3 en reserva · 3 cambiarlo · 4 cambiarlo por uno de carga baja o quitarlo */
 const LES_ACC={leve:{m:1,a:2},fuerte:{m:2,a:3},extremo:{m:4,a:4}};
-function lesAcc(n,g,zs){let v=0,ang=false;const ks=[];
-  for(const x of zs){const c=lesCarga(n,g,x.z,x.p);if(c==='b')continue;const a=LES_ACC[x.n][c];ks.push(lesK(x));if(x.n==='leve')ang=true;if(a>v)v=a}
-  return {v,ks,ang}}
+// v26 (Fase 2, caso 6) · desencadenantes: ejercicios en los que anotaste molestia en esa zona en los últimos 28 días. En cualquier nivel se
+// cambian (con dolor extremo, carga baja o fuera) y no sirven de alternativa: no se mantiene un ejercicio que ya te dolió solo por el nivel.
+const GAT_DIAS=28;let gatC={k:'',m:new Map()};
+function lesGatillos(){const k=hist.length+':'+(hist[0]?(hist[0].id+(hist[0].sets||[]).length):'')+':'+Math.floor(Date.now()/864e5);
+  if(gatC.k===k)return gatC.m;const m=new Map(),desde=Date.now()-GAT_DIAS*864e5;
+  hist.forEach(h=>{if(Date.parse(h.start)<desde)return;(h.sets||[]).forEach(r=>{if(r.ej&&LES_Z.includes(r.mol)){if(!m.has(r.ej))m.set(r.ej,new Set());m.get(r.ej).add(r.mol)}})});
+  gatC={k,m};return m}
+function lesAcc(n,g,zs){let v=0,ang=false,gat=false;const ks=[],G=lesGatillos().get(n);
+  for(const x of zs){const c=lesCarga(n,g,x.z,x.p);let a=c==='b'?0:LES_ACC[x.n][c];
+    if(G&&G.has(x.z)){gat=true;a=Math.max(a,x.n==='extremo'?4:3)}   // te dolió aquí: cambiarlo
+    if(!a)continue;ks.push(lesK(x));if(x.n==='leve')ang=true;if(a>v)v=a}
+  return {v,ks,ang,gat}}
 // mejor alternativa del mismo grupo que ninguna zona obligue a cambiar (acción < 3): que trabaje los mismos músculos y que no esté ya en el plan
 function lesAlt(g,E,zs,ya){const mE=musculos(E.n,g),P=new Set(zs.flatMap(x=>[...(LES_PREF[x.z]||[])]));let best=null;
   for(const d of ANIM.lista){if(d.g!==g||d.id==='vacio'||d.id==='generico'||ya.has(d.n))continue;const r=lesAcc(d.n,g,zs);if(r.v>=3)continue;
@@ -725,10 +748,10 @@ const nCorto=n=>{if(SUGEJ[n])return SUGEJ[n].s;const w=n.split(' ');const s=w.le
      extremo:  a y m → alternativa de carga baja; si no hay, el ejercicio se quita (lesFuera). Sin ninguno seguro, el grupo queda en pausa.
    lesZs: las zonas («z|p») que afectan a ese ejercicio, para los avisos. */
 function lesLista(g,L,zs){if(!Array.isArray(zs))zs=[zs];const ya=new Set(L.map(x=>x.n));
-  return L.map(E=>{if(E.levy)return E;const r=lesAcc(E.n,g,zs);if(!r.v)return E;const base={...E,lesZs:r.ks,orig:E};
+  return L.map(E=>{if(E.levy)return E;const r=lesAcc(E.n,g,zs);if(!r.v)return E;const base={...E,lesZs:r.ks,orig:E,...(r.gat?{lesGat:1}:{})};
     if(r.v===1)return {...base,lesAng:1};
     if(r.v===2)return {...base,lesM:zs[0].z,...(r.ang?{lesAng:1}:{})};
-    const a=lesAlt(g,E,zs,ya);if(!a)return r.v===4?{...base,lesFuera:1}:{...base,lesM:zs[0].z,lesSin:true};ya.add(a.n);
+    const a=lesAlt(g,E,zs,ya);if(!a)return r.v===4||r.gat?{...base,lesFuera:1}:{...base,lesM:zs[0].z,lesSin:true};ya.add(a.n);   // un desencadenante sin alternativa se quita
     const sg=SUGEJ[a.n]||{},ext=sg.ext||'part',o={...base,n:a.n,s:sg.s||nCorto(a.n),tempo:sg.tempo||'controlado · sin dolor',ext,
       extN:sg.extN||'Parciales',extH:sg.extH||'recorrido corto y sin dolor',k:KEXT[ext]||1.5,lesDe:E.n,lesZ:zs[0].z};
     if(a.r.v===2)o.lesM=zs[0].z;else if(a.r.v===1)o.lesAng=1;if(a.r.ks.length)o.lesZs=[...new Set(r.ks.concat(a.r.ks))];return o})}
@@ -744,7 +767,7 @@ function lesAvisoSesion(g,ests){const L=CAT[g].e.filter((x,i)=>!ests||ests.inclu
   return `Cuidando ${q}`+(c.length?`: cambié ${c.join(' y ')}`:'')+(m.length?`. En ${m.join(' y ')}, series rectas con 2 o 3 en reserva`:'')
     +(an.length?`. ${[...new Set(an.map(angDe))].join(' ')}`:'')+(!c.length&&!m.length&&!an.length?': hoy ningún ejercicio lo carga mucho':'')+'. Si duele, para'}
 function avisoEst(g,E){const a=avisoMolestia(g,E);if(!E||(!E.lesDe&&!E.lesM&&!E.lesAng))return a;const q=lesQueDe(E);
-  const l=E.lesDe?`Cambiado por cuidar ${q}: ${E.n} en lugar de ${E.lesDe}`+(E.lesM?' · 2–3 en reserva':'')
+  const l=E.lesDe?`Cambiado por cuidar ${q}: ${E.n} en lugar de ${E.lesDe}`+(E.lesGat?' (anotaste molestia en ese ejercicio)':'')+(E.lesM?' · 2–3 en reserva':'')
     :E.lesM?`Cuidando ${q}: series rectas con 2–3 en reserva, sin llegar al fallo`+(E.lesAng?`. ${angDe(E)}`:'')
     :`Cuidando ${q}: ${angDe(E)}`;
   return a?l+'. '+a:l}
@@ -789,8 +812,9 @@ function aplicar(ev){
   const mol=S.molR,molP=S.molP;S.molR=null;S.molP=null;
   const o=avanzar(ev),t=now(),pr=esRecord(o.row);if(pr)o.row.pr=true;if(mol!=null){o.row.mol=mol||'sin zona';if(mol&&molP&&LES_P[mol]&&LES_P[mol].includes(molP))o.row.molP=molP}S.sets.push(o.row);
   Object.assign(S,{P0:S.P,C0:S.C,t0:t,last:t,restDur:o.rest,lastSec:-1});
-  if(pr){S.pr=t+6;S.prK='¡Récord personal!';S.prTxt=`${o.row.ex}: ${kgTxt(o.row.kg)} × ${o.row.reps}`;fanfarria()}
-  const yaPr=pr?'¡Récord personal! ':'';
+  const prR=pr&&o.row.prT==='reps';   // récord de reps con la misma carga
+  if(pr){S.pr=t+6;S.prK=prR?'¡Récord de reps!':'¡Récord personal!';S.prTxt=`${o.row.ex}: ${o.row.kg>0?kgTxt(o.row.kg):'peso corporal'} × ${o.row.reps}`;fanfarria()}
+  const yaPr=pr?(prR?'¡Récord de repeticiones con la misma carga! ':'¡Récord personal! '):'';
   if(o.mode==='done'){const ok=metaHecha();S.st='done';S.antes=!ok;guardar(ok);   // el motor agotó los ejercicios: «Completa» solo con la meta
     const md=revisarMedallas(),pre=yaPr+fraseMed(md);
     if(SS){celebrar(md,t);ssFinLado(pre+(S.aviso?S.aviso+'. ':''),t);return}   // superserie: sigue el otro lado o termina todo
@@ -802,15 +826,18 @@ function aplicar(ev){
   decir(yaPr+fraseMed(md)+(S.aviso&&!SS?S.aviso+'. ':'')+fd);render()}
 function repsDe(sets){return sets.reduce((a,r)=>a+(r.rir!=='—'?parseInt(r.reps,10)||0:0),0)}
 const sinCal=sets=>(sets||[]).filter(r=>r.k!=='cal.');   // las series de calentamiento no cuentan como series
+const ESQUEMA=2;   // versión del registro de sesión (v26: esq, creada, editada; series con predF/mod/prT)
 function guardar(completa){
-  if(!S.id||!sinCal(S.sets).length)return;
+  if(!S.id||!sinCal(S.sets).length)return;const prev=hist.find(h=>h.id===S.id),ahora=new Date().toISOString();
   const ent={id:S.id,start:S.start,g:grupo,grupo:CAT[grupo].n,series:sinCal(S.sets).length,reps:repsDe(S.sets),tuc:Math.round(S.tuc),iso:Math.round(S.iso),completa:!!completa,sets:S.sets,
     efectivas:Math.round(efDe(S.sets)*100)/100,meta:S.meta,bien:S.bien||undefined,nota:S.nota||undefined,
     antes:!completa&&S.antes||undefined,desc:S.desc||undefined,serC:S.desc?serDe(S.sets):S.fza?fzaHechas():undefined,
     rut:enRutina()?{n:RUTINAS[rutI].mia?'La mía':RUTINAS[rutI].n,pos:rutPos,de:rutLista().length}:undefined,
-    fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined,cuidaP:S.les&&S.lesP||undefined,cuidaN:S.les&&S.lesN||undefined,cuidaL:S.les&&S.lesL&&S.lesL.length>1?S.lesL:undefined};
+    fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined,cuidaP:S.les&&S.lesP||undefined,cuidaN:S.les&&S.lesN||undefined,cuidaL:S.les&&S.lesL&&S.lesL.length>1?S.lesL:undefined,
+    esq:ESQUEMA,creada:prev&&prev.creada||ahora,editada:prev&&prev.editada||undefined};
   hist=[ent].concat(hist.filter(h=>h.id!==S.id));   // sin tope: nunca se borran sesiones viejas
   $('save').textContent=escribirHist()?'Guardado ✓':'Sin espacio: no se guardó (mira el aviso)';
+  if(S.st==='done')recRegistra();   // Fase 4: al cerrar la sesión se reevalúa el modelo y se registra si cambió
   if(persistE==null)pedirPersist();pintarHist()}
 /* ---------- almacenamiento: historial completo en localStorage (compartido con Comida, ~5 millones de caracteres por origen).
    Si no cabe NO se borra nada: queda en memoria, se avisa y se sugiere la copia de seguridad completa (que lo lleva entero). ---------- */
@@ -940,25 +967,114 @@ $('cTempos').onclick=e=>{const b=e.target.closest('[data-t]');if(b)fijarTempo({t
 $('cTempoAdd').onclick=()=>{const v=$('cTempoN').value.trim().replace(/[\s/.,]+/g,'-');const p=v.split('-').map(Number);
   if(p.length!==4||String(tempoP(v))!==String(p)){$('cTempoN').value='';$('cTempoN').placeholder='4 números de 0 a 9, p. ej. 3-1-2-0';return}
   $('cTempoN').value='';fijarTempo({t:p.join('-'),on:true})};
-/* ---------- recuperación aprendida: k_g = mediana de (reps hechas / objetivo sin calibrar) de las mini-series del grupo ---------- */
-const CALIB_MIN=8;
-function calib(){const r={};Object.keys(CAT).forEach(g=>r[g]=[]);const desde=calibC.desde?Date.parse(calibC.desde):0;
-  hist.forEach(h=>{const g=gDe(h);if(!r[g]||(desde&&Date.parse(h.start)<=desde))return;
-    (h.sets||[]).forEach(x=>{const R=parseInt(x.reps,10);if(x.k==='myo'&&+x.obj>0&&R>=0)r[g].push(R/x.obj*(+x.kc||1))})});   // ×kc: deshace la calibración ya aplicada
-  const out={};for(const g in r){const v=r[g].sort((a,b)=>a-b),n=v.length,med=n?(n%2?v[(n-1)/2]:(v[n/2-1]+v[n/2])/2):1;
-    // acotada a 0,7–1,3 y encogida hacia 1 según cuántos datos hay (con 8 pesa la mitad)
-    const mc=Math.min(1.3,Math.max(.7,med)),k=n>=CALIB_MIN?Math.min(1.3,Math.max(.7,1+(mc-1)*n/(n+CALIB_MIN))):1;out[g]={k:Math.round(k*1000)/1000,n,med}}
-  return out}
-const kDe=g=>(calib()[g]||{k:1}).k;
-let calibBorrar=false;
-function renderCalib(){const c=calib(),pc=k=>Math.round(Math.abs(1/k-1)*100);
-  $('cCalib').innerHTML=`<p class="muted" style="font-size:13px;margin:0 0 6px">El reloj compara las reps que haces en cada mini-serie con las que esperaba. Si sueles hacer menos, alarga el descanso y baja el objetivo; si haces más, lo acorta. Hacen falta ${CALIB_MIN} mini-series por grupo.</p>
-    <div class="tbl"><table><thead><tr><th>Grupo</th><th>Factor</th><th>Datos</th><th style="text-align:left;padding-left:10px">Qué significa</th></tr></thead><tbody>${Object.keys(CAT).map(g=>{const x=c[g];
-      const q=x.n<CALIB_MIN?`faltan ${CALIB_MIN-x.n} mini-series`:Math.abs(x.k-1)<.005?'te recuperas como predice':x.k<1?`descansos ${pc(x.k)} % más largos, objetivo más bajo`:`descansos ${pc(x.k)} % más cortos, objetivo más alto`;
-      return `<tr><td>${CAT[g].n}</td><td>${num2(x.k)}</td><td>${x.n}</td><td style="text-align:left;padding-left:10px;white-space:normal">${q}</td></tr>`}).join('')}</tbody></table></div>
+/* ---------- Fase 4 (v27) · recuperación aprendida, evaluada y auditable ----------
+   Qué predice: las reps hasta el fallo de cada mini-serie, pred = RTF × C(t), con RTF = reps + reserva de la serie principal del
+   ejercicio y C(t) = capacidad recuperada tras el descanso (modelo fijo de congestión y capacidad). Un factor k por grupo la escala.
+   Qué observa: reps + reserva de la mini-serie (R + RIR). NO reps/objetivo: la mini-serie se reporta por defecto con su objetivo
+   (65–90 % de lo previsto), así que ese cociente vale 1 si aceptas el número y nunca puede indicar que te recuperas más rápido.
+   Reservas «3+»/«4+» son cotas, no valores: se excluyen del ajuste y de la evaluación.
+   Modelos (todos en escala logarítmica del cociente hecho/predicho, robusto con la mediana):
+     fijo    k = 1.
+     rec-1   el de v18–v26: k = mediana de R/objetivo, encogida n/(n+8), sin efecto con n < 8 (solo como referencia).
+     rec-2   por grupo: k = exp(mediana de ln(obs/pred) encogida n/(n+8) hacia 0).
+     rec-2p  agrupado: el sesgo común de TODOS tus grupos (encogido N/(N+8)) y, encima, el de cada grupo encogido hacia ese común
+             (pesa n_g/(n_g+8)); un grupo con pocos datos hereda sobre todo el común. Acotado a [0,7, 1,3].
+   Evaluación PREQUENTIAL: se recorren las mini-series en orden temporal y cada una se predice solo con las anteriores (de todos los
+   grupos). Métricas: error absoluto medio en reps, sesgo, y prueba de signo pareada (en cuántas acierta mejor cada modelo).
+   Selección (conservadora): se usa rec-2p solo si, con ≥ 20 predicciones evaluadas, su error medio es ≥ 5 % menor que el del fijo Y
+   la prueba de signo da p < 0,10; además el grupo no puede ir peor que con el fijo en sus propias predicciones. Si deja de cumplirse,
+   se vuelve al fijo (detección de degradación). Cambios de modelo o de k > 0,02: registro con fecha, motivo y errores. */
+const CALIB_MIN=8,REC2_MIN=4,REC_GANA=.05,REC_NEV=20,REC_P=.10,MODKEY='reloj-anomalo-modelo',REC_MODS=['fijo','rec-2p'];
+const normModelo=o=>{const r={sel:{},log:[]};if(!esObj(o))return r;
+  if(esObj(o.sel))for(const g of Object.keys(CAT)){const x=o.sel[g];if(esObj(x)&&REC_MODS.includes(x.m)){const k=vNum(x.k,.5,2);if(k!=null)r.sel[g]={m:x.m,k}}}
+  if(Array.isArray(o.log))r.log=o.log.slice(-200).filter(x=>esObj(x)&&esG(x.g)&&vFecha(x.t)).map(x=>({t:x.t,g:x.g,de:vTxt(x.de,40)||'',a:vTxt(x.a,40)||'',por:vTxt(x.por,300)||''}));
+  return r};
+let modState=normModelo(leerJSON(MODKEY,{}));
+const mediana=v=>{if(!v.length)return null;const s=v.slice().sort((a,b)=>a-b),n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2};
+const clK=x=>Math.min(1.3,Math.max(.7,x));
+// observaciones en orden temporal: una por mini-serie con objetivo y capacidad prevista guardados (desde v18)
+function obsRec(){const out=[],desde=calibC.desde?Date.parse(calibC.desde):0;
+  hist.slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)).forEach(h=>{const g=gDe(h),t=Date.parse(h.start);if(!g||!CAT[g]||(desde&&t<=desde))return;
+    const rtf={};(h.sets||[]).forEach((x,i)=>{const ej=x.ej||x.ex,R=parseInt(x.reps,10);
+      if(x.k==='act.'){rtf[ej]={v:R+rirN(x.rir),cens:/\+/.test(x.rir||'')};return}
+      if(x.k!=='myo'||!(+x.obj>0)||!(+x.Cpre>0)||!rtf[ej]||!(R>=0))return;
+      const kc=+x.kc||1,Cf=+x.Cpre/kc,pf=rtf[ej].v*Cf,cens=rtf[ej].cens||/\+/.test(x.rir||'');
+      if(!(pf>=1))return;out.push({t:t+i,g,ej,pf:Math.round(pf*100)/100,obs:R+rirN(x.rir),r:R,obj:+x.obj,kc,cens,mod:x.mod||'rec-1'})})});
+  return out.sort((a,b)=>a.t-b.t)}
+const logsDe=L=>L.filter(o=>!o.cens&&o.obs>0).map(o=>Math.log(o.obs/o.pf));
+function kRec1(tr){const v=tr.map(o=>o.r/o.obj*o.kc),n=v.length;if(n<CALIB_MIN)return 1;const m=clK(mediana(v));return clK(1+(m-1)*n/(n+CALIB_MIN))}
+function kRec2(tr){const v=logsDe(tr),n=v.length;if(n<REC2_MIN)return 1;return clK(Math.exp(mediana(v)*n/(n+CALIB_MIN)))}
+// agrupado: común encogido hacia 0 y grupo encogido hacia el común; intervalo aproximado con la dispersión (MAD) del grupo o, si tiene pocos, de todos
+function kPool(tr,g){const va=logsDe(tr),N=va.length,vg=logsDe(tr.filter(o=>o.g===g)),n=vg.length;
+  const m0=N?mediana(va)*N/(N+CALIB_MIN):0,m=n?(n*mediana(vg)+CALIB_MIN*m0)/(n+CALIB_MIN):m0;
+  const base=n>=REC2_MIN?vg:va,mb=base.length?mediana(base):0,se=base.length?1.4826*mediana(base.map(x=>Math.abs(x-mb)))*1.253/Math.sqrt(base.length):null;
+  return {k:clK(Math.exp(m)),n,N,lo:se==null?null:clK(Math.exp(m-1.96*se)),hi:se==null?null:clK(Math.exp(m+1.96*se))}}
+// cola de la binomial (prueba de signo, una cola): P(X ≥ w | n, ½)
+function pSigno(w,n){if(!n)return 1;let p=0,c=1;for(let i=0;i<=n;i++){if(i>0)c=c*(n-i+1)/i;if(i>=w)p+=c}return Math.min(1,p/Math.pow(2,n))}
+function compara(ev,a,b){let w=0,l=0;ev.forEach(e=>{const ea=Math.abs(e.obs-e[a]),eb=Math.abs(e.obs-e[b]);if(ea<eb-1e-9)w++;else if(eb<ea-1e-9)l++});return {w,l,p:pSigno(w,w+l)}}
+const maeDe=(L,k)=>L.length?L.reduce((a,e)=>a+Math.abs(e.obs-e[k]),0)/L.length:null,sesgoDe=(L,k)=>L.length?L.reduce((a,e)=>a+(e.obs-e[k]),0)/L.length:null;
+// evaluación en orden temporal (todos los grupos juntos: el modelo agrupado aprende también de los demás grupos)
+function evalRec(){const O=obsRec(),ev=[];
+  O.forEach((x,i)=>{if(x.cens)return;const tr=O.slice(0,i),trg=tr.filter(y=>y.g===x.g);
+    ev.push({t:x.t,g:x.g,ej:x.ej,obs:x.obs,p0:x.pf,p1:x.pf*kRec1(trg),p2:x.pf*kRec2(trg),p3:x.pf*kPool(tr,x.g).k,ntr:logsDe(trg).length})});
+  const G={n:ev.length,mae0:maeDe(ev,'p0'),mae1:maeDe(ev,'p1'),mae2:maeDe(ev,'p2'),mae3:maeDe(ev,'p3'),sesgo0:sesgoDe(ev,'p0'),sesgo3:sesgoDe(ev,'p3'),s3:compara(ev,'p3','p0'),s2:compara(ev,'p2','p0')};
+  G.bien=G.n>=REC_NEV&&G.mae3<=G.mae0*(1-REC_GANA)&&G.s3.p<REC_P;
+  G.por=G.n<REC_NEV?`solo ${G.n} mini-series evaluadas en orden temporal (hacen falta ${REC_NEV})`
+    :G.bien?`con ${G.n} mini-series en orden temporal, el aprendido se equivocó ${num(G.mae3)} reps de media frente a ${num(G.mae0)} del fijo y acertó mejor en ${G.s3.w} de ${G.s3.w+G.s3.l} (prueba de signo p = ${num2(G.s3.p)})`
+    :`el aprendido no mejora con claridad al fijo (${num(G.mae3)} frente a ${num(G.mae0)} reps; mejor en ${G.s3.w} de ${G.s3.w+G.s3.l}, p = ${num2(G.s3.p)}): se usa el fijo`;
+  const R={_:G};
+  for(const g of Object.keys(CAT)){const o=O.filter(x=>x.g===g),e=ev.filter(x=>x.g===g),k=kPool(O,g),m0=maeDe(e,'p0'),m3=maeDe(e,'p3');
+    const peor=e.length>=5&&m3>m0;const usa=G.bien&&!peor;
+    R[g]={n:o.length,nUt:logsDe(o).length,nEval:e.length,ev:e,k,mae0:m0,mae1:maeDe(e,'p1'),mae2:maeDe(e,'p2'),mae3:m3,sesgo0:sesgoDe(e,'p0'),sesgo3:sesgoDe(e,'p3'),s3:compara(e,'p3','p0'),
+      usa,kUsa:usa?Math.round(k.k*1000)/1000:1,modelo:usa?'rec-2p':'fijo',
+      por:!G.bien?G.por:peor?`en tus ${e.length} mini-series de este grupo el aprendido fue peor que el fijo (${num(m3)} frente a ${num(m0)} reps): se usa el fijo`
+        :`${G.por}; en este grupo: ${e.length?`${num(m3)} frente a ${num(m0)} reps en ${e.length} mini-series`:'sin mini-series propias aún, hereda el sesgo común'}`}}
+  return R}
+let recMemo={k:'',v:null};
+function recEval(){const k=hist.length+':'+(hist[0]?(hist[0].id+(hist[0].sets||[]).length+(hist[0].editada||'')):'')+':'+(calibC.desde||'');
+  if(recMemo.k!==k)recMemo={k,v:evalRec()};return recMemo.v}
+const MODELO_REC='rec-2p';   // procedimiento vigente; cada mini-serie guarda en mod el modelo que la predijo (fijo o rec-2p)
+const kDe=g=>{const r=recEval()[g];return r?r.kUsa:1};
+const modDe=g=>{const r=recEval()[g];return r?r.modelo:'fijo'};
+// registro de cambios: se compara la selección actual con la guardada (al arrancar y al cerrar cada sesión)
+function recRegistra(){const R=recEval(),t=new Date().toISOString();let cambio=false;
+  for(const g of Object.keys(CAT)){const a={m:R[g].modelo,k:R[g].kUsa},d=modState.sel[g]||{m:'fijo',k:1};
+    if(a.m!==d.m||Math.abs(a.k-d.k)>.02){modState.log.push({t,g,de:`${d.m} k=${num2(d.k)}`,a:`${a.m} k=${num2(a.k)}`,por:R[g].por});cambio=true}
+    modState.sel[g]=a}
+  if(cambio){modState.log=modState.log.slice(-200);guardarObj(MODKEY,modState)}else if(!leerJSON(MODKEY,null))guardarObj(MODKEY,modState)}
+// gráfico predicho frente a hecho (fijo en gris, aprendido en color), con la diagonal de acierto exacto
+function recGraf(ev){if(!ev.length)return '';const mx=Math.max(4,...ev.map(e=>Math.max(e.obs,e.p0,e.p3)))*1.08,W=220,P=26,x=v=>P+v/mx*(W-P-6),y=v=>W-P-v/mx*(W-P-6);
+  const pts=(k,c,r)=>ev.map(e=>`<circle cx="${x(e[k]).toFixed(1)}" cy="${y(e.obs).toFixed(1)}" r="${r}" fill="${c}" fill-opacity=".75"><title>predicho ${num(e[k])} · hecho ${e.obs}</title></circle>`).join('');
+  return `<svg viewBox="0 0 ${W} ${W}" class="recg" role="img" aria-label="Reps predichas frente a reps hechas hasta el fallo">
+    <line x1="${x(0)}" y1="${y(0)}" x2="${x(mx)}" y2="${y(mx)}" stroke="var(--muted)" stroke-dasharray="3 3"/>
+    <line x1="${P}" y1="${W-P}" x2="${W-4}" y2="${W-P}" stroke="var(--line)"/><line x1="${P}" y1="6" x2="${P}" y2="${W-P}" stroke="var(--line)"/>
+    ${pts('p0','var(--muted)',3)}${pts('p3','var(--art)',2.4)}
+    <text x="${W/2}" y="${W-6}" text-anchor="middle" class="rect">predicho (reps hasta el fallo)</text><text x="9" y="${W/2}" text-anchor="middle" transform="rotate(-90 9 ${W/2})" class="rect">hecho</text></svg>`}
+let calibBorrar=false,recSel='';
+function renderCalib(){const R=recEval(),G=R._,pc=k=>Math.round(Math.abs(1/k-1)*100),O=Object.keys(CAT);
+  const fila=g=>{const x=R[g],k=x.kUsa;
+    const q=x.usa?(Math.abs(k-1)<.005?'te recuperas como predice el modelo fijo':k<1?`descansos ${pc(k)} % más largos, objetivo más bajo`:`descansos ${pc(k)} % más cortos, objetivo más alto`):'modelo fijo';
+    // estrecha para el teléfono: el significado del factor va en el detalle (¿por qué?)
+    return `<tr data-recg="${g}" style="cursor:pointer"${recSel===g?' class="on"':''} title="${esc(q)}"><td>${CAT[g].n}</td><td>${x.usa?'aprendido':'fijo'}</td><td>${num2(k)}</td><td>${x.nUt}</td>`
+      +`<td>${x.mae0==null?'—':`${num(x.mae0)} → ${num(x.mae3)}`}</td></tr>`};
+  let det='';
+  if(recSel&&R[recSel]){const x=R[recSel],k=x.k;
+    const kU=x.kUsa,efecto=!x.usa?'Se usa el modelo fijo.':Math.abs(kU-1)<.005?'Te recuperas como predice el modelo fijo.':kU<1?`Efecto: descansos ${Math.round(Math.abs(1/kU-1)*100)} % más largos y objetivo de mini-serie más bajo.`:`Efecto: descansos ${Math.round(Math.abs(1/kU-1)*100)} % más cortos y objetivo más alto.`;
+    det=`<div class="recdet"><p><b>${CAT[recSel].n}: ¿por qué?</b> ${esc(x.por)}. ${efecto}</p>
+      <p class="hint">Qué mide y qué no: el modelo fijo sobrestima o infraestima tus reps tras el descanso; el factor lo corrige. No distingue si la causa es recuperación más lenta, fatiga acumulada en la sesión o cómo estimas la reserva: solo que, con tus datos, así se predice mejor.</p>
+      <p class="hint">Datos: ${x.n} mini-series con predicción guardada, ${x.nUt} utilizables (las de reserva «3+»/«4+» son cotas y no cuentan), ${x.nEval} evaluadas en orden temporal.
+      Error medio en reps hasta el fallo: fijo ${x.mae0==null?'—':num(x.mae0)} · aprendido ${x.mae3==null?'—':num(x.mae3)} · anterior, reps/objetivo ${x.mae1==null?'—':num(x.mae1)}.
+      Sesgo (hecho − predicho): fijo ${x.sesgo0==null?'—':num(x.sesgo0)} · aprendido ${x.sesgo3==null?'—':num(x.sesgo3)} reps. Acertó mejor el aprendido en ${x.s3.w} y el fijo en ${x.s3.l}.
+      Factor estimado: ${num2(k.k)}${k.lo!=null?` (intervalo aproximado al 95 %: ${num2(k.lo)}–${num2(k.hi)})`:''}${x.usa?'':' — no se aplica'}.</p>
+      ${x.ev.length?recGraf(x.ev)+'<p class="hint">Cada punto es una mini-serie: gris = lo que predijo el modelo fijo, color = el aprendido solo con los datos anteriores. Sobre la diagonal, acierto exacto; por debajo, hiciste menos de lo previsto.</p>':'<p class="hint">Sin mini-series evaluables todavía.</p>'}
+      ${modState.log.filter(c=>c.g===recSel).slice(-5).reverse().map(c=>`<p class="hint">${new Date(c.t).toLocaleDateString('es-DO',{day:'numeric',month:'short'})}: ${esc(c.de)} → ${esc(c.a)}. ${esc(c.por)}.</p>`).join('')}</div>`}
+  $('cCalib').innerHTML=`<p class="muted" style="font-size:13px;margin:0 0 6px">El reloj predice cuántas reps hasta el fallo te quedan en cada mini-serie (reps + reserva) y comprueba después lo que hiciste. Solo usa lo aprendido si, en orden temporal, predice mejor que el modelo fijo con evidencia suficiente; si no, sigue con el fijo y lo dice. Toca un grupo para ver por qué.</p>
+    <p class="hint"><b>Evidencia global:</b> ${esc(G.por)}.</p>
+    <div class="tbl"><table><thead><tr><th>Grupo</th><th>Modelo</th><th>Factor</th><th>Datos</th><th>Error (reps)<br>fijo → aprendido</th></tr></thead><tbody>${O.map(fila).join('')}</tbody></table></div>${det}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><button id="calibRes" type="button" class="btn2${calibBorrar?' peligro':''}">${calibBorrar?'¿Seguro? Toca otra vez':'Reiniciar calibración'}</button>
-    <span class="hint">${calibC.desde?'Cuenta desde el '+new Date(calibC.desde).toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'}):'Cuenta todas tus sesiones'}</span></div>`;
-  $('calibRes').onclick=()=>{if(!calibBorrar){calibBorrar=true;renderCalib();return}calibBorrar=false;calibC={desde:new Date().toISOString()};guardarObj(CKEY,calibC);renderCalib()}}
+    <span class="hint">${calibC.desde?'Cuenta desde el '+new Date(calibC.desde).toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'}):'Cuenta todas tus sesiones'} · procedimiento ${MODELO_REC}</span></div>`;
+  $('cCalib').querySelectorAll('[data-recg]').forEach(tr=>tr.onclick=()=>{recSel=recSel===tr.dataset.recg?'':tr.dataset.recg;renderCalib()});
+  $('calibRes').onclick=()=>{if(!calibBorrar){calibBorrar=true;renderCalib();return}calibBorrar=false;calibC={desde:new Date().toISOString()};guardarObj(CKEY,calibC);recRegistra();renderCalib()}}
 $('cCal').onclick=()=>{CFG.cal=!CFG.cal;guardarCfg()};
 $('cBarra').onclick=e=>{const b=e.target.closest('[data-b]');if(b){CFG[esLb()?'barraLb':'barra']=+b.dataset.b;guardarCfg()}};
 const kD=()=>esLb()?'discosLb':'discos',kX=()=>esLb()?'discosXLb':'discosX',misDiscos=()=>(CFG[kD()]||(esLb()?DISCOS_LB:[])).map(Number);
@@ -1284,6 +1400,7 @@ $('hist').addEventListener('click',e=>{const b=e.target.closest('[data-hed]');if
     if(!sinCal(sets).length){hist=hist.filter(x=>x.id!==id);if(S.id===id&&!enCurso())S=fresh();$('ioMsg').textContent='Sesión borrada: no le quedaban series.'}
     else{Object.assign(h,{sets,series:sinCal(sets).length,reps:repsDe(sets),efectivas:Math.round(efDe(sets)*100)/100});
       if(h.desc)h.serC=serDe(sets);else if(h.fza)h.serC=sets.filter(r=>r.k==='act.').length;   // series completas o pesadas, como al guardar
+      h.editada=new Date().toISOString();h.esq=ESQUEMA;   // corrección a mano: queda la fecha de edición
       if(h.completa||h.antes){const ok=metaHechaH(h);h.completa=ok;h.antes=!ok||undefined}   // terminada: la meta se vuelve a medir con lo editado
       if(S.id===id&&S.st==='done'){S.sets=clon(sets);S.ef=efDe(sets);S.antes=!h.completa}$('ioMsg').textContent='Cambios guardados ✓'}
     histEd=null;histDraft=null;histBorrar=false;guardarHist()}});
@@ -1580,11 +1697,19 @@ function renderCmp(){const [PA,PB]=periodos(),A=statsP(...PA),B=statsP(...PB),en
   let h=`<select id="cmpSel" aria-label="Periodos a comparar">${CMPS.map(([k,n])=>`<option value="${k}"${k===cmpModo?' selected':''}>${n}</option>`).join('')}</select>`;
   if(cmpModo==='mano')h+=`<div class="cmpf"><label>A desde<input class="in" type="date" data-cf="a1" value="${esc(cmpF.a1)}"></label><label>A hasta<input class="in" type="date" data-cf="a2" value="${esc(cmpF.a2)}"></label>
     <label>B desde<input class="in" type="date" data-cf="b1" value="${esc(cmpF.b1)}"></label><label>B hasta<input class="in" type="date" data-cf="b2" value="${esc(cmpF.b2)}"></label></div>`;
-  h+=`<p class="hint">A: ${fRango(PA)} · B: ${fRango(PB)}${enCursoB?' (en curso)':''}. Flecha verde: mejora; ámbar: baja.</p>`;
-  h+=`<div class="tbl"><table>${th('General','A','B')}<tbody>${fila('Sesiones',A.ses,B.ses,ent)}${fila('Días entrenados',A.dias,B.dias,ent)}${fila('Series efectivas',A.ef,B.ef)}${fila('Récords',A.recs,B.recs,ent)}</tbody></table></div>`;
-  h+=`<h3>Series efectivas por grupo</h3><div class="tbl"><table>${th('Grupo','A','B')}<tbody>${Object.keys(CAT).map(g=>fila(CAT[g].n,A.g[g]||0,B.g[g]||0)).join('')}</tbody></table></div>`;
+  /* v26 (Fase 2, caso 3): ACTIVIDAD (sesiones, días, series) se compara en neutro: más actividad no es mejor rendimiento. Solo el
+     RENDIMIENTO con carga comparable (récords, 1RM del mismo ejercicio en los dos periodos) lleva verde o ámbar. Con un periodo vacío
+     no hay comparación de rendimiento posible y se dice. */
+  const vacio=!A.ses||!B.ses,act=(n,a,b,fmtv=ef1)=>fila(n,a,b,fmtv,0);
+  h+=`<p class="hint">A: ${fRango(PA)} · B: ${fRango(PB)}${enCursoB?' (en curso)':''}. Actividad, en gris: cuánto entrenaste, no si rendiste mejor. Solo el rendimiento con carga comparable lleva color (verde: mejora; ámbar: baja).</p>`
+    +(vacio?`<p class="aviso-d">${!A.ses&&!B.ses?'Ningún periodo tiene sesiones':`El periodo ${!A.ses?'A':'B'} no tiene sesiones`}: se ve la diferencia de actividad, pero no hay con qué comparar el rendimiento.</p>`:'');
+  h+=`<h3>Actividad</h3><div class="tbl"><table>${th('','A','B')}<tbody>${act('Sesiones',A.ses,B.ses,ent)}${act('Días entrenados',A.dias,B.dias,ent)}${act('Series efectivas (únicas)',A.ef,B.ef)}</tbody></table></div>`;
+  const sA=Object.values(A.g).reduce((x,y)=>x+y,0),sB=Object.values(B.g).reduce((x,y)=>x+y,0);
+  h+=`<h3>Series efectivas por grupo</h3><div class="tbl"><table>${th('Grupo','A','B')}<tbody>${Object.keys(CAT).map(g=>act(CAT[g].n,A.g[g]||0,B.g[g]||0)).join('')}</tbody></table></div>`
+    +(sA>A.ef+.05||sB>B.ef+.05?`<p class="hint">La suma por grupo (A ${ef1(sA)} · B ${ef1(sB)}) es mayor que las series únicas (A ${ef1(A.ef)} · B ${ef1(B.ef)}): una serie cuenta entera en su grupo y, ponderada, también en los que ayudan (press inclinado: hombros ½, tríceps ½). No es doble conteo de series; son atribuciones.</p>`:'');
+  h+=`<h3>Rendimiento</h3><div class="tbl"><table>${th('','A','B')}<tbody>${vacio?`<tr><td>Récords</td><td>${ent(A.recs)}</td><td>${ent(B.recs)}</td><td class="eq">—</td></tr>`:fila('Récords',A.recs,B.recs,ent)}</tbody></table></div>`;
   const zs=Object.keys(MUS).map(m=>[m,(B.z[m]||0)-(A.z[m]||0)]).filter(x=>Math.abs(x[1])>=.05).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).slice(0,5);
-  h+=`<h3>Zonas con más cambio</h3>`+(zs.length?`<div class="tbl"><table>${th('Zona','A','B')}<tbody>${zs.map(([m])=>fila(MUS[m][0],A.z[m]||0,B.z[m]||0)).join('')}</tbody></table></div>`:'<p class="hint">Sin cambios por zona.</p>');
+  h+=`<h3>Zonas con más cambio</h3>`+(zs.length?`<div class="tbl"><table>${th('Zona','A','B')}<tbody>${zs.map(([m])=>act(MUS[m][0],A.z[m]||0,B.z[m]||0)).join('')}</tbody></table></div>`:'<p class="hint">Sin cambios por zona.</p>');
   const ej=Object.keys(B.best).filter(k=>A.best[k]).map(k=>[k,A.best[k],B.best[k],100*(B.best[k]/A.best[k]-1)]).sort((x,y)=>Math.abs(y[3])-Math.abs(x[3]));
   h+=`<h3>Mejor 1RM estimado por ejercicio (${uTxt()})</h3>`+(ej.length?`<div class="tbl"><table>${th('Ejercicio','A','B')}<tbody>${ej.map(([k,a,b,pc])=>fila(esc(k),aU(a),aU(b),num,1,(pc>0?'+':'−')+num(Math.abs(pc))+' %')).join('')}</tbody></table></div>`
     :'<p class="hint">Ningún ejercicio con peso anotado en los dos periodos.</p>');
@@ -1813,7 +1938,9 @@ if(!medVistas){medVistas={};revisarMedallas()}   // primera vez: lo ya ganado se
 const fraseMed=md=>md.length?`Nueva medalla: ${md.map(m=>m.n).join(', ')}. `:'';
 function celebrar(md,t){if(!md.length)return;const n=md.map(m=>m.n).join(' · ');
   if(S.pr>t){S.prK='¡Récord y medalla!';S.prTxt+=' · '+n}else{S.pr=t+6;S.prK='¡Medalla nueva!';S.prTxt=n;fanfarria()}}
-function renderMedallas(){const g={...medallasGanadas(),...medVistas},n=MEDALLAS.filter(m=>g[m.id]).length;
+// (v27, caso 2) la fecha sale del historial actual: si borraste la sesión que la dio, se ve la de la sesión que hoy la cumple.
+// Las ya vistas que el historial actual ya no cumple se siguen mostrando con su fecha guardada.
+function renderMedallas(){const g={...medVistas,...medallasGanadas()},n=MEDALLAS.filter(m=>g[m.id]).length;
   const f=x=>new Date(x).toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'2-digit'});
   $('pMed').innerHTML=`<p class="hint">${n} de ${MEDALLAS.length} ganadas. Las grises dicen qué falta.</p><div class="meds">`+MEDALLAS.map(m=>`<div class="med${g[m.id]?'':' no'}"><span class="disco">${m.ic}</span><b>${m.n}</b><small>${g[m.id]?f(g[m.id]):m.d}</small></div>`).join('')+'</div>'}
 /* ---------- medidas (cm) ---------- */
@@ -2002,7 +2129,7 @@ async function copiaJSON(){let fs=null;try{fs=await fotoTx('readonly',st=>st.get
   const fotos=[];for(const x of fs||[]){let b=x.blob;if(b&&b.type!=='image/jpeg')try{b=(await comprimir(b)).blob}catch(e){}
     if(b)fotos.push({f:x.f,t:x.t,w:x.w,h:x.h,data:await blobAData(b)})}
   return {app:'reloj-anomalo',tipo:'copia-completa',v:2,exportado:new Date().toISOString(),sesiones:hist,metas,ajustes:CFG,ejercicios:misEj,
-    rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,fotos,...(fs?{}:{sinFotos:true})}}
+    rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,modelo:modState,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,fotos,...(fs?{}:{sinFotos:true})}}
 async function hacerCopia(msg=$('copiaMsg')){msg.textContent='Preparando la copia…';
   try{const d=await copiaJSON(),nombre=`reloj-anomalo-copia-${hoy()}.json`;
     const ok=await entregarBlob(nombre,new Blob([JSON.stringify(d)],{type:'application/json'}),msg);
@@ -2025,7 +2152,7 @@ async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw 
   const sol=(k,v,n,norm)=>{if(v==null)return;if(!esObj(v)){r.mal++;return}const x=norm(v);if(!Object.keys(x).length){if(Object.keys(v).length)r.mal++;return}
     if(localStorage.getItem(k)!=null){r.mant.push(n);return}if(guardarObj(k,x))r.puestos.push(n);else r.sinEspacio=true};
   sol(MKEY,d.metas,'metas',normMetas);sol(AKEY,d.ajustes,'ajustes',normCfg);sol(EJKEY,d.ejercicios,'ejercicios',normMisEj);sol(RKEY,d.rutina,'rutina',normRut);
-  sol(DKEY,d.descarga,'descarga',normDescarga);sol(CKEY,d.calibracion,'calibración',normCalib);sol(BQKEY,d.bloque,'bloque',normBloque);
+  sol(DKEY,d.descarga,'descarga',normDescarga);sol(CKEY,d.calibracion,'calibración',normCalib);sol(MODKEY,d.modelo,'modelo de recuperación',normModelo);sol(BQKEY,d.bloque,'bloque',normBloque);
   sol(FZKEY,d.fuerza,'fuerza',normFuerza);sol(LESKEY,d.lesion,'zona cuidada',normLesion);sol(SSKEY,d.superserie,'superserie',normSsSel);   // v18
   if(d.estilo!=null&&!(typeof d.estilo==='string'&&tiene(ESTILOS,d.estilo)))r.mal++;
   else if(d.estilo!=null&&localStorage.getItem(EKEY)==null){try{localStorage.setItem(EKEY,d.estilo)}catch(e){}aplicarEstilo(d.estilo);r.puestos.push('estilo')}
@@ -2045,7 +2172,7 @@ function recargar(){metas={...META_DEF,...normMetas(leerJSON(MKEY,{}))};
   fzaCfg=normFuerza(leerJSON(FZKEY,{}));lesion=normLesion(leerJSON(LESKEY,{}));ssSel=normSsSel(leerJSON(SSKEY,{}));   // v18 (antes de aplicarEjercicios: la zona cuidada cambia los ejercicios)
   misEj=normMisEj(leerJSON(EJKEY,{}));aplicarEjercicios();
   {const x=normRut(leerJSON(RKEY,{}));rutI=x.i;miaLista=x.mia}
-  descarga=leerObj(DKEY,normDescarga);calibC=leerObj(CKEY,normCalib);bloque=leerObj(BQKEY,normBloque);
+  descarga=leerObj(DKEY,normDescarga);calibC=leerObj(CKEY,normCalib);modState=normModelo(leerJSON(MODKEY,{}));recMemo={k:'',v:null};bloque=leerObj(BQKEY,normBloque);
   if(S.st==='idle'){rutPos=0;rutEf=0;if(enRutina())grupo=rutLista()[0];S=fresh()}lastPlan='';renderGrupos();renderCfg();pintarHist();revisarMedallas();render()}
 $('restBtn').onclick=()=>{if(enCurso()){$('copiaMsg').textContent='Termina la sesión en curso antes de restaurar.';return}$('restFile').click()};
 $('restFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const msg=$('copiaMsg');
@@ -2140,6 +2267,6 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   navigator.serviceWorker.register('sw.js').then(r=>{document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})})}).catch(()=>{});
 }
 
-v18listo=true;if(lesOn())aplicarEjercicios();if(ssSel.on){const L=ssLados();if(L)grupo=L[0].g}
+v18listo=true;if(lesOn())aplicarEjercicios();try{recRegistra()}catch(e){}if(ssSel.on){const L=ssLados();if(L)grupo=L[0].g}
 if(enRutina())grupo=rutLista()[0];retomar=leerEnCurso();renderHist();renderGrupos();renderCfg();render();if(hist.length)pedirPersist();else renderAlmacen();
 if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>{vozEs=null};

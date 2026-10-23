@@ -1,6 +1,6 @@
 // Copia local de la app para que funcione sin internet.
 // Al cambiar cualquier archivo de la app, sube VERSION para que el celular descargue la nueva.
-const VERSION = 'reloj-anomalo-v25';
+const VERSION = 'reloj-anomalo-v27';   // v26 (Fase 2) + v27 (Fase 4) van juntas
 // Las fuentes van en una caché aparte que no se borra con cada versión (no cambian).
 const FUENTES = 'reloj-fuentes-v1';
 const ARCHIVOS = ['./', './index.html', './estilo.js', './anim.js', './reloj.js', './manifest.json', './icono.svg', './icono-192.png', './icono-512.png', './icono-maskable-512.png'];

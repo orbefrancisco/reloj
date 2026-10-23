@@ -325,6 +325,77 @@
     return { ok: !m.length, d: m.join('; ') };
   });
 
+  // ---------- 12. v26 · Fase 2: casos de la auditoría inicial (en memoria; todo se restaura) ----------
+  const conHist = (H, fn) => { const H0 = hist, S0 = S, g0 = grupo; try { hist = H; return fn(); } finally { hist = H0; S = S0; grupo = g0; } };
+  const fil = (g, i, reps, rir, kg, extra = {}) => { const E = CAT[g].base[i]; return { ex: E.s, ej: E.n, k: 'act.', reps: String(reps), rir: String(rir), kg, P: .5, rest: 60, ...extra }; };
+  const sesF = (id, g, t, sets) => ({ id, start: new Date(t).toISOString(), g, grupo: CAT[g].n, sets, series: sets.length, completa: true, meta: 6 });
+  prueba('Caso 3: con un periodo vacío la actividad no se pinta como mejora y se avisa', () => conHist([sesF('c3', 'pecho', Date.now() - 36e5, [fil('pecho', 0, 10, 1, 30)])], () => {
+    const m0 = cmpModo; cmpModo = 'sem'; renderCmp(); cmpModo = m0;
+    const t = document.getElementById('pCmp'), verdes = [...t.querySelectorAll('td.up,td.dn')].map(td => td.closest('tr').firstChild.textContent);
+    const ok = !verdes.length && /no tiene sesiones/.test(t.textContent);
+    return { ok, d: verdes.length ? 'con color: ' + verdes.join(', ') : '' };
+  }));
+  prueba('Caso 1: la comparación explica que la suma por grupo supera a las series únicas', () => conHist([sesF('c1', 'pecho', Date.now() - 36e5, [fil('pecho', 0, 10, 1, 30), fil('pecho', 1, 10, 1, 20)])], () => {
+    const m0 = cmpModo; cmpModo = 'sem'; renderCmp(); cmpModo = m0;
+    return { ok: /no es doble conteo/i.test(document.getElementById('pCmp').textContent) };
+  }));
+  prueba('Caso 5: récord de repeticiones con la misma carga (y con peso corporal); sin línea base o sin peso no hay', () => {
+    const m = [];
+    const prueba1 = (kg, rirAntes, rirHoy, reps) => conHist([sesF('c5', 'biceps', Date.now() - 2 * 864e5, [fil('biceps', 0, 10, rirAntes, kg)])], () => {
+      grupo = 'biceps'; S = { ...fresh(), id: 'hoy', sets: [] }; const r = fil('biceps', 0, reps, rirHoy, kg); return esRecord(r) ? (r.prT || 'e1') : 'no'; });
+    if (prueba1(12, 1, 1, 11) === 'no') m.push('12 kg 10→11 reps con RIR igual: debería ser récord');
+    if (prueba1(0, 1, 1, 11) !== 'reps') m.push('peso corporal 10→11: debería ser récord de reps');
+    if (prueba1(12, 1, 0, 11) === 'reps') m.push('más reps pero con menos reserva (más esfuerzo): no es récord de reps comparable');
+    if (prueba1(null, 1, 1, 11) !== 'no') m.push('sin peso anotado no hay carga con qué comparar');
+    const sinBase = conHist([], () => { grupo = 'biceps'; S = { ...fresh(), id: 'hoy', sets: [] }; return esRecord(fil('biceps', 0, 20, 1, 12)); });
+    if (sinBase) m.push('primera vez: sin línea base no hay récord');
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Caso 6: un ejercicio con molestia anotada en la zona cuidada se cambia o se quita, también con nivel «molestia»', () => {
+    const E = CAT.hombros.base[0];
+    return conHist([sesF('c6', 'hombros', Date.now() - 2 * 864e5, [fil('hombros', 0, 10, 1, 10, { mol: 'hombro' })])], () => {
+      const L = lesLista('hombros', CAT.hombros.base, [{ z: 'hombro', p: 'entero', n: 'leve' }]), x = L[0];
+      const ok = !!(x.lesDe || x.lesFuera) && !!x.lesGat && !L.some(y => y.n === E.n && !y.lesFuera);
+      return { ok, d: `${E.n} → ${x.lesDe ? 'cambiado por ' + x.n : x.lesFuera ? 'quitado' : 'MANTENIDO'}` };
+    });
+  });
+  prueba('Esquema v26: la sesión guarda versión y fechas de registro/edición; la mini-serie, su predicción y el modelo', () => {
+    const s = normSes({ id: 'e', start: new Date().toISOString(), g: 'biceps', sets: [{ ex: 'x', k: 'myo', reps: '5', rir: '1', obj: 5, Cpre: .6, kc: 1, predF: 7.2, mod: 'rec-1' }, { ex: 'x', k: 'act.', reps: '9', rir: '1', pr: true, prT: 'reps' }],
+      esq: 2, creada: '2026-10-20T10:00:00.000Z', editada: '2026-10-21T10:00:00.000Z' });
+    const ok = s.esq === 2 && s.creada && s.editada && s.sets[0].predF === 7.2 && s.sets[0].mod === 'rec-1' && s.sets[1].prT === 'reps' && MODELO_REC === 'rec-2p';   // v27: procedimiento vigente
+    return { ok, d: JSON.stringify({ esq: s.esq, creada: !!s.creada, predF: s.sets[0].predF, prT: s.sets[1].prT }) };
+  });
+
+  // ---------- 13. v27 · Fase 4: aprendizaje de recuperación evaluado en orden temporal (datos sintéticos en memoria) ----------
+  // sesiones con serie principal (RTF = 12 + 1) y mini-series con predicción guardada (Cpre = 0,7 → 9,1 reps hasta el fallo)
+  const sesRec = (n, hechoDe, g = 'biceps') => Array.from({ length: n }, (_, i) => {
+    const E = CAT[g].base[0], pf = 13 * .7, obs = hechoDe(pf, i);
+    return { id: 'r' + i, start: new Date(Date.now() - (n - i) * 864e5).toISOString(), g, grupo: CAT[g].n, completa: true, meta: 6,
+      sets: [{ ex: E.s, ej: E.n, k: 'act.', reps: '12', rir: '1' }, { ex: E.s, ej: E.n, k: 'myo', reps: String(obs - 1), rir: '1', obj: 6, Cpre: .7, kc: 1 }] };
+  });
+  const conRec = (H, fn) => { const H0 = hist, c0 = calibC; try { hist = H; calibC = {}; recMemo = { k: '', v: null }; return fn(); } finally { hist = H0; calibC = c0; recMemo = { k: '', v: null }; } };
+  prueba('Fase 4: sin fuga del futuro — la primera predicción es la del fijo y cada una usa solo las anteriores', () => conRec(sesRec(10, (pf, i) => i < 5 ? Math.round(pf * .7) : 30), () => {
+    const ev = evalRec().biceps.ev, m = [];
+    if (Math.abs(ev[0].p3 - ev[0].p0) > 1e-9) m.push('la primera ya estaba ajustada');
+    if (ev[4].p3 > ev[4].p0) m.push('la quinta (tras 4 por debajo) predijo por encima: usó datos futuros');
+    return { ok: !m.length, d: m.join('; ') };
+  }));
+  prueba('Fase 4: el modelo anterior (reps/objetivo) no aprende si aceptas el número propuesto; el nuevo sí ve el sesgo', () => conRec(sesRec(24, pf => Math.round(pf * .75)).map(h => (h.sets[1].obj = +h.sets[1].reps, h)), () => {
+    const R = evalRec().biceps;
+    return { ok: Math.abs(R.mae1 - R.mae0) < 1e-9 && R.mae3 < R.mae0, d: `rec-1 ${R.mae1.toFixed(2)} = fijo ${R.mae0.toFixed(2)} · rec-2p ${R.mae3.toFixed(2)}` };
+  }));
+  prueba('Fase 4: sesgo sistemático con ≥ 20 observaciones → se usa lo aprendido (k < 1) y queda registrado; con el fijo acertando, no', () => {
+    const a = conRec(sesRec(24, pf => Math.round(pf * .75)), () => ({ u: evalRec().biceps.usa, k: kDe('biceps'), m: modDe('biceps') }));
+    const b = conRec(sesRec(24, (pf, i) => Math.round(pf) + (i % 2 ? 1 : -1)), () => ({ u: evalRec().biceps.usa, k: kDe('biceps') }));
+    const pocos = conRec(sesRec(6, pf => Math.round(pf * .75)), () => evalRec()._.bien);
+    const ok = a.u && a.k < 1 && a.m === 'rec-2p' && !b.u && b.k === 1 && !pocos;
+    return { ok, d: JSON.stringify({ sesgo: a, sinSesgo: b, pocosDatos: pocos }) };
+  });
+  prueba('Fase 4: estado del modelo validado al leer (k fuera de rango o modelo desconocido se descartan)', () => {
+    const r = normModelo({ sel: { biceps: { m: 'rec-2p', k: 5 }, triceps: { m: 'magia', k: .9 }, pecho: { m: 'rec-2p', k: .88 } }, log: [{ t: 'x' }] });
+    return { ok: !r.sel.biceps && !r.sel.triceps && r.sel.pecho.k === .88 && r.log.length === 0, d: JSON.stringify(r) };
+  });
+
   // ---------- 7. Los datos originales no se tocan ----------
   prueba('Pintar todas las vistas no modifica las sesiones guardadas', () => localStorage.getItem(KEY) === crudoAntes);
 
