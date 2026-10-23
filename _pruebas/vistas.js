@@ -247,6 +247,46 @@
     return { ok: !m.length, d: m.join('; ') };
   });
 
+  // ---------- 10. v24: cuidar una zona por parte y nivel (en memoria; se deja todo como estaba) ----------
+  const conLes = (les, fn) => { const L0 = lesion; try { lesion = les; aplicarEjercicios(); return fn(); } finally { lesion = L0; aplicarEjercicios(); } };
+  const dentro = (d = 7) => ({ ini: new Date(Date.now() - 864e5).toISOString(), hasta: new Date(Date.now() + d * 864e5).toISOString() });
+  prueba('Lo guardado antes de v24 (sin parte ni nivel) sigue igual: zona entera y dolor fuerte', () => {
+    const r = normLesion({ z: 'hombro', ...dentro() }), r2 = normLesion({ z: 'hombro', p: 'xx', n: 'yy', ...dentro() }), r3 = normLesion({ z: 'brazo', ...dentro() });
+    const ok = r.p === 'entero' && r.n === 'fuerte' && r2.p === 'entero' && r2.n === 'fuerte' && r3.p === 'biceps_prox';
+    return { ok, d: JSON.stringify([r.p, r.n, r2.p, r2.n, r3.p]) };
+  });
+  prueba('Niveles: molestia no cambia ejercicios; fuerte los cambia; extremo quita o pausa', () => conLes({ z: 'hombro', p: 'del_lat', n: 'leve', ...dentro() }, () => {
+    const m = [], base = CAT.hombros.base.map(x => x.n).join('|');
+    const nivel = n => { lesion = { ...lesion, n }; aplicarEjercicios(); return CAT.hombros.e; };
+    const L = nivel('leve'); if (L.some(x => x.lesDe) || L.filter(x => !x.levy).map(x => x.n).join('|') !== base.split('|').filter(Boolean).join('|')) m.push('molestia cambió ejercicios');
+    if (!L.some(x => x.lesM && x.lesAng)) m.push('molestia sin serie recta en el de carga alta');
+    const F = nivel('fuerte'); if (!F.some(x => x.lesDe)) m.push('fuerte no cambió nada');
+    nivel('extremo'); if (!enPausa('hombros')) m.push('extremo: hombros debería quedar en pausa (deltoide lateral)');
+    if (enPausa('pecho') || enPausa('espalda')) m.push('extremo pausó grupos que no cargan el deltoide lateral');
+    return { ok: !m.length, d: m.join('; ') };
+  }));
+  prueba('En pausa: no se puede empezar, «Qué toca hoy» no lo propone y la rutina lo salta', () => conLes({ z: 'hombro', p: 'del_ant', n: 'extremo', ...dentro() }, () => {
+    const m = [], g0 = grupo, r0 = rutI;
+    if (!enPausa('pecho')) m.push('pecho no quedó en pausa');
+    grupo = 'pecho'; if (!pausaInicio()) m.push('pausaInicio() no bloquea pecho');
+    const q = queToca(); if (q.g === 'pecho' || (q.items || []).some(x => x.g === 'pecho')) m.push('Qué toca propone pecho');
+    rutI = RUTINAS.findIndex(R => R.g && R.g.includes('pecho') && R.g.includes('triceps')); if (rutLista().includes('pecho')) m.push('la rutina Pecho + Tríceps incluye pecho');
+    grupo = g0; rutI = r0;
+    return { ok: !m.length, d: m.join('; ') };
+  }));
+  prueba('La parte cambia el resultado: tríceps afecta a tríceps y no a bíceps; tendón largo del bíceps afecta también a espalda', () => {
+    const efecto = (z, p, g) => lesLista(g, CAT[g].base, { z, p, n: 'fuerte' }).some(x => x.lesDe || x.lesM);
+    const m = [];
+    if (!efecto('brazo', 'triceps', 'triceps') || efecto('brazo', 'triceps', 'biceps')) m.push('tríceps');
+    if (!efecto('brazo', 'biceps_prox', 'espalda')) m.push('bíceps proximal no toca espalda');
+    if (efecto('hombro', 'del_lat', 'pecho')) m.push('deltoide lateral toca pecho');
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Molestia con parte: se guarda en la serie y se valida al leer', () => {
+    const a = normSet({ ex: 'x', k: 'act.', reps: '8', rir: '1', mol: 'hombro', molP: 'manguito' }), b = normSet({ ex: 'x', k: 'act.', reps: '8', rir: '1', mol: 'hombro', molP: 'rodilla' });
+    return { ok: a.molP === 'manguito' && !b.molP, d: `${a.molP} / ${b.molP}` };
+  });
+
   // ---------- 7. Los datos originales no se tocan ----------
   prueba('Pintar todas las vistas no modifica las sesiones guardadas', () => localStorage.getItem(KEY) === crudoAntes);
 

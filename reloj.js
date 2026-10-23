@@ -74,7 +74,7 @@ function normSet(r){if(!esObj(r))return null;const o={ex:vTxt(r.ex)??'',k:vTxt(r
   if('kg' in r)o.kg=r.kg==null||r.kg===''?null:vNum(r.kg,0,1000);
   o.P=vNum(r.P,0,10)??0;o.rest=vNum(r.rest,0,36000)??0;
   for(const [k,hi] of [['obj',1000],['Cpre',10],['kc',10]]){const v=vNum(r[k],0,hi);if(v!=null)o[k]=v}
-  if(r.pr===true)o.pr=true;const mol=r.mol?vTxt(r.mol,40):null;if(mol)o.mol=mol;
+  if(r.pr===true)o.pr=true;const mol=r.mol?vTxt(r.mol,40):null;if(mol){o.mol=mol;if(LES_P[mol]&&LES_P[mol].includes(r.molP))o.molP=r.molP}
   if(r.recta===true)o.recta=true;   // v18: serie recta por cuidar una zona
   return o}
 // una sesión del historial: hace falta id y fecha válidos; las series raras se descartan
@@ -90,7 +90,7 @@ function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha
   // v18: día de fuerza, superserie ('biceps+triceps', mismo superId en sus dos sesiones, lado A o B) y zona cuidada
   if(s.fza===true)o.fza=true;
   if(typeof s.super==='string'&&s.super.length<=40){const p=s.super.split('+');if(p.length===2&&p.every(esG)){o.super=s.super;const si=vTxt(s.superId,80);if(si)o.superId=si;if(s.lado==='A'||s.lado==='B')o.lado=s.lado}}
-  if(LES_Z.includes(s.cuida))o.cuida=s.cuida;
+  if(LES_Z.includes(s.cuida)){o.cuida=s.cuida;if(LES_P[s.cuida].includes(s.cuidaP))o.cuidaP=s.cuidaP;if(LES_N.includes(s.cuidaN))o.cuidaN=s.cuidaN}
   return o}
 function normHist(a,cnt){const out=[],ids=new Set();(Array.isArray(a)?a:[]).slice(0,SES_MAX).forEach(s=>{const v=normSes(s);
   if(v&&!ids.has(v.id)){out.push(v);ids.add(v.id)}else if(cnt)cnt.mal++});return out}
@@ -153,11 +153,31 @@ const SUG_DEF={biceps:'Curl con barra Z',triceps:'Press francés',espalda:'Remo 
 const dDe=r=>Math.round((rango(r)[0]+rango(r)[1])/2);
 /* ---------- v18: superseries, cuidar una zona (lesión o molestia) y días de fuerza. Lo guardado se normaliza como el resto. ---------- */
 const SSKEY='reloj-anomalo-superserie',LESKEY='reloj-anomalo-lesion',FZKEY='reloj-anomalo-fuerza';
-const LES_Z=['hombro','codo','muñeca','espalda baja','rodilla','cadera'],LES_D=[7,14,28];
-const LES_ART={hombro:'el hombro',codo:'el codo','muñeca':'la muñeca','espalda baja':'la espalda baja',rodilla:'la rodilla',cadera:'la cadera'};
-// {z, ini, hasta}: la zona que se cuida (7, 14 o 28 días; terminar antes = hasta ahora) y {nz, nf}: la sugerencia que dijiste «ahora no»
+const LES_Z=['hombro','brazo','codo','muñeca','espalda baja','rodilla','cadera'],LES_D=[7,14,28];
+const LES_ART={hombro:'el hombro',brazo:'el brazo',codo:'el codo','muñeca':'la muñeca','espalda baja':'la espalda baja',rodilla:'la rodilla',cadera:'la cadera'};
+/* v24 · partes de cada zona (la primera es la de por defecto; «entero» = toda la zona, tabla CARGA_ART) y nivel de la molestia.
+   Las tablas de carga por parte (LES_TAB) están más abajo, junto a CARGA_ART. */
+const LES_P={hombro:['entero','manguito','del_ant','del_lat','del_post'],brazo:['biceps_prox','biceps_dist','triceps','antebrazo'],
+  codo:['entero','interna','externa','posterior'],'muñeca':['entero','empujar','agarrar'],'espalda baja':['entero'],rodilla:['entero','delante','detras'],cadera:['entero','ingle','lateral']};
+const LES_PN={manguito:'manguito rotador',del_ant:'deltoide anterior',del_lat:'deltoide lateral',del_post:'deltoide posterior',
+  biceps_prox:'bíceps: tendón largo (delante del hombro)',biceps_dist:'bíceps junto al codo',triceps:'tríceps',antebrazo:'antebrazo',
+  interna:'cara interna',externa:'cara externa',posterior:'detrás (tendón del tríceps)',empujar:'al empujar (muñeca hacia atrás)',agarrar:'al agarrar',
+  delante:'delante (rótula y tendón)',detras:'detrás',ingle:'ingle',lateral:'lateral (glúteo medio)'};
+const LES_PART={manguito:'el manguito rotador',del_ant:'el deltoide anterior',del_lat:'el deltoide lateral',del_post:'el deltoide posterior',
+  biceps_prox:'el tendón largo del bíceps',biceps_dist:'el bíceps junto al codo',triceps:'el tríceps',antebrazo:'el antebrazo',
+  interna:'la cara interna del codo',externa:'la cara externa del codo',posterior:'el tendón del tríceps en el codo',empujar:'la muñeca al empujar',agarrar:'la muñeca al agarrar',
+  delante:'la parte delantera de la rodilla',detras:'la parte de atrás de la rodilla',ingle:'la ingle',lateral:'el lateral de la cadera'};
+const LES_FEM=new Set(['muñeca','espalda baja','rodilla','cadera']);
+const lesPN=(z,p)=>p&&p!=='entero'?LES_PN[p]:LES_FEM.has(z)?'entera':'entero';           // nombre corto de la parte (chips)
+const lesTxt=(z,p)=>p&&p!=='entero'&&LES_PART[p]?LES_PART[p]:LES_ART[z];                // «el manguito rotador», «la rodilla»…
+// nivel: molestia = mismos ejercicios sin el ángulo que molesta; fuerte = se cambian los que cargan la parte; extremo = también los de carga media
+// y los grupos que la cargan de rebote (pecho y tríceps con el hombro, espalda con el bíceps…); un grupo sin ejercicios seguros queda en pausa
+const LES_N=['leve','fuerte','extremo'],LES_NN={leve:'molestia',fuerte:'dolor fuerte',extremo:'dolor extremo'};
+// {z, p, n, ini, hasta}: zona, parte y nivel que se cuidan (7, 14 o 28 días; terminar antes = hasta ahora) y {nz, nf}: la sugerencia que dijiste «ahora no».
+// Lo guardado antes de v24 no trae parte ni nivel: zona entera y dolor fuerte, que es lo que hacía.
 function normLesion(o){const r={};if(!esObj(o))return r;const z=LES_Z.includes(o.z)?o.z:null,i=vFecha(o.ini),h=vFecha(o.hasta);
-  if(z&&i&&h&&Date.parse(h)>Date.parse(i)&&Date.parse(h)-Date.parse(i)<=29*864e5)Object.assign(r,{z,ini:i,hasta:h});
+  if(z&&i&&h&&Date.parse(h)>Date.parse(i)&&Date.parse(h)-Date.parse(i)<=29*864e5)
+    Object.assign(r,{z,p:LES_P[z].includes(o.p)?o.p:LES_P[z][0],n:LES_N.includes(o.n)?o.n:'fuerte',ini:i,hasta:h});
   const nz=LES_Z.includes(o.nz)?o.nz:null,nf=vFecha(o.nf);if(nz&&nf)Object.assign(r,{nz,nf});return r}
 let lesion=normLesion(leerJSON(LESKEY,{})),v18listo=false,lesAplicada='';
 const lesOn=()=>!!lesion.z&&Date.now()<Date.parse(lesion.hasta);
@@ -177,8 +197,13 @@ function aplicarEjercicios(){for(const g in BASE){const M=misEj[g]||{},q=new Set
   const ex=(Array.isArray(M.x)?M.x:[]).filter(m=>m&&m.n).map((m,j)=>({tempo:'controlado · 2–3 s abajo',ext:'part',extN:'Parciales',extH:'mitad del recorrido',...m,k:KEXT[m.ext]||1.5,d:dDe(m.r),xi:j}));
   let ok=base.filter(x=>!q.has(x.b));
   if(ok.length+ex.length<EST_MIN||!ok.concat(ex).some(x=>!x.levy))ok=base;   // nunca menos de 2 ni sin ejercicio con series
-  CAT[g].e=[...ok.filter(x=>!x.levy),...ex,...ok.filter(x=>x.levy)];if(v18listo&&lesOn())CAT[g].e=lesLista(g,CAT[g].e,lesion.z)}
-  lesAplicada=v18listo&&lesOn()?lesion.z+'|'+lesion.hasta:''}
+  CAT[g].e=[...ok.filter(x=>!x.levy),...ex,...ok.filter(x=>x.levy)];CAT[g].pausa=false;CAT[g].base=CAT[g].e;   // base: el plan sin cuidar (tabla de Ajustes)
+  if(v18listo&&lesOn()){const L=lesLista(g,CAT[g].e,lesion),q=L.filter(x=>!x.lesFuera);
+    // dolor extremo: fuera lo que no tiene alternativa segura; sin ningún ejercicio con series, el grupo queda en pausa (se conserva la lista)
+    if(q.some(x=>!x.levy))CAT[g].e=q;else{CAT[g].e=L;CAT[g].pausa=true}}}
+  lesAplicada=v18listo&&lesOn()?lesKey():''}
+function lesKey(){return [lesion.z,lesion.p,lesion.n,lesion.hasta].join('|')}
+function enPausa(g){return !!(CAT[g]&&CAT[g].pausa)}
 aplicarEjercicios();
 const DISCOS_STD=[25,20,15,10,5,2.5,1.25],BARRAS=[20,15,10,7],DISCOS_LB=[45,35,25,10,5,2.5],BARRAS_LB=[45,35,25,15];
 let CFG={voz:true,vibra:true,cal:true,barra:20,discos:DISCOS_STD.slice(),discosX:[],barraEj:{},tempo:{on:false,t:'3-0-1-0',voz:false},rel:false,
@@ -196,7 +221,7 @@ const RUTINAS=[{n:'Un grupo'},{n:'Pecho + Tríceps',g:['pecho','triceps']},{n:'E
  {n:'Piernas + Abdomen',g:['piernas','abdominales']},{n:'Hombros + Abdomen',g:['hombros','abdominales']},{n:'La mía',mia:1}];
 let rutI=0,miaLista=[],rutPos=0,rutEf=0;
 {const r=normRut(leerJSON(RKEY,{}));rutI=r.i;miaLista=r.mia}
-const rutLista=()=>{const R=RUTINAS[rutI];return R.mia?miaLista:R.g||[]};
+const rutLista=()=>{const R=RUTINAS[rutI];return (R.mia?miaLista:R.g||[]).filter(g=>!enPausa(g))};   // los grupos en pausa (cuidar, dolor extremo) se saltan
 const enRutina=()=>!ssSel.on&&rutLista().length>1;   // con superserie elegida no hay rutina
 const guardarRut=()=>guardarObj(RKEY,{i:rutI,mia:miaLista});
 const now=()=>Date.now()/1000;
@@ -265,7 +290,7 @@ Object.assign(metas,normMetas(leerJSON(MKEY,{})));
 function fresh(){return {st:'idle',P:0,C:1,tauC:35,P0:0,C0:1,sec:0,nIn:0,R1:0,RTF:0,target:0,phase:'act',levyN:0,levyT:0,
   t0:0,last:0,restDur:0,lastSec:-1,workDur:0,hechas:0,label:'',sets:[],tuc:0,iso:0,id:null,start:null,
   meta:0,metaE:[],ef:0,efE:0,ronda:1,esRonda:false,kg:null,sug:null,aviso:'',pr:0,prTxt:'',prK:'',rutTrans:false,
-  cal:null,calI:0,calHecho:false,calRest:false,molAv:'',molDicho:false,molR:null,nota:'',bien:null,kRec:1,Cpre:null,tempoHasta:0,
+  cal:null,calI:0,calHecho:false,calRest:false,molAv:'',molDicho:false,molR:null,molP:null,nota:'',bien:null,kRec:1,Cpre:null,tempoHasta:0,
   desc:false,serE:0,antes:false}}   // desc: sesión en modo descarga; serE: series completas del ejercicio; antes: terminada antes de la meta
 S=fresh();
 const estsDe=()=>S.fza?S.fza.e:CAT[grupo].e;   // en fuerza, sus 1–2 estaciones propias
@@ -318,7 +343,7 @@ const descargaActiva=()=>descargaManual()||!!(bloqueSem()||{}).desc;
 // Regla de doble progresión sobre la primera serie del ejercicio.
 function regla(E,r){const [lo,hi]=rango(E.r),R=parseInt(r.reps,10)||0,n=rirN(r.rir),kg=+r.kg||0;
   if(descargaActiva())return {kg,txt:`semana de descarga: ${kgTxt(kg)} y para lejos del fallo`,cambio:false};
-  if(E.lesM)return {kg,txt:`cuidando ${LES_ART[E.lesM]}: mantén ${kgTxt(kg)} y deja 2–3 en reserva`,cambio:false};
+  if(E.lesM)return {kg,txt:`cuidando ${lesQue()}: mantén ${kgTxt(kg)} y deja 2–3 en reserva`,cambio:false};
   if(kg>0&&(n>=4||(R>=hi&&n>=1))){const k=cambiaKg(E,kg,1);return {kg:k,txt:`sube a ${kgTxt(k)}`,cambio:true}}
   if(kg>0&&R<lo&&n===0){const k=cambiaKg(E,kg,-1);
     if(k>=kg)return {kg,txt:`${kgTxt(kg)} es la barra sola: repite y busca ${lo} reps, o pasa a una variante más fácil`,cambio:true};
@@ -361,7 +386,7 @@ function discTxt(kg,E){if(!esBarra(E)||!(kg>0))return '';const b=barraU(),u=aU(k
   const {out,falta}=discosLado(kg),g=[];out.forEach(d=>{const l=g[g.length-1];if(l&&l.d===d)l.n++;else g.push({d,n:1})});
   return `Por lado: ${g.map(x=>num2(x.d)+(x.n>1?' ×'+x.n:'')).join(' + ')||'nada'}${falta>.01?` y faltan ${num2(falta)} ${U}: con tus discos no cuadra exacto (es lo más cercano por debajo)`:''} · barra ${num2(b)}`}
 /* ---------- molestias ---------- */
-const ZONAS=['hombro','codo','muñeca','espalda baja','rodilla','cadera','otra'];   // v18: + cadera (las de «cuidar» y «otra»)
+const ZONAS=['hombro','brazo','codo','muñeca','espalda baja','rodilla','cadera','otra'];   // las de «cuidar» y «otra» (v18: + cadera; v24: + brazo)
 // Aviso si el ejercicio tuvo molestia en 2 de sus últimas 3 sesiones.
 function avisoMolestia(g,E){if(!E||E.levy)return '';const ses=[];
   for(const h of hist){if(h.id===S.id||gDe(h)!==g)continue;const r=(h.sets||[]).filter(x=>x.ej===E.n);if(r.length)ses.push(r);if(ses.length>=3)break}
@@ -385,7 +410,7 @@ function iniciarSesion(x){x=x||{};if(x.fza)S.fza=x.fza;if(x.ests)S.ests=x.ests;
     meta:metaHoy(grupo),metaE:repartir(grupo),bien:bienDe(b),kRec:kDe(grupo),desc:descargaActiva()});
   if(x.ests){S.sec=s0;S.meta=x.ests.reduce((a,i)=>a+(S.metaE[i]||0),0)}   // la meta del grupo se reparte entre los dos lados
   if(x.fza){S.desc=false;S.meta=x.fza.nP+x.fza.nA;S.metaE=x.fza.e.map(e=>e.fz==='p'?x.fza.nP:x.fza.nA)}   // en fuerza la meta son series pesadas
-  if(lesOn()){S.les=lesion.z;S.lesAv=lesAvisoSesion(grupo,x.ests)}
+  if(lesOn()){S.les=lesion.z;S.lesP=lesion.p;S.lesN=lesion.n;S.lesAv=lesAvisoSesion(grupo,x.ests)}
   prepEstacion()}
 // En rutina: al cerrar un grupo, guarda y pasa al siguiente tras 2 min.
 function sigueRutina(pre=''){const L=rutLista();if(!enRutina()||rutPos>=L.length-1)return false;
@@ -538,7 +563,7 @@ const fzaReps=p=>Math.min(6,Math.max(3,Math.round(30*(1/p-1)-1.5)));   // reps a
 const fzaHechas=()=>S.sets.filter(r=>r.k==='act.').length;
 // ¿ya hubo fuerza de este grupo esta semana? (se aconseja una como mucho)
 const fzaSemana=g=>hist.some(h=>h.fza&&gDe(h)===g&&Date.parse(h.start)>=lunes(Date.now()));
-function planFuerza(g){if(!fzaDisponible(g))return null;const L=FZA_PRIN[g].filter(n=>!(lesOn()&&lesCarga(n,g,lesion.z)==='a'));if(!L.length)return null;
+function planFuerza(g){if(!fzaDisponible(g))return null;const L=FZA_PRIN[g].filter(n=>{if(!lesOn())return true;const c=lesCarga(n,g,lesion.z,lesion.p);return !(c==='a'||(lesion.n==='extremo'&&c==='m'))});if(!L.length)return null;
   const plan=CAT[g].e.map(x=>x.n),c=L.map(n=>({n,p:previas(g,n).filter(x=>x.kg>0)}));
   const el=c.filter(x=>x.p.length).sort((a,b)=>Date.parse(b.p[0].fecha)-Date.parse(a.p[0].fecha))[0]||c.find(x=>plan.includes(x.n))||c[0];
   const n=el.n,rm=el.p.length?Math.max(...el.p.slice(0,3).map(x=>x.mejor)):null,pct=fzaCfg.pct[n]||FZA_PCT,reps=fzaReps(pct);
@@ -576,43 +601,123 @@ const CARGA_ART=Object.fromEntries(Object.entries({
  cadera:{a:'sentadilla_barra sentadilla_frontal sentadilla_goblet zancada zancada_bulgara peso_muerto peso_muerto_rumano prensa elev_colgado',
   m:'sentadilla_hack hip_thrust rodillas_colgado elev_banco crunch_inverso abductores aductores patada_gluteo hiperextension remo_barra remo_t'}
 }).map(([z,o])=>[z,{a:new Set(o.a.split(' ')),m:new Set(o.m.split(' '))}]));
+/* v24 · carga por PARTE (clave «zona|parte»): a = la lleva al ángulo o a la carga que suele molestar; m = la carga algo; el resto, poco o nada.
+   ang = qué evitar con nivel «molestia». Incluye ejercicios de otros grupos que la cargan de rebote (press de banca y hombro, jalón y bíceps…).
+   Orientativo, a partir de la biomecánica de cada ejercicio; no es consejo médico. La parte «entero» usa CARGA_ART de la zona. */
+const LES_TAB=Object.fromEntries(Object.entries({
+ 'hombro|entero':{ang:'Evita los brazos por encima de la cabeza y el fondo de los press, fondos y aperturas; recorrido cómodo y sin dolor.'},
+ 'hombro|manguito':{a:'press_militar press_hombro_mancuernas press_hombro_maquina flexiones_pica elev_frontales remo_menton fondos_pecho fondos_triceps sobre_cabeza pullover_mancuerna pullover_polea dominadas',
+  m:'press_banca press_inclinado_barra press_inclinado_mancuernas press_mancuernas press_declinado elev_laterales elev_lateral_polea elev_lateral_maquina jalon jalon_neutro sobre_cabeza_polea aperturas_mancuernas cruces_polea pec_deck flexiones flexiones_lastradas frances elev_colgado rodillas_colgado',
+  ang:'Evita los brazos por encima de la cabeza y la rotación interna con carga (codo arriba y mano abajo). En laterales, no pases de la horizontal y sube con el pulgar algo hacia arriba.'},
+ 'hombro|del_ant':{a:'press_militar press_hombro_mancuernas press_hombro_maquina elev_frontales flexiones_pica press_inclinado_barra press_inclinado_mancuernas press_banca fondos_pecho fondos_triceps aperturas_mancuernas',
+  m:'press_mancuernas press_declinado press_maquina flexiones flexiones_lastradas cruces_polea pec_deck press_cerrado fondos_maquina remo_menton curl_inclinado curl_bayes pullover_mancuerna',
+  ang:'Evita estirar la parte delantera del hombro: en press no bajes por debajo del pecho, recorta el fondo de aperturas y fondos, y nada de elevaciones frontales.'},
+ 'hombro|del_lat':{a:'elev_laterales elev_lateral_polea elev_lateral_maquina remo_menton press_militar press_hombro_mancuernas press_hombro_maquina',
+  m:'flexiones_pica elev_frontales pajaros_mancuernas pajaros_maquina pajaros_polea face_pull',
+  ang:'Evita subir el brazo de lado con carga por encima de 60–90°: laterales en recorrido corto y sin balanceo; en press, agarre más estrecho con los codos algo adelante.'},
+ 'hombro|del_post':{a:'pajaros_mancuernas pajaros_maquina pajaros_polea face_pull',
+  m:'remo_barra remo_mancuerna remo_maquina remo_polea remo_t remo_invertido jalon jalon_neutro dominadas',
+  ang:'Evita llevar el codo por detrás del tronco: en los remos, para cuando el codo llegue al costado; pájaros y face pull fuera hasta que no moleste.'},
+ 'brazo|biceps_prox':{a:'curl_inclinado curl_bayes dominadas fondos_pecho fondos_triceps curl_barra',
+  m:'curl_mancuernas curl_polea curl_cuerda curl_arana curl_predicador curl_concentrado jalon jalon_neutro remo_barra remo_t remo_invertido press_banca press_inclinado_barra press_inclinado_mancuernas aperturas_mancuernas elev_frontales pullover_mancuerna pullover_polea',
+  ang:'Evita estirar el bíceps con el brazo por detrás del cuerpo (curl inclinado, fondos, fondo del press) y el agarre con la palma hacia ti en jalones y remos: usa agarre neutro.'},
+ 'brazo|biceps_dist':{a:'curl_barra curl_predicador dominadas curl_arana',
+  m:'curl_mancuernas curl_inclinado curl_concentrado curl_polea curl_bayes curl_cuerda curl_martillo remo_barra remo_t remo_invertido jalon peso_muerto',
+  ang:'Evita estirar el codo del todo con carga y girar la muñeca con fuerza: no bloquees abajo en el curl, usa agarre neutro o martillo y baja despacio.'},
+ 'brazo|triceps':{a:'frances sobre_cabeza sobre_cabeza_polea fondos_triceps press_cerrado flexiones_cerradas',
+  m:'pushdown_barra pushdown_cuerda patada patada_polea fondos_maquina fondos_pecho press_banca press_inclinado_barra press_inclinado_mancuernas press_mancuernas press_declinado press_maquina press_militar press_hombro_mancuernas press_hombro_maquina flexiones flexiones_lastradas flexiones_pica',
+  ang:'Evita doblar el codo al máximo con carga (francés y extensiones sobre la cabeza) y el bloqueo brusco al final; en los press, recorrido algo más corto.'},
+ 'brazo|antebrazo':{a:'curl_barra peso_muerto encogimientos dominadas',
+  m:'curl_martillo curl_mancuernas curl_predicador curl_concentrado curl_arana curl_polea curl_cuerda curl_inclinado curl_bayes peso_muerto_rumano remo_barra remo_t remo_mancuerna remo_polea remo_invertido jalon jalon_neutro elev_colgado rodillas_colgado',
+  ang:'Evita apretar al máximo: correas en jalones, remos y peso muerto, agarre neutro y nada de colgarte de la barra.'},
+ 'codo|entero':{ang:'Evita bloquear el codo con carga y doblarlo al máximo con peso; agarre neutro cuando se pueda.'},
+ 'codo|interna':{a:'curl_barra curl_predicador dominadas curl_arana',
+  m:'curl_mancuernas curl_inclinado curl_concentrado curl_polea curl_bayes curl_cuerda jalon jalon_neutro remo_barra remo_t remo_mancuerna remo_polea remo_invertido peso_muerto encogimientos elev_colgado rodillas_colgado pullover_mancuerna frances',
+  ang:'Evita doblar la muñeca hacia ti con carga y el agarre fuerte con la palma arriba: agarre neutro o martillo, correas para tirar y muñeca recta.'},
+ 'codo|externa':{a:'remo_barra remo_t dominadas peso_muerto pushdown_barra',
+  m:'jalon jalon_neutro remo_mancuerna remo_polea remo_maquina remo_invertido encogimientos curl_martillo curl_barra curl_predicador frances press_cerrado press_banca',
+  ang:'Evita la muñeca doblada hacia atrás con carga y el agarre prono apretado: agarre neutro, correas y cuerda o barra más gruesa.'},
+ 'codo|posterior':{a:'frances sobre_cabeza sobre_cabeza_polea fondos_triceps press_cerrado flexiones_cerradas',
+  m:'pushdown_barra pushdown_cuerda patada patada_polea fondos_maquina fondos_pecho press_banca press_inclinado_barra press_militar flexiones flexiones_lastradas flexiones_pica',
+  ang:'Evita doblar el codo al máximo con carga y el bloqueo brusco: nada de francés ni extensiones tras la nuca; en press, no bloquees del todo.'},
+ 'muñeca|entero':{ang:'Muñeca recta: agarre neutro y sin doblarla con peso encima.'},
+ 'muñeca|empujar':{a:'flexiones flexiones_lastradas flexiones_cerradas flexiones_pica fondos_triceps fondos_pecho sentadilla_frontal rueda plancha press_banca press_inclinado_barra press_militar press_cerrado',
+  m:'press_mancuernas press_inclinado_mancuernas press_declinado press_hombro_mancuernas press_maquina press_hombro_maquina fondos_maquina pushdown_barra frances sentadilla_barra',
+  ang:'Evita la muñeca doblada hacia atrás con peso encima: mancuernas o asas en neutro, flexiones sobre puños o asas y la barra sobre el talón de la mano.'},
+ 'muñeca|agarrar':{a:'curl_barra peso_muerto encogimientos dominadas curl_predicador',
+  m:'curl_mancuernas curl_inclinado curl_concentrado curl_arana curl_polea curl_bayes curl_cuerda curl_martillo remo_barra remo_t remo_mancuerna remo_polea remo_maquina remo_invertido jalon jalon_neutro peso_muerto_rumano elev_colgado rodillas_colgado',
+  ang:'Evita el agarre fuerte y la muñeca girada: correas, agarre neutro y nada de colgarte de la barra.'},
+ 'espalda baja|entero':{ang:'Espalda neutra: sin redondear ni arquear con carga; mejor máquinas y apoyos que la descarguen.'},
+ 'rodilla|entero':{ang:'Evita doblar la rodilla al máximo con carga y el bloqueo brusco al estirarla.'},
+ 'rodilla|delante':{a:'sentadilla_barra sentadilla_frontal sentadilla_hack sentadilla_goblet zancada zancada_bulgara ext_cuadriceps',
+  m:'prensa peso_muerto',
+  ang:'Evita doblar mucho la rodilla con carga: sentadilla y prensa hasta unos 90°, extensión de cuádriceps solo en el último tramo y sin zancadas.'},
+ 'rodilla|detras':{a:'curl_femoral curl_femoral_sentado nordico',
+  m:'peso_muerto_rumano peso_muerto zancada_bulgara sentadilla_barra sentadilla_hack',
+  ang:'Evita doblar la rodilla contra resistencia y estirar al máximo los isquios: curl femoral en recorrido corto y peso muerto rumano sin bajar tanto.'},
+ 'cadera|entero':{ang:'Evita la flexión profunda de cadera y las posturas muy abiertas con carga.'},
+ 'cadera|ingle':{a:'aductores sentadilla_barra sentadilla_frontal sentadilla_goblet zancada zancada_bulgara elev_colgado rodillas_colgado',
+  m:'prensa sentadilla_hack peso_muerto peso_muerto_rumano elev_banco crunch_inverso',
+  ang:'Evita doblar mucho la cadera y abrir las piernas con carga: sentadilla con postura más estrecha y menos profunda, sin aductores ni elevaciones de piernas colgado.'},
+ 'cadera|lateral':{a:'abductores zancada_bulgara zancada',
+  m:'sentadilla_goblet sentadilla_barra hip_thrust patada_gluteo peso_muerto_rumano',
+  ang:'Evita apoyarte en una sola pierna con carga y abrir la pierna contra resistencia: ejercicios a dos piernas y postura estable.'}
+}).map(([k,o])=>[k,{a:new Set((o.a||'').split(' ').filter(Boolean)),m:new Set((o.m||'').split(' ').filter(Boolean)),ang:o.ang||''}]));
+const lesTab=(z,p)=>!p||p==='entero'?CARGA_ART[z]:LES_TAB[z+'|'+p];
+const lesAng=(z,p)=>(LES_TAB[z+'|'+(p||'entero')]||{}).ang||'';
 // sustitutos preferidos por zona (desempatan entre los de carga baja)
 const LES_PREF={hombro:new Set(['press_maquina','remo_maquina','elev_lateral_maquina','pushdown_barra']),codo:new Set(['curl_martillo','remo_maquina']),
  'muñeca':new Set(['curl_martillo','press_maquina','pushdown_cuerda']),'espalda baja':new Set(['prensa','remo_maquina','remo_polea','hip_thrust']),
  rodilla:new Set(['hip_thrust','peso_muerto_rumano']),cadera:new Set(['ext_cuadriceps','curl_femoral','remo_maquina'])};
 const LES_PRUD='No es consejo médico: si el dolor es agudo, sigue o empeora, consulta a un profesional de la salud.';
-function lesCarga(n,g,z){const T=CARGA_ART[z];if(!T)return 'b';const b=ANIM.buscar(n,g);if(b.d&&b.d.id==='vacio')return 'b';if(b.aprox)return 'm';
+// carga de un ejercicio sobre la zona (y la parte, v24): a / m / b. Un nombre que el catálogo no reconoce cuenta como «media».
+function lesCarga(n,g,z,p){const T=lesTab(z,p);if(!T)return 'b';const b=ANIM.buscar(n,g);if(b.d&&b.d.id==='vacio')return 'b';if(b.aprox)return 'm';
   return T.a.has(b.d.id)?'a':T.m.has(b.d.id)?'m':'b'}
-// mejor alternativa del mismo grupo: de carga baja (si no hay, media), que trabaje los mismos músculos y que no esté ya en el plan
-function lesAlt(g,E,z,ya){const mE=musculos(E.n,g),P=LES_PREF[z]||new Set();let best=null;
-  for(const d of ANIM.lista){if(d.g!==g||d.id==='vacio'||d.id==='generico'||ya.has(d.n))continue;const c=lesCarga(d.n,g,z);if(c==='a')continue;
+// mejor alternativa del mismo grupo: de carga baja (si no hay, media, salvo con soloB), que trabaje los mismos músculos y que no esté ya en el plan
+function lesAlt(g,E,z,p,ya,soloB){const mE=musculos(E.n,g),P=LES_PREF[z]||new Set();let best=null;
+  for(const d of ANIM.lista){if(d.g!==g||d.id==='vacio'||d.id==='generico'||ya.has(d.n))continue;const c=lesCarga(d.n,g,z,p);if(c==='a'||(soloB&&c==='m'))continue;
     const m=musculos(d.n,g);let s=0;for(const k in mE)if(m[k])s+=Math.min(mE[k],m[k]);if(P.has(d.id))s+=.6;if(c==='m')s-=10;
     if(!best||s>best.s)best={n:d.n,c,s}}
   return best}
 const nCorto=n=>{if(SUGEJ[n])return SUGEJ[n].s;const w=n.split(' ');const s=w.length>1?w[0]+' '+w[w.length-1]:w[0];return s.length>14?(w[0].slice(0,4)+'. '+w[w.length-1]).slice(0,14):s};
-function lesLista(g,L,z){const ya=new Set(L.map(x=>x.n));
-  return L.map(E=>{if(E.levy)return E;const c=lesCarga(E.n,g,z);if(c==='b')return E;if(c==='m')return {...E,lesM:z,orig:E};
-    const a=lesAlt(g,E,z,ya);if(!a)return {...E,lesM:z,lesSin:true,orig:E};ya.add(a.n);
+/* plan de un grupo cuidando les = {z, p, n}. Por nivel, según la carga del ejercicio sobre la parte:
+     molestia: a → el mismo ejercicio, serie recta con 2–3 en reserva y sin el ángulo que molesta (lesAng); m → el mismo, con el aviso del ángulo
+     fuerte:   a → la mejor alternativa (o serie recta si no hay); m → serie recta con 2–3 en reserva
+     extremo:  a y m → alternativa de carga baja; si no hay, el ejercicio se quita (lesFuera). Sin ninguno seguro, el grupo queda en pausa. */
+function lesLista(g,L,les){const z=les.z,p=les.p,nv=les.n||'fuerte',ya=new Set(L.map(x=>x.n));
+  return L.map(E=>{if(E.levy)return E;const c=lesCarga(E.n,g,z,p);if(c==='b')return E;
+    if(nv==='leve')return c==='a'?{...E,lesM:z,lesAng:1,orig:E}:{...E,lesAng:1,orig:E};
+    if(nv==='fuerte'&&c==='m')return {...E,lesM:z,orig:E};
+    const a=lesAlt(g,E,z,p,ya,nv==='extremo');if(!a)return nv==='extremo'?{...E,lesFuera:1,orig:E}:{...E,lesM:z,lesSin:true,orig:E};ya.add(a.n);
     const sg=SUGEJ[a.n]||{},ext=sg.ext||'part',o={...E,n:a.n,s:sg.s||nCorto(a.n),tempo:sg.tempo||'controlado · sin dolor',ext,
       extN:sg.extN||'Parciales',extH:sg.extH||'recorrido corto y sin dolor',k:KEXT[ext]||1.5,lesDe:E.n,lesZ:z,orig:E};
     if(a.c==='m')o.lesM=z;return o})}
-function lesAvisoSesion(g,ests){const z=lesion.z,L=CAT[g].e.filter((x,i)=>!ests||ests.includes(i));
-  const c=L.filter(x=>x.lesDe).map(x=>`${x.n} en lugar de ${x.lesDe}`),m=L.filter(x=>x.lesM&&!x.lesDe).map(x=>x.s.toLowerCase());
-  return `Cuidando ${LES_ART[z]}`+(c.length?`: cambié ${c.join(' y ')}`:'')+(m.length?`. En ${m.join(' y ')}, series rectas con 2 o 3 en reserva`:'')
-    +(!c.length&&!m.length?': hoy ningún ejercicio lo carga mucho':'')+'. Si duele, para'}
-function avisoEst(g,E){const a=avisoMolestia(g,E);if(!E||(!E.lesDe&&!E.lesM))return a;const z=E.lesZ||E.lesM;
-  const l=E.lesDe?`Cambiado por cuidar ${LES_ART[z]}: ${E.n} en lugar de ${E.lesDe}`+(E.lesM?' · 2–3 en reserva':''):`Cuidando ${LES_ART[z]}: series rectas con 2–3 en reserva, sin llegar al fallo`;
+const lesQue=()=>lesTxt(lesion.z,lesion.p);   // lo que se cuida ahora, con artículo
+function lesAvisoSesion(g,ests){const L=CAT[g].e.filter((x,i)=>!ests||ests.includes(i)),q=lesQue();
+  const c=L.filter(x=>x.lesDe).map(x=>`${x.n} en lugar de ${x.lesDe}`),m=L.filter(x=>x.lesM&&!x.lesDe).map(x=>x.s.toLowerCase()),an=L.some(x=>x.lesAng);
+  return `Cuidando ${q} · ${LES_NN[lesion.n]}`+(c.length?`: cambié ${c.join(' y ')}`:'')+(m.length?`. En ${m.join(' y ')}, series rectas con 2 o 3 en reserva`:'')
+    +(an?`. ${lesAng(lesion.z,lesion.p)}`:'')+(!c.length&&!m.length&&!an?': hoy ningún ejercicio lo carga mucho':'')+'. Si duele, para'}
+function avisoEst(g,E){const a=avisoMolestia(g,E);if(!E||(!E.lesDe&&!E.lesM&&!E.lesAng))return a;const q=lesQue();
+  const l=E.lesDe?`Cambiado por cuidar ${q}: ${E.n} en lugar de ${E.lesDe}`+(E.lesM?' · 2–3 en reserva':'')
+    :E.lesM?`Cuidando ${q}: series rectas con 2–3 en reserva, sin llegar al fallo`+(E.lesAng?`. ${lesAng(lesion.z,lesion.p)}`:'')
+    :`Cuidando ${q}: ${lesAng(lesion.z,lesion.p)}`;
   return a?l+'. '+a:l}
 // progreso de la meta cuidando: las series rectas valen 1 si llegan a 5 reps (como en descarga); las demás, sus efectivas
 const progLes=sets=>(sets||[]).reduce((a,r)=>a+(r.recta?(r.k==='act.'&&(parseInt(r.reps,10)||0)>=5?1:0):efectiva(r)),0);
 // sugerencia: la misma zona con molestia en 2 de las 3 últimas sesiones (salvo que dijeras «ahora no» hace menos de 7 días)
+// (v24) con la parte más marcada de esa zona, si la anotaste; si no, la zona entera
 function lesSugerida(){if(lesOn())return null;const H=hist.slice(0,3),n={};if(H.length<2)return null;
   H.forEach(h=>new Set((h.sets||[]).map(r=>r.mol).filter(z=>LES_Z.includes(z))).forEach(z=>n[z]=(n[z]||0)+1));
-  const z=LES_Z.find(z=>n[z]>=2);if(!z||(lesion.nz===z&&Date.now()-Date.parse(lesion.nf)<7*864e5))return null;return z}
+  const z=LES_Z.find(z=>n[z]>=2);if(!z||(lesion.nz===z&&Date.now()-Date.parse(lesion.nf)<7*864e5))return null;
+  const np={};H.forEach(h=>(h.sets||[]).forEach(r=>{if(r.mol===z&&LES_P[z].includes(r.molP))np[r.molP]=(np[r.molP]||0)+1}));
+  const p=Object.keys(np).sort((a,b)=>np[b]-np[a])[0]||LES_P[z][0];return {z,p}}
 // al volver a reposo: si la zona cuidada empezó, cambió o venció, se rehace el plan
-function lesRefresca(){if(!v18listo||S.st!=='idle')return;const k=lesOn()?lesion.z+'|'+lesion.hasta:'';if(k!==lesAplicada){aplicarEjercicios();lastPlan=''}}
-function lesEmpezar(z,d){const t=Date.now();lesion={...(lesion.nz?{nz:lesion.nz,nf:lesion.nf}:{}),z,ini:new Date(t).toISOString(),hasta:new Date(t+d*864e5).toISOString()};
+function lesRefresca(){if(!v18listo||S.st!=='idle')return;const k=lesOn()?lesKey():'';if(k!==lesAplicada){aplicarEjercicios();lastPlan=''}}
+function lesEmpezar(z,d,p,n){const t=Date.now();p=LES_P[z].includes(p)?p:LES_P[z][0];n=LES_N.includes(n)?n:'fuerte';
+  lesion={...(lesion.nz?{nz:lesion.nz,nf:lesion.nf}:{}),z,p,n,ini:new Date(t).toISOString(),hasta:new Date(t+d*864e5).toISOString()};
   guardarObj(LESKEY,lesion);aplicarEjercicios();lastPlan='';if(S.st==='idle')S=fresh()}
+// subir o bajar el nivel mientras dura (mismo periodo): el plan se rehace al volver a reposo
+function lesNivel(n){if(!lesOn()||!LES_N.includes(n))return;lesion={...lesion,n};guardarObj(LESKEY,lesion);aplicarEjercicios();lastPlan='';if(S.st==='idle')S=fresh()}
 function lesTerminar(){if(!lesion.z)return;lesion={...lesion,hasta:new Date().toISOString()};guardarObj(LESKEY,lesion);aplicarEjercicios();lastPlan='';if(S.st==='idle')S=fresh()}
 const fLarga=x=>new Date(x).toLocaleDateString('es-DO',{weekday:'long',day:'numeric',month:'short'});
 /* ---------- deshacer: antes de cada serie se guarda una copia profunda del motor (y de lo que una rutina cambia al pasar de grupo) ---------- */
@@ -632,8 +737,8 @@ function deshacer(){const p=pila.pop();if(!p)return;const idAhora=S.id;
 $('deshacer').onclick=deshacer;
 function aplicar(ev){
   pila.push({S:clon(S),grupo,rutPos,rutEf,med:clon(medVistas||{}),ev:{R:ev.R,rir:ev.rir,hold:ev.hold},...(SS?{ss:clon(SS)}:{}),...(S.fza?{fz:clon(fzaCfg)}:{})});if(pila.length>PILA_MAX)pila.shift();rirPrev=null;
-  const mol=S.molR;S.molR=null;
-  const o=avanzar(ev),t=now(),pr=esRecord(o.row);if(pr)o.row.pr=true;if(mol!=null)o.row.mol=mol||'sin zona';S.sets.push(o.row);
+  const mol=S.molR,molP=S.molP;S.molR=null;S.molP=null;
+  const o=avanzar(ev),t=now(),pr=esRecord(o.row);if(pr)o.row.pr=true;if(mol!=null){o.row.mol=mol||'sin zona';if(mol&&molP&&LES_P[mol]&&LES_P[mol].includes(molP))o.row.molP=molP}S.sets.push(o.row);
   Object.assign(S,{P0:S.P,C0:S.C,t0:t,last:t,restDur:o.rest,lastSec:-1});
   if(pr){S.pr=t+6;S.prK='¡Récord personal!';S.prTxt=`${o.row.ex}: ${kgTxt(o.row.kg)} × ${o.row.reps}`;fanfarria()}
   const yaPr=pr?'¡Récord personal! ':'';
@@ -654,7 +759,7 @@ function guardar(completa){
     efectivas:Math.round(efDe(S.sets)*100)/100,meta:S.meta,bien:S.bien||undefined,nota:S.nota||undefined,
     antes:!completa&&S.antes||undefined,desc:S.desc||undefined,serC:S.desc?serDe(S.sets):S.fza?fzaHechas():undefined,
     rut:enRutina()?{n:RUTINAS[rutI].mia?'La mía':RUTINAS[rutI].n,pos:rutPos,de:rutLista().length}:undefined,
-    fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined};
+    fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined,cuidaP:S.les&&S.lesP||undefined,cuidaN:S.les&&S.lesN||undefined};
   hist=[ent].concat(hist.filter(h=>h.id!==S.id));   // sin tope: nunca se borran sesiones viejas
   $('save').textContent=escribirHist()?'Guardado ✓':'Sin espacio: no se guardó (mira el aviso)';
   if(persistE==null)pedirPersist();pintarHist()}
@@ -696,6 +801,8 @@ setInterval(tick,200);
 
 const activarAudio=()=>{try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();audio.resume()}catch(e){}};
 const sinGrupo=()=>!!RUTINAS[rutI].mia&&!miaLista.length;
+// cuidando con dolor extremo: el grupo elegido (o un lado de la superserie) está en pausa y no se puede empezar
+const pausaInicio=()=>ssSel.on?!!(ssLados()||[]).some(l=>enPausa(l.g)):enPausa(grupo);
 // reps propuestas al reportar la serie principal: las de la última vez con el mismo peso; con otro peso, las que da el 1RM
 // estimado de entonces dejando 1 en reserva (dentro de rango −3…+5); sin datos, el punto medio del rango. Mini-series y variante: su objetivo.
 function repsSug(){if(S.phase!=='act')return S.target;const E=est(),p=S.sug&&S.sug.prev;
@@ -711,7 +818,7 @@ $('pad').onclick=async()=>{
   if(!lock)try{navigator.wakeLock?.request('screen').then(l=>{lock=l}).catch(()=>{})}catch(e){}   // sin esperar: el toque responde al instante
   const t=now();
   if(S.st==='idle'){
-    if(sinGrupo()||(ssSel.on&&!ssLados())){render();return}   // «La mía» sin grupos o superserie propia sin sus dos grupos: no empieza
+    if(sinGrupo()||(ssSel.on&&!ssLados())||pausaInicio()){render();return}   // «La mía» sin grupos o superserie propia sin sus dos grupos: no empieza
     // antes de la primera sesión del día: cómo llegas (un segundo toque empieza igual). Si Comida ya anotó el sueño, solo pregunta la energía.
     if(!bienHoy()&&!omitHoy()&&!pideBien){pideBien=true;bienEd=bienEd||bienDe(bienDia())||{};render();$('bien').scrollIntoView?.({block:'nearest',behavior:'smooth'});return}
     if(retomar)descartarRetomar();
@@ -738,7 +845,8 @@ $('minus').onclick=()=>{S.hechas=Math.max(1,S.hechas-1);render()};
 $('plus').onclick=()=>{S.hechas=Math.min(80,S.hechas+1);render()};
 document.querySelectorAll('.rir button').forEach(b=>b.onclick=()=>{if(S.st==='report')aplicar({R:S.hechas,rir:+b.dataset.r,dur:S.workDur})});
 $('molB').onclick=e=>{const b=e.target.closest('button');if(!b||S.st!=='report')return;const z=b.dataset.z;
-  if(z==='')S.molR=S.molR==null?'':null;else S.molR=S.molR===z?'':z;render()};
+  const mp=b.dataset.mp;if(mp!=null){S.molP=S.molP===mp?null:mp;render();return}   // v24: la parte, opcional
+  if(z==='')S.molR=S.molR==null?'':null;else S.molR=S.molR===z?'':z;S.molP=null;render()};
 // «Completa» solo si llegaste a la meta; si no, «Terminada antes (x de y)».
 $('terminar').onclick=()=>{if(SS){if(enCurso())ssTerminar();return}
   // sin series de trabajo (pausa antes del siguiente grupo de la rutina, o solo el calentamiento): lo hecho ya está guardado; se corta aquí
@@ -944,7 +1052,7 @@ function renderGrupos(){
     +(i?'':`<button type="button" data-ss="1" aria-pressed="${ssSel.on}" ${bloq}>Superserie</button>`)).join('');   // «Superserie» va 2.º: se ve sin deslizar
   const SG=ssSel.on?ssGrupos():null;   // superserie: los grupos del par, marcados A y B
   $('grupos').innerHTML=Object.keys(CAT).map(id=>{const k=SG?SG.indexOf(id):L.indexOf(id),on=SG?k>=0:L.length>1||RUTINAS[rutI].mia?k>=0:id===grupo;
-    return `<button type="button" data-g="${id}" aria-pressed="${on}" ${bloq}>${CAT[id].n}${on&&SG?`<sup>${SG[0]===SG[1]?'A⇄B':'AB'[k]}</sup>`:on&&L.length>1?`<sup>${k+1}</sup>`:''}</button>`}).join('');
+    return `<button type="button" data-g="${id}" aria-pressed="${on}" ${bloq}${enPausa(id)?' class="pausa" title="En pausa: cuidando con dolor extremo"':''}>${CAT[id].n}${enPausa(id)?' <small>pausa</small>':''}${on&&SG?`<sup>${SG[0]===SG[1]?'A⇄B':'AB'[k]}</sup>`:on&&L.length>1?`<sup>${k+1}</sup>`:''}</button>`}).join('');
   $('rutHint').hidden=!RUTINAS[rutI].mia||S.st!=='idle'||ssSel.on;renderSsPar();
   $('rutHint').textContent=miaLista.length?'Toca un grupo para quitarlo o agregarlo al final.':'Toca los grupos en el orden en que los quieres hacer.';
   $('rutinas').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(enCurso())return;
@@ -996,7 +1104,7 @@ function metaV18(){let h='';
   h+=`<div class="tog tipo" role="group" aria-label="Tipo de sesión"><button type="button" data-tipo="h" aria-pressed="${!on}">Hipertrofia</button><button type="button" data-tipo="f" aria-pressed="${on}"${dis?' disabled':''}>Fuerza</button>`
     +(on?`<button type="button" data-tipo="acc" aria-pressed="${!!F.nA}">Con accesorio</button>`:'')+'</div>';
   if(descargaActiva())return h+'<span class="aviso">En semana de descarga no hay días de fuerza.</span>';
-  if(!F)return h+(fzaHoy?`<span class="aviso">Cuidando ${LES_ART[lesion.z]}: hoy no hay un compuesto pesado de ${CAT[grupo].n.toLowerCase()} que no lo cargue.</span>`:'');
+  if(!F)return h+(fzaHoy?`<span class="aviso">Cuidando ${lesQue()}: hoy no hay un compuesto pesado de ${CAT[grupo].n.toLowerCase()} que no lo cargue.</span>`:'');
   if(!on){const b=bloqueSem();return h+(b&&!b.desc&&b.i===b.n-2?`<span class="aviso">Semana ${b.i+1} del bloque: buena para un día de fuerza (como mucho uno por grupo a la semana).</span>`:'')}
   const E=F.e[0];
   h+=(FZA_NOTA[grupo]?`<span class="aviso">${esc(FZA_NOTA[grupo])}</span>`:'')
@@ -1011,33 +1119,48 @@ function fzaSeriesHTML(F){const E=F.e[0],kg=fzaKg(F),cal=CFG.cal?planCal(kg,E,CA
 document.addEventListener('click',e=>{const b=e.target.closest('[data-tipo]');if(!b||S.st!=='idle')return;const v=b.dataset.tipo;
   if(v==='acc'){fzaCfg.acc=!(fzaCfg.acc!==false);guardarObj(FZKEY,fzaCfg)}else fzaHoy=v==='f'&&fzaDisponible(grupo);
   lastPlan='';renderMeta();render()});
+const LES_ND={leve:'Mantiene tus ejercicios. En los que llevan la parte al ángulo que molesta: serie recta con 2–3 en reserva y recorrido cómodo; en el resto, el aviso de qué evitar.',
+  fuerte:'Cambia los ejercicios que cargan mucho la parte por la mejor alternativa del mismo grupo; en los de carga media, serie recta con 2–3 en reserva.',
+  extremo:'Solo deja ejercicios que casi no la cargan, también en los grupos que la cargan de rebote. Lo que no tenga alternativa se quita, y el grupo que se quede sin ejercicios queda en pausa. Con dolor así, lo primero es que te vea un profesional.'};
 function lesBanner(){
-  if(lesOn()){const L=CAT[grupo].e,c=L.filter(x=>x.lesDe),m=L.filter(x=>x.lesM&&!x.lesDe);
-    return `<div class="aviso-d les"><span><b>Cuidando ${LES_ART[lesion.z]}</b> hasta el ${esc(fLarga(lesion.hasta))}. `
-      +(c.length?`Cambiado por cuidar ${LES_ART[lesion.z]}: `+c.map(x=>`${esc(x.lesDe)} → <b>${esc(x.n)}</b>`).join(' · ')+'. ':'')
-      +(m.length?`Series rectas con 2–3 en reserva en ${m.map(x=>esc(x.s.toLowerCase())).join(', ')}. `:'')
-      +(!c.length&&!m.length?`Hoy ${esc(CAT[grupo].n.toLowerCase())} casi no lo carga: entrena normal y para si duele. `:'')
+  if(lesOn()){const L=CAT[grupo].e,c=L.filter(x=>x.lesDe),m=L.filter(x=>x.lesM&&!x.lesDe),q=lesQue(),an=L.some(x=>x.lesAng);
+    return `<div class="aviso-d les${lesion.n==='extremo'?' fuerte':''}"><span><b>Cuidando ${esc(q)} · ${LES_NN[lesion.n]}</b> hasta el ${esc(fLarga(lesion.hasta))}. `
+      +(enPausa(grupo)?`<b>${esc(CAT[grupo].n)} está en pausa</b>: no queda ningún ejercicio que no la cargue. Elige otro grupo. `:'')
+      +(c.length&&!enPausa(grupo)?`Cambiado: `+c.map(x=>`${esc(x.lesDe)} → <b>${esc(x.n)}</b>`).join(' · ')+'. ':'')
+      +(m.length&&!enPausa(grupo)?`Series rectas con 2–3 en reserva en ${m.map(x=>esc(x.s.toLowerCase())).join(', ')}. `:'')
+      +(an&&!enPausa(grupo)?`${esc(lesAng(lesion.z,lesion.p))} `:'')
+      +(!c.length&&!m.length&&!an&&!enPausa(grupo)?`Hoy ${esc(CAT[grupo].n.toLowerCase())} casi no la carga: entrena normal y para si duele. `:'')
       +`<small>${LES_PRUD}</small></span><button type="button" data-les="fin">Terminar antes</button></div>`}
-  const z=lesSugerida();
-  return z?`<div class="aviso-d"><span>Marcaste molestia en <b>${LES_ART[z]}</b> en 2 de tus últimas 3 sesiones. ¿Lo cuidamos unos días? Cambio los ejercicios que más lo cargan y bajo la intensidad. <small>${LES_PRUD}</small></span>`
-    +`<div class="tog">${LES_D.map(d=>`<button type="button" data-ld="${d}" data-lz="${esc(z)}">Cuidar ${d} días</button>`).join('')}<button type="button" data-les="no" data-lz="${esc(z)}">Ahora no</button></div></div>`:''}
-let lesZsel='hombro';
-function renderLesCfg(){const el=$('cLes');if(!el)return;const on=lesOn(),z=on?lesion.z:lesZsel;
-  const filas=Object.keys(CAT).map(g=>{const L=on?CAT[g].e:lesLista(g,CAT[g].e.map(x=>x.orig||x),z),c=L.filter(x=>x.lesDe),m=L.filter(x=>x.lesM&&!x.lesDe);
-    return `<tr><td>${CAT[g].n}</td><td class="lc">${c.map(x=>`${esc(x.lesDe)} → <b>${esc(x.n)}</b>`).join('<br>')||'—'}</td><td class="lc">${m.map(x=>esc(x.s)).join(', ')||'—'}</td></tr>`}).join('');
-  const h=(on?`<div class="aviso-d les"><span><b>Cuidando ${LES_ART[z]}</b> desde el ${esc(fLarga(lesion.ini))} hasta el ${esc(fLarga(lesion.hasta))} · quedan ${Math.max(1,Math.ceil((Date.parse(lesion.hasta)-Date.now())/864e5))} días.</span><button type="button" data-les="fin">Terminar antes</button></div>`
-      :`<span class="lbl">Zona</span><div class="chips">${LES_Z.map(x=>`<button type="button" data-lsel="1" data-lz="${esc(x)}" aria-pressed="${x===z}">${esc(x)}</button>`).join('')}</div>
-      <span class="lbl">Cuánto tiempo</span><div class="tog">${LES_D.map(d=>`<button type="button" data-ld="${d}" data-lz="${esc(z)}">Cuidar ${d} días</button>`).join('')}</div>`)
-    +`<p class="hint">${on?'Así queda tu plan':'Qué cambiaría'}: los ejercicios que cargan mucho ${LES_ART[z]} se cambian por la mejor alternativa del mismo grupo; en los de carga media, series rectas con 2–3 en reserva, sin mini-series ni parciales al fallo. Se avisa al empezar, también con la voz.</p>
-    <div class="tbl"><table class="lest"><thead><tr><th>Grupo</th><th>Se cambia</th><th>Más suave</th></tr></thead><tbody>${filas}</tbody></table></div>
-    <p class="hint"><b>${LES_PRUD}</b> Este modo solo adapta el entrenamiento mientras dura; no trata la lesión ni sustituye una valoración.</p>`;
+  const sg=lesSugerida();if(!sg)return '';const {z,p}=sg;
+  return `<div class="aviso-d"><span>Marcaste molestia en <b>${esc(lesTxt(z,p))}</b> en 2 de tus últimas 3 sesiones. ¿Lo cuidamos unos días? Empiezo en nivel «molestia»: mismos ejercicios, sin los ángulos que suelen molestar (lo puedes subir en Ajustes). <small>${LES_PRUD}</small></span>`
+    +`<div class="tog">${LES_D.map(d=>`<button type="button" data-ld="${d}" data-lz="${esc(z)}" data-lp="${esc(p)}" data-ln="leve">Cuidar ${d} días</button>`).join('')}<button type="button" data-les="no" data-lz="${esc(z)}">Ahora no</button></div></div>`}
+let lesZsel='hombro',lesPsel='entero',lesNsel='fuerte';
+function renderLesCfg(){const el=$('cLes');if(!el)return;const on=lesOn(),z=on?lesion.z:lesZsel,p=on?lesion.p:(LES_P[z].includes(lesPsel)?lesPsel:LES_P[z][0]),n=on?lesion.n:lesNsel;
+  const filas=Object.keys(CAT).map(g=>{const L=lesLista(g,CAT[g].base||CAT[g].e,{z,p,n}),pausa=!L.some(x=>!x.levy&&!x.lesFuera);
+    const c=L.filter(x=>x.lesDe),m=L.filter(x=>x.lesM&&!x.lesDe),an=L.filter(x=>x.lesAng&&!x.lesM),f=L.filter(x=>x.lesFuera);
+    return `<tr${pausa?' class="pausa"':''}><td>${CAT[g].n}${pausa?'<br><b>en pausa</b>':''}</td><td class="lc">${pausa?'—':c.map(x=>`${esc(x.lesDe)} → <b>${esc(x.n)}</b>`).join('<br>')||'—'}</td>`
+      +`<td class="lc">${pausa?'—':m.map(x=>esc(x.s)).concat(an.map(x=>esc(x.s)+' (ojo al ángulo)')).join(', ')||'—'}</td><td class="lc">${pausa?'todo el grupo':f.map(x=>esc(x.s)).join(', ')||'—'}</td></tr>`}).join('');
+  const chips=(lista,sel,attr,nom)=>`<div class="chips">${lista.map(x=>`<button type="button" ${attr}="${esc(x)}" aria-pressed="${x===sel}">${esc(nom(x))}</button>`).join('')}</div>`;
+  const h=(on?`<div class="aviso-d les${n==='extremo'?' fuerte':''}"><span><b>Cuidando ${esc(lesTxt(z,p))} · ${LES_NN[n]}</b> desde el ${esc(fLarga(lesion.ini))} hasta el ${esc(fLarga(lesion.hasta))} · quedan ${Math.max(1,Math.ceil((Date.parse(lesion.hasta)-Date.now())/864e5))} días.</span><button type="button" data-les="fin">Terminar antes</button></div>
+      <span class="lbl">Cómo va (cámbialo cuando mejore o empeore)</span>${chips(LES_N,n,'data-lniv',x=>LES_NN[x])}`
+      :`<span class="lbl">Zona</span>${chips(LES_Z,z,'data-lsel',x=>x)}
+      ${LES_P[z].length>1?`<span class="lbl">Qué parte</span>${chips(LES_P[z],p,'data-lpsel',x=>lesPN(z,x))}`:''}
+      <span class="lbl">Cuánto molesta</span>${chips(LES_N,n,'data-lnsel',x=>LES_NN[x])}
+      <span class="lbl">Cuánto tiempo</span><div class="tog">${LES_D.map(d=>`<button type="button" data-ld="${d}" data-lz="${esc(z)}" data-lp="${esc(p)}" data-ln="${n}">Cuidar ${d} días</button>`).join('')}</div>`)
+    +`<p class="hint"><b>${esc(LES_NN[n])[0].toUpperCase()+esc(LES_NN[n]).slice(1)}:</b> ${LES_ND[n]}${lesAng(z,p)?` <b>Qué evitar:</b> ${esc(lesAng(z,p))}`:''}</p>
+    <p class="hint">${on?'Así queda tu plan':'Qué cambiaría'}, grupo por grupo:</p>
+    <div class="tbl"><table class="lest"><thead><tr><th>Grupo</th><th>Se cambia</th><th>Más suave</th><th>Se quita</th></tr></thead><tbody>${filas}</tbody></table></div>
+    <p class="hint"><b>${LES_PRUD}</b> Este modo solo adapta el entrenamiento mientras dura; no trata la lesión ni sustituye una valoración. Las cargas por parte son orientativas.</p>`;
   if(el.innerHTML!==h)el.innerHTML=h}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-ld],[data-les],[data-lsel]');if(!b)return;const z=b.dataset.lz;
-  if(b.dataset.lsel){if(LES_Z.includes(z))lesZsel=z;renderLesCfg();return}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-ld],[data-les],[data-lsel],[data-lpsel],[data-lnsel],[data-lniv]');if(!b)return;const d=b.dataset,z=d.lz;
+  if(d.lsel){if(LES_Z.includes(d.lsel)){lesZsel=d.lsel;lesPsel=LES_P[d.lsel][0]}renderLesCfg();return}
+  if(d.lpsel){if(LES_P[lesZsel].includes(d.lpsel))lesPsel=d.lpsel;renderLesCfg();return}
+  if(d.lnsel){if(LES_N.includes(d.lnsel))lesNsel=d.lnsel;renderLesCfg();return}
   if(enCurso())return;   // a media sesión el plan no cambia
-  if(b.dataset.ld&&LES_Z.includes(z)&&LES_D.includes(+b.dataset.ld)){lesEmpezar(z,+b.dataset.ld);decir(`Cuidando ${LES_ART[z]} ${b.dataset.ld} días. ${LES_PRUD}`)}
-  else if(b.dataset.les==='fin'){lesTerminar();decir('Terminado el modo cuidar')}
-  else if(b.dataset.les==='no'&&LES_Z.includes(z)){lesion={...lesion,nz:z,nf:new Date().toISOString()};guardarObj(LESKEY,lesion)}
+  if(d.lniv){lesNivel(d.lniv);decir(`Cuidando ${lesQue()}: ${LES_NN[lesion.n]}. ${lesion.n==='extremo'?LES_PRUD:''}`)}
+  else if(d.ld&&LES_Z.includes(z)&&LES_D.includes(+d.ld)){lesEmpezar(z,+d.ld,d.lp,d.ln);decir(`Cuidando ${lesQue()} ${d.ld} días, ${LES_NN[lesion.n]}. ${LES_PRUD}`)}
+  else if(d.les==='fin'){lesTerminar();decir('Terminado el modo cuidar')}
+  else if(d.les==='no'&&LES_Z.includes(z)){lesion={...lesion,nz:z,nf:new Date().toISOString()};guardarObj(LESKEY,lesion)}
   renderGrupos();renderLesCfg();render()});
 /* ---------- v18 · el pad en superserie, fuerza y reposo con modo (sin modo, render no pasa por aquí) ---------- */
 function v18Pad(o){const E=o.E,e=o.e;
@@ -1091,7 +1214,7 @@ function leerDraft(card){card.querySelectorAll('.hr').forEach(el=>{const r=histD
   const v=parseInt(el.querySelector('[data-f="reps"]').value,10);if(v>=0&&v<=999)r.reps=r.rir==='—'&&r.k!=='cal.'?v+' s':String(v);
   const k=el.querySelector('[data-f="kg"]').value.trim().replace(',','.');   // en la unidad de la pantalla; si no lo tocaste, el valor guardado no cambia
   if(k==='')r.kg=r.kg==null?null:r.kg;else if(+k>=0&&+k<=(esLb()?1100:500)&&(r.kg==null||Math.abs(aU(r.kg)-(+k))>1e-9))r.kg=deU(+k);
-  const ri=el.querySelector('[data-f="rir"]');if(ri)r.rir=ri.value;const m=el.querySelector('[data-f="mol"]').value;if(m)r.mol=m;else delete r.mol})}
+  const ri=el.querySelector('[data-f="rir"]');if(ri)r.rir=ri.value;const m=el.querySelector('[data-f="mol"]').value;if(m){if(r.mol!==m)delete r.molP;r.mol=m}else{delete r.mol;delete r.molP}})}
 function guardarHist(){escribirHist();
   if(pila.some(p=>!hist.some(h=>h.id===p.S.id))||!hist.some(h=>h.id===S.id))pila=[];   // no se puede deshacer hacia una sesión borrada
   revisarMedallas();renderHist();if(tab==='progreso')renderProg()}
@@ -1110,10 +1233,10 @@ $('hist').addEventListener('click',e=>{const b=e.target.closest('[data-hed]');if
       if(S.id===id&&S.st==='done'){S.sets=clon(sets);S.ef=efDe(sets);S.antes=!h.completa}$('ioMsg').textContent='Cambios guardados ✓'}
     histEd=null;histDraft=null;histBorrar=false;guardarHist()}});
 // Notas, molestias y cómo llegaste, debajo de cada sesión del historial (sesiones viejas: no muestra nada).
-function histExtra(h){const mols=[...new Map((h.sets||[]).filter(r=>r.mol).map(r=>[r.ej+r.mol,`${r.mol==='sin zona'?'sí':esc(r.mol)} (${esc(r.ex)})`])).values()];
+function histExtra(h){const mols=[...new Map((h.sets||[]).filter(r=>r.mol).map(r=>[r.ej+r.mol+(r.molP||''),`${r.mol==='sin zona'?'sí':esc(r.mol)+(r.molP&&LES_PN[r.molP]?' · '+esc(LES_PN[r.molP]):'')} (${esc(r.ex)})`])).values()];
   const x=[h.bien&&bienTxt(h.bien)?`Cómo llegaste: ${esc(bienTxt(h.bien))}`:'',mols.length?`<b>Molestia:</b> ${mols.join(', ')}`:'',
     h.nota?`<b>Nota:</b> ${esc(h.nota)}`:'',(h.sets||[]).some(r=>r.k==='cal.')?'Con calentamiento':'',
-    h.super?`<b>Superserie</b> ${h.super.split('+').map(g=>esc(CAT[g].n)).join(' + ')}${h.lado?` · lado ${esc(h.lado)}`:''}`:'',h.fza?'<b>Día de fuerza</b>':'',h.cuida?`Cuidando ${LES_ART[h.cuida]}`:''].filter(Boolean);
+    h.super?`<b>Superserie</b> ${h.super.split('+').map(g=>esc(CAT[g].n)).join(' + ')}${h.lado?` · lado ${esc(h.lado)}`:''}`:'',h.fza?'<b>Día de fuerza</b>':'',h.cuida?`Cuidando ${esc(lesTxt(h.cuida,h.cuidaP))}${h.cuidaN?` · ${LES_NN[h.cuidaN]}`:''}`:''].filter(Boolean);
   return x.length?`<div class="hist-x">${x.join('<br>')}</div>`:''}
 let lastG=null,lastEn=null,lastPlan='',lastRows='';
 function subInicio(E){const s=sugerir(grupo,E);
@@ -1142,6 +1265,7 @@ function render(){
   if(S.st==='idle'){if(!G.e[0].levy){const p=sugerir(grupo,G.e[0]);disc=p?discTxt(p.kg,G.e[0]):'';pav=avisoEst(grupo,G.e[0])}
     if(pideBien){kind='Antes de empezar';sub=bienDia()?'Falta tu energía de hoy (arriba) o toca otra vez para empezar ya':'Cuéntame cómo llegas hoy (arriba) o toca otra vez para empezar ya'}
     if(sinGrupo()){kind='Elige al menos un grupo';sub='Rutina «La mía»: toca arriba los grupos en el orden en que los quieres hacer.';disc='';pav=''}
+    else if(pausaInicio()){kind='En pausa';big='—';sub=`Cuidando ${lesQue()} con dolor extremo: ${ssSel.on?'un grupo de la superserie':CAT[grupo].n.toLowerCase()} no tiene ejercicios que no la carguen. Elige otro grupo.`;disc='';pav=''}
     else if(descargaActiva()&&!pideBien)kind+=' · semana de descarga'}
   if(S.st==='work'){cls='work';
     if(S.phase==='act'&&(S.desc||E.lesM)){const m=Math.max(1,S.metaE[S.sec]||0);kind=`${E.s} · ${S.desc?'descarga':'cuidado'} · serie ${Math.min(S.nIn+1,m+2)}${S.nIn<m?' de '+m:''} · ${fmt(e)}`;big=E.r;
@@ -1186,7 +1310,9 @@ function render(){
   if(S.st==='report'){const dt=discTxt(S.kg,E),barra=!$('kgFila').hidden&&!E.levy;$('discos').hidden=!barra;
     $('discosT').textContent=dt||(esBarra(E)?'Anota el peso total con la barra':'');$('barraT').textContent=esBarra(E)?'Con barra ✓':'¿Es con barra?';
     $('molB').innerHTML=`<button type="button" data-z="" aria-pressed="${S.molR!=null}">Molestia${S.molR!=null?':':''}</button>`
-      +(S.molR!=null?ZONAS.map(z=>`<button type="button" data-z="${z}" aria-pressed="${S.molR===z}">${z}</button>`).join(''):'')}
+      +(S.molR!=null?ZONAS.map(z=>`<button type="button" data-z="${z}" aria-pressed="${S.molR===z}">${z}</button>`).join(''):'')
+      +(S.molR&&LES_P[S.molR]&&LES_P[S.molR].length>1?`<span class="lbl" style="flex-basis:100%;margin:4px 0 0">Qué parte (opcional)</span>`
+        +LES_P[S.molR].filter(p=>p!=='entero').map(p=>`<button type="button" data-mp="${p}" aria-pressed="${S.molP===p}">${esc(LES_PN[p])}</button>`).join(''):'')}
   $('hoyCard').hidden=S.st!=='idle'||rutPos>0;if(!$('hoyCard').hidden)renderHoy();
   renderBien();
   const ci=$('cierre');ci.hidden=S.st!=='done'||!S.id;if(!ci.hidden&&ci.dataset.id!==S.id){ci.dataset.id=S.id;$('notaIn').value=S.nota||'';$('notaMsg').textContent=''}
@@ -1252,7 +1378,7 @@ const tipoMov=n=>{const s=sinTilde(n),m=MOVS.find(([r])=>r.test(s));return m?m[1
 /* ---------- qué toca hoy: lo que falta de la semana y lo descansado que está cada grupo ---------- */
 const ultimaVez=g=>hist.reduce((m,h)=>gDe(h)===g?Math.max(m,Date.parse(h.start)||0):m,0);
 function queToca(){const w=semana(0),ahora=Date.now();
-  const info=Object.keys(CAT).map(g=>{const v=w[g]||0,[lo,hi]=semRango(g),u=ultimaVez(g),h=u?(ahora-u)/36e5:Infinity;
+  const info=Object.keys(CAT).filter(g=>!enPausa(g)).map(g=>{const v=w[g]||0,[lo,hi]=semRango(g),u=ultimaVez(g),h=u?(ahora-u)/36e5:Infinity;   // en pausa (cuidar): no se propone
     // primero lo que falta para el mínimo semanal; a igualdad, mejor 48–72 h de descanso
     return {g,v,lo,hi,h,ok:h>=48&&v<hi,s:Math.max(0,lo-v)/lo+(h>=48&&h<=72?.25:h>72?.15:0)}});
   const c=info.filter(x=>x.ok).sort((a,b)=>b.s-a.s);
@@ -1338,7 +1464,7 @@ function renderProg(){
       const det=[`<b>directas ${ef1(o.dir)}</b> · indirectas (estimadas) ${ef1(o.ind)}`];
       if(zs.length>1||o.solape>.05)det.push(`zonas: ${zTxt}${o.solape>.05?` = ${ef1(sz)} (${ef1(o.solape)} es la misma serie en dos zonas)`:''}`);
       if(o.sinDetalle>.05)det.push(`${ef1(o.sinDetalle)} de sesiones sin detalle por ejercicio (no salen en el mapa)`);
-      return `<div class="sem" data-g="${g}" data-v="${v}" data-est="${est}"><span>${CAT[g].n}</span><div class="track"><span class="banda" style="left:${100*lo/tope}%;width:${100*(hi-lo)/tope}%"></span><div class="fill" style="width:${Math.min(100,100*v/tope)}%;background:var(--${EST_VAR[est]})"></div></div>
+      return `<div class="sem" data-g="${g}" data-v="${v}" data-est="${est}"><span>${CAT[g].n}${enPausa(g)?' <small class="muted">· en pausa (cuidando)</small>':''}</span><div class="track"><span class="banda" style="left:${100*lo/tope}%;width:${100*(hi-lo)/tope}%"></span><div class="fill" style="width:${Math.min(100,100*v/tope)}%;background:var(--${EST_VAR[est]})"></div></div>
         <span class="val">${ef1(v)} <small>/ ${lo}–${hi}</small></span></div><p class="semd">${det.join(' · ')}</p>`}).join('')
     +`<p class="hint">Semana pasada: ${Object.keys(CAT).filter(g=>w1[g]).map(g=>`${CAT[g].n.toLowerCase()} ${ef1(w1[g])}`).join(' · ')||'sin entrenos'}.</p>`;
   // constancia
@@ -1895,9 +2021,9 @@ function normS(x){if(!esObj(x))return null;const f=fresh(),o={};
   const cal=vLista(x.cal,5,c=>esObj(c)&&vNum(c.kg,0,1000)!=null&&vNum(c.reps,0,100)!=null?{kg:+c.kg,reps:+c.reps,f:vNum(c.f,0,1)??.5}:null);o.cal=cal.length?cal:null;
   const p=esObj(x.sug)&&esObj(x.sug.prev)?normSet(x.sug.prev):null;
   o.sug=p?{kg:vNum(x.sug.kg,0,1000)??0,txt:vTxt(x.sug.txt)??'',cambio:x.sug.cambio===true,prev:{...p,mejor:vNum(x.sug.prev.mejor,0,1e5)??0,fecha:vFecha(x.sug.prev.fecha)}}:null;
-  o.molR=x.molR==null?null:vTxt(x.molR,40);o.bien=x.bien==null?null:normBien1(x.bien);o.Cpre=x.Cpre==null?null:vNum(x.Cpre,0,10);
+  o.molR=x.molR==null?null:vTxt(x.molR,40);o.molP=o.molR&&LES_P[o.molR]&&LES_P[o.molR].includes(x.molP)?x.molP:null;o.bien=x.bien==null?null:normBien1(x.bien);o.Cpre=x.Cpre==null?null:vNum(x.Cpre,0,10);
   // v18: zona cuidada, estaciones de un lado de superserie y plan de fuerza
-  if(LES_Z.includes(x.les))o.les=x.les;{const t=vTxt(x.lesAv,400);if(t)o.lesAv=t}if(x.lesDicho===true)o.lesDicho=true;if(x.ssW===true)o.ssW=true;
+  if(LES_Z.includes(x.les)){o.les=x.les;if(LES_P[x.les].includes(x.lesP))o.lesP=x.lesP;if(LES_N.includes(x.lesN))o.lesN=x.lesN}{const t=vTxt(x.lesAv,400);if(t)o.lesAv=t}if(x.lesDicho===true)o.lesDicho=true;if(x.ssW===true)o.ssW=true;
   if(Array.isArray(x.ests)){const e=vLista(x.ests,EST_MAX,v=>vEnt(v,0,EST_MAX-1));if(e.length)o.ests=e}
   if(x.fza!=null){const f=normFzaS(x.fza);if(!f)return null;o.fza=f}
   return o}
