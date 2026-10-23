@@ -201,6 +201,52 @@
     return { ok: !m.length, d: m.join('; ') || `mapa: ${[...clases].map(c => EST_MUS[c]).join(', ')}` };
   });
 
+  // ---------- 9. v23: arreglos de la ronda 2 y mejoras de uso (solo en memoria: no guardan nada) ----------
+  prueba('Meta de una sesión guardada en su propia unidad (efectivas, descarga, fuerza, cuidar una zona)', () => {
+    const fila = (k, reps, rir, extra = {}) => ({ k, reps: String(reps), rir: String(rir), kg: 20, ...extra });
+    const m = [];
+    if (!metaHechaH({ meta: 2, efectivas: 2, sets: [] }) || metaHechaH({ meta: 3, efectivas: 2, sets: [] })) m.push('efectivas');
+    if (!metaHechaH({ meta: 2, desc: true, serC: 2 }) || metaHechaH({ meta: 3, desc: true, serC: 2 })) m.push('descarga');
+    if (!metaHechaH({ meta: 2, fza: true, serC: 2 })) m.push('fuerza');
+    const recta = [fila('act.', 8, 2, { recta: true }), fila('act.', 8, 3, { recta: true })];   // 2 series rectas: cuentan 1 cada una aunque su efectiva sea menor
+    if (!metaHechaH({ meta: 2, cuida: 'codo', sets: recta, efectivas: efDe(recta) })) m.push(`cuidar una zona: progLes=${progLes(recta)}`);
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Con barra, «−» y la sugerencia no bajan de la barra sola', () => {
+    const E = { n: 'Press con barra', s: 'Press', r: '8–12' }, b = barraU(), m = [];
+    const k = cambiaKg(E, deU(b), -1); if (Math.abs(aU(k) - b) > 1e-6) m.push(`− desde la barra: ${aU(k)}`);
+    const k2 = cambiaKg(E, deU(b + 10), -1); if (!(aU(k2) < b + 10 && aU(k2) >= b)) m.push(`− desde barra+10: ${aU(k2)}`);
+    const r = regla(E, { reps: '5', rir: '0', kg: deU(b) }); if (r.kg !== deU(b) || !/barra sola/.test(r.txt)) m.push(`regla: ${r.txt}`);
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('«Ahora no» en «Cómo llegas hoy» solo vale para ese día', () => {
+    const antes = bienOmit; bienOmit = diaK(Date.now()); const hoy = omitHoy();
+    bienOmit = diaK(Date.now() - 864e5); const ayer = omitHoy(); bienOmit = antes;
+    return { ok: hoy && !ayer, d: `hoy=${hoy} ayer=${ayer}` };
+  });
+  prueba('Reps propuestas al reportar: las de la última vez con el mismo peso; con otro peso, las del 1RM estimado', () => {
+    const S0 = S, m = [];
+    try {
+      const E = est(), [lo, hi] = rango(E.r), p = { reps: '11', rir: '1', kg: 20 };
+      S = { ...fresh(), phase: 'act', ronda: 1, kg: 20, sug: { prev: p } }; if (repsSug() !== 11) m.push(`mismo peso: ${repsSug()}`);
+      S = { ...S, kg: 22.5 }; const r = repsSug(), esp = Math.min(hi + 5, Math.max(Math.max(1, lo - 3), Math.round(30 * (e1(p) / 22.5 - 1)) - 1));
+      if (r !== esp || r >= 11) m.push(`más peso: ${r} (esperado ${esp})`);
+      S = { ...S, sug: null }; if (repsSug() !== E.d) m.push(`sin datos: ${repsSug()}`);
+      S = { ...S, phase: 'myo', target: 4 }; if (repsSug() !== 4) m.push(`mini-serie: ${repsSug()}`);
+    } finally { S = S0; }
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Un toque suelto no salta el descanso: hace falta un segundo toque; +30 s alarga el descanso', () => {
+    const S0 = S, pila0 = pila.slice(), m = [];
+    try {
+      S = { ...fresh(), st: 'rest', t0: now(), last: now(), restDur: 60, label: 'x', sets: [] }; saltoConf = 0;
+      document.getElementById('pad').onclick();   // primer toque: solo avisa
+      if (S.st !== 'rest' || !(saltoConf > Date.now())) m.push(`primer toque: st=${S.st}`);
+      document.getElementById('mas30').onclick(); if (S.restDur !== 90) m.push(`+30 s: ${S.restDur}`);
+    } finally { S = S0; pila = pila0; saltoConf = 0; render(); }
+    return { ok: !m.length, d: m.join('; ') };
+  });
+
   // ---------- 7. Los datos originales no se tocan ----------
   prueba('Pintar todas las vistas no modifica las sesiones guardadas', () => localStorage.getItem(KEY) === crudoAntes);
 
