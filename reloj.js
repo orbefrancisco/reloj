@@ -187,7 +187,9 @@ let descarga=normDescarga(leerJSON(DKEY,{}));
 // Calibración de la recuperación ({desde}: solo cuenta lo posterior), plan por bloques ({inicio:'AAAA-MM-DD' lunes, sem:4|5|6}) y última copia ({fecha, pos}).
 const CKEY='reloj-anomalo-calib',BQKEY='reloj-anomalo-bloque',COPKEY='reloj-anomalo-copia';
 const leerObj=(k,norm)=>norm(leerJSON(k,{}));
-const guardarObj=(k,o)=>{try{localStorage.setItem(k,JSON.stringify(o))}catch(e){}};
+// sin espacio: los guardados que fallan avisan igual que el historial (antes callaban y al recargar se perdía el cambio)
+function sinSitio(){try{sinEspacio=true;renderAlmacen()}catch(e){}return false}
+const guardarObj=(k,o)=>{try{localStorage.setItem(k,JSON.stringify(o));return true}catch(e){return sinSitio()}};
 let calibC=leerObj(CKEY,normCalib),bloque=leerObj(BQKEY,normBloque),copiaC=leerObj(COPKEY,normCopiaC);
 // Rutinas: varios grupos seguidos; al cerrar uno, 2 min de cambio y empieza el siguiente.
 const RUTINAS=[{n:'Un grupo'},{n:'Pecho + Tríceps',g:['pecho','triceps']},{n:'Espalda + Bíceps',g:['espalda','biceps']},{n:'Brazos',g:['biceps','triceps']},
@@ -196,7 +198,7 @@ let rutI=0,miaLista=[],rutPos=0,rutEf=0;
 {const r=normRut(leerJSON(RKEY,{}));rutI=r.i;miaLista=r.mia}
 const rutLista=()=>{const R=RUTINAS[rutI];return R.mia?miaLista:R.g||[]};
 const enRutina=()=>!ssSel.on&&rutLista().length>1;   // con superserie elegida no hay rutina
-const guardarRut=()=>{try{localStorage.setItem(RKEY,JSON.stringify({i:rutI,mia:miaLista}))}catch(e){}};
+const guardarRut=()=>guardarObj(RKEY,{i:rutI,mia:miaLista});
 const now=()=>Date.now()/1000;
 const num=x=>String(Math.round(x*10)/10).replace('.',',');
 const num2=x=>String(Math.round(x*100)/100).replace('.',',');
@@ -210,7 +212,7 @@ const bienDia=()=>{const b=leerBien()[diaK(Date.now())];return b&&typeof b==='ob
 const bienHoy=()=>{const b=bienDia();return b&&b.sueno!=null&&b.energia!=null?b:null};
 const bienDe=b=>b?{...(b.sueno!=null?{sueno:+b.sueno}:{}),...(b.energia!=null?{energia:+b.energia}:{})}:null;
 const bienTxt=b=>[b.sueno!=null?sueTxt(+b.sueno)+' de sueño':'',b.energia!=null?`energía ${b.energia}/5`:''].filter(Boolean).join(' · ');
-function guardarBien(sueno,energia){const o=leerBien(),k=diaK(Date.now());o[k]={...(o[k]||{}),sueno,energia,t:Date.now()};try{localStorage.setItem(BKEY,JSON.stringify(o))}catch(e){}}
+function guardarBien(sueno,energia){const o=leerBien(),k=diaK(Date.now());o[k]={...(o[k]||{}),sueno,energia,t:Date.now()};guardarObj(BKEY,o)}
 const sueTxt=v=>v===4.5?'menos de 5 h':v===8.5?'8 h o más':(SUENO.find(s=>s[1]===v)||[num(v)])[0]+' h';
 const bajaHoy=()=>{const b=bienDia();return !!b&&((b.sueno!=null&&+b.sueno<6)||(b.energia!=null&&+b.energia<=2))};   // basta con uno de los dos
 let bienEd=null,pideBien=false,bienOmit=false,bienSueno=false;   // bienEd: respuesta a medias mientras se elige; bienSueno: cambiar el sueño ya anotado
@@ -434,6 +436,7 @@ function avanzar(ev){
   // para calibrar: objetivo que dio el motor, capacidad prevista y factor de recuperación usado
   if(ph==='myo'&&S.Cpre!=null){row.obj=S.target;row.Cpre=Math.round(S.Cpre*1000)/1000;row.kc=S.kRec||1}
   const c=efectiva(row);S.efE+=c;S.ef+=c;
+  if(ph==='act'&&row.kg>0)S.calHecho=true;   // ya se trabajó con peso: los ejercicios siguientes no vuelven a calentar (la fila aún no está en S.sets)
   if(ph==='act'&&row.kg!=null&&S.ronda===1&&!S.fza){const rg=regla(E,row);if(rg.cambio)S.aviso=`Próxima vez en ${E.s}: ${rg.txt}`}
   if(S.fza)return avanzarFuerza(R,row);
   if(E.lesM&&!S.desc)row.recta=true;   // cuidar una zona: serie recta, sin fallo
@@ -625,7 +628,8 @@ function aplicar(ev){
   Object.assign(S,{P0:S.P,C0:S.C,t0:t,last:t,restDur:o.rest,lastSec:-1});
   if(pr){S.pr=t+6;S.prK='¡Récord personal!';S.prTxt=`${o.row.ex}: ${kgTxt(o.row.kg)} × ${o.row.reps}`;fanfarria()}
   const yaPr=pr?'¡Récord personal! ':'';
-  if(o.mode==='done'){S.st='done';guardar(true);const md=revisarMedallas(),pre=yaPr+fraseMed(md);
+  if(o.mode==='done'){const ok=metaHecha();S.st='done';S.antes=!ok;guardar(ok);   // el motor agotó los ejercicios: «Completa» solo con la meta
+    const md=revisarMedallas(),pre=yaPr+fraseMed(md);
     if(SS){celebrar(md,t);ssFinLado(pre+(S.aviso?S.aviso+'. ':''),t);return}   // superserie: sigue el otro lado o termina todo
     if(sigueRutina(pre)){celebrar(md,t);return}celebrar(md,t);
     if(!pr&&!md.length){beep(660,.2);setTimeout(()=>beep(990,.35),220)}vibrar([200,100,200]);
@@ -714,6 +718,8 @@ $('molB').onclick=e=>{const b=e.target.closest('button');if(!b||S.st!=='report')
   if(z==='')S.molR=S.molR==null?'':null;else S.molR=S.molR===z?'':z;render()};
 // «Completa» solo si llegaste a la meta; si no, «Terminada antes (x de y)».
 $('terminar').onclick=()=>{if(SS){if(enCurso())ssTerminar();return}
+  // sin series de trabajo (pausa antes del siguiente grupo de la rutina, o solo el calentamiento): lo hecho ya está guardado; se corta aquí
+  if(!sinCal(S.sets).length&&enCurso()){nuevaConf=Date.now()+5000;$('nueva').onclick();return}
   if(sinCal(S.sets).length&&S.st!=='done'){const ok=metaHecha();S.st='done';S.antes=!ok;guardar(ok);const md=revisarMedallas(),t=now();
   if(sigueRutina(fraseMed(md))){celebrar(md,t);return}celebrar(md,t);if(md.length)decir(fraseMed(md));render()}};
 // Con una sesión en curso pide un segundo toque (5 s) dentro de la página; lo ya reportado queda guardado como «Parcial».
@@ -728,12 +734,12 @@ $('kgv').addEventListener('input',()=>{const t=$('kgv').value.trim().replace(','
 $('kgv').addEventListener('focus',()=>{try{$('kgv').select()}catch(e){}});
 $('kgv').addEventListener('keydown',e=>{if(e.key==='Enter')$('kgv').blur()});
 $('barraT').onclick=()=>{const E=est();CFG.barraEj={...(CFG.barraEj||{}),[E.n]:!esBarra(E)};guardarCfg();render()};
-$('notaOk').onclick=()=>{S.nota=$('notaIn').value.trim().slice(0,140);guardar(true);$('notaMsg').textContent=S.nota?'Nota guardada ✓':'Nota borrada'};
+$('notaOk').onclick=()=>{S.nota=$('notaIn').value.trim().slice(0,140);guardar(S.st==='done'&&!S.antes);$('notaMsg').textContent=S.nota?'Nota guardada ✓':'Nota borrada'};
 $('tProg').onclick=()=>{tab='progreso';renderProg();render()};
 $('cVoz').onclick=()=>{CFG.voz=!CFG.voz;guardarCfg();if(CFG.voz)decir('Voz activada')};
 $('cVib').onclick=()=>{CFG.vibra=!CFG.vibra;guardarCfg();vibrar(200)};
 $('cProbar').onclick=()=>{vibrar([80,60,80]);decir(CFG.voz?'Descanso, noventa segundos. Faltan diez segundos.':'')};
-function guardarCfg(){try{localStorage.setItem(AKEY,JSON.stringify(CFG))}catch(e){}renderCfg()}
+function guardarCfg(){guardarObj(AKEY,CFG);renderCfg()}
 function renderCfg(){$('cVoz').setAttribute('aria-pressed',CFG.voz);$('cVib').setAttribute('aria-pressed',CFG.vibra);
   $('cVoz').textContent=CFG.voz?'Voz: sí':'Voz: no';$('cVib').textContent=CFG.vibra?'Vibración: sí':'Vibración: no';
   $('cCal').setAttribute('aria-pressed',!!CFG.cal);$('cCal').textContent=CFG.cal?'Calentamiento: sí':'Calentamiento: no';
@@ -808,7 +814,7 @@ function abrirEditor(i){if(enCurso())return;const G=CAT[grupo],E0=i==null?null:G
 $('edN').addEventListener('change',()=>{const sg=SUGEJ[$('edN').value.trim()];if(sg&&(edModo==='nuevo'||edModo==='extra'))llenarEd({n:$('edN').value.trim(),...sg})});
 $('edF').onchange=formaUI;
 function guardarEj(){const M=misEj[grupo];if(M){if(M.x&&!M.x.length)delete M.x;if(M.q&&!M.q.length)delete M.q;if(!Object.keys(M).length)delete misEj[grupo]}
-  try{localStorage.setItem(EJKEY,JSON.stringify(misEj))}catch(e){}aplicarEjercicios();$('editor').hidden=true;renderMeta();render()}
+  guardarObj(EJKEY,misEj);aplicarEjercicios();$('editor').hidden=true;renderMeta();render()}
 $('edOk').onclick=()=>{const n=$('edN').value.trim();if(!n)return;
   const s=($('edS').value.trim()||n.split(' ')[0]).slice(0,14),r=$('edR').value,E=CAT[grupo].e[edI];
   if(edModo==='base'){const b=BASE[grupo].e[E.b];
@@ -834,14 +840,17 @@ $('planX').onclick=e=>{if(S.st!=='idle')return;const a=e.target.closest('[data-p
 const diaK=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const diasEntrenados=dias=>new Set(hist.filter(h=>Date.now()-Date.parse(h.start)<dias*864e5).map(h=>diaK(Date.parse(h.start)))).size;
 // Ejercicios cuyo 1RM estimado bajó en las 3 últimas sesiones (de las 4 últimas semanas y después de la última descarga).
-function estancados(){const desde=Math.max(descarga.fin?Date.parse(descarga.fin):0,Date.now()-28*864e5),out=[];
+// fin de la última descarga: la manual o la última semana (de descarga) de un bloque ya terminado
+const finDescBloque=()=>bloqueTerminado()?lunes(Date.parse(bloque.inicio+'T12:00:00'))+(+bloque.sem)*7*864e5:0;
+const finDesc=()=>Math.max(descarga.fin?Date.parse(descarga.fin):0,finDescBloque());
+function estancados(){const desde=Math.max(finDesc(),Date.now()-28*864e5),out=[];
   const vistos=new Set();
   for(const h of hist){const g=gDe(h);for(const r of h.sets||[]){if(!r.ej||r.k!=='act.'||!(r.kg>0))continue;const k=g+'|'+r.ej;if(vistos.has(k))continue;vistos.add(k);
     const p=previas(g,r.ej).filter(x=>Date.parse(x.fecha)>desde&&x.mejor>0).slice(0,3);if(p.length<3)continue;
     const [c,b,a]=p.map(x=>x.mejor);if(b<=a&&c<b&&c<=a*.97)out.push(r.ej)}}
   return out}
 function semanasSinDescarga(){if(!hist.length)return 0;
-  const desde=Math.max(descarga.fin?Date.parse(descarga.fin):0,Date.parse(hist[hist.length-1].start));return Math.floor((Date.now()-desde)/(7*864e5))}
+  const desde=Math.max(finDesc(),Date.parse(hist[hist.length-1].start));return Math.floor((Date.now()-desde)/(7*864e5))}
 function consejoDescarga(){if(descargaActiva())return null;const e=estancados(),w=semanasSinDescarga();
   if(e.length>=2)return `Rindes menos desde hace 3 sesiones en <b>${e.slice(0,3).map(esc).join(', ')}</b>: es fatiga acumulada, no falta de ganas.`;
   if(w>=8&&diasEntrenados(14)>=6)return `Llevas <b>${w} semanas</b> entrenando fuerte sin una semana suave.`;
@@ -857,7 +866,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-desc]');if
   const t=new Date().toISOString();
   if(b.dataset.desc==='ini'){const h=new Date(Date.now()+7*864e5).toISOString();descarga={inicio:t,hasta:h,fin:h}}
   else descarga={...descarga,hasta:t,fin:t};
-  try{localStorage.setItem(DKEY,JSON.stringify(descarga))}catch(err){}
+  guardarObj(DKEY,descarga);
   if(S.st==='idle')S=fresh();renderGrupos();renderProg();render()});
 /* ---------- plan por bloques (mesociclo): la meta sube semana a semana y la última es de descarga ---------- */
 const BQMULT={4:[.85,1,1.1,0],5:[.8,.9,1,1.1,0],6:[.8,.9,1,1.05,1.1,0]};   // 0 = descarga (½ meta, 2–3 en reserva)
@@ -953,7 +962,7 @@ function renderMeta(){
     +(m>10?'<span class="aviso">Más de 10 en una sesión apenas suma músculo: sobre todo acumula fatiga.</span>':'')+metaV18();
   const lh=lesBanner();$('lesR').hidden=S.st!=='idle'||!lh;if($('lesR').innerHTML!==lh)$('lesR').innerHTML=lh;
   const fijar=d=>{metas[grupo]=Math.min(META_MAX,Math.max(META_MIN,metas[grupo]+d));
-    try{localStorage.setItem(MKEY,JSON.stringify(metas))}catch(e){}renderMeta();render()};
+    guardarObj(MKEY,metas);renderMeta();render()};
   if($('mMenos')){$('mMenos').onclick=()=>fijar(-1);$('mMas').onclick=()=>fijar(1)}}
 /* ---------- v18 · reposo: tipo de sesión (hipertrofia o fuerza), metas de la superserie, aviso de «cuidar una zona» ---------- */
 function metaV18(){let h='';
@@ -1031,11 +1040,14 @@ function v18Pad(o){const E=o.E,e=o.e;
   return o}
 /* ---------- historial: cada sesión se puede abrir para corregir reps, kg, reserva y molestia, borrar series o borrarla entera ---------- */
 let histEd=null,histDraft=null,histBorrar=false;
-const estadoSes=h=>h.completa?'Completa':h.antes?`Terminada antes (${h.desc||h.fza?esc(h.serC||0)+' de '+esc(h.meta)+' series':ef1(efH(h))+' de '+esc(h.meta)})`:'Parcial';
+// sesión en curso, o el lado que espera en una superserie (su copia en memoria reescribiría lo editado)
+const enUso=id=>enCurso()&&(id===S.id||!!(SS&&SS.otro&&SS.otro.id===id));
+const efMeta=h=>h.cuida?progLes(h.sets):efH(h);   // cuidar una zona: el progreso hacia la meta cuenta las series rectas (como metaHecha)
+const estadoSes=h=>h.completa?'Completa':h.antes?`Terminada antes (${h.desc||h.fza?esc(h.serC||0)+' de '+esc(h.meta)+' series':ef1(efMeta(h))+' de '+esc(h.meta)})`:'Parcial';
 function renderHist(){histSucio=false;renderAlmacen();
   $('hist').innerHTML=hist.length?hist.map(h=>`<div class="card" data-hid="${esc(h.id)}"><div class="top"><span class="g">${esc(h.grupo)}</span><span class="muted" style="font-family:var(--mono);font-size:12px">${new Date(h.start).toLocaleString('es-DO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
-    <div class="meta"><span>${esc(h.series)} series</span>${h.desc||h.fza?`<span>${esc(h.serC||0)}${h.meta?' / '+esc(h.meta):''} series ${h.fza?'de fuerza':'de descarga'}</span><span>${ef1(efH(h))} efectivas</span>`:`<span>${ef1(efH(h))}${h.meta?' / '+esc(h.meta):''} efectivas</span>`}<span>${esc(h.reps)} reps</span><span>${fmt(h.tuc)} bajo congestión</span><span class="muted">${estadoSes(h)}</span></div>${histExtra(h)}
-    ${histEd===h.id?editorSesion(h):`<button type="button" class="lnk" data-hed="abrir" style="align-self:flex-start">${h.id===S.id&&enCurso()?'En curso':'Abrir y editar'}</button>`}</div>`).join('')
+    <div class="meta"><span>${esc(h.series)} series</span>${h.desc||h.fza?`<span>${esc(h.serC||0)}${h.meta?' / '+esc(h.meta):''} series ${h.fza?'de fuerza':'de descarga'}</span><span>${ef1(efH(h))} efectivas</span>`:`<span>${ef1(efMeta(h))}${h.meta?' / '+esc(h.meta):''} efectivas</span>`}<span>${esc(h.reps)} reps</span><span>${fmt(h.tuc)} bajo congestión</span><span class="muted">${estadoSes(h)}</span></div>${histExtra(h)}
+    ${histEd===h.id?editorSesion(h):`<button type="button" class="lnk" data-hed="abrir" style="align-self:flex-start">${enUso(h.id)?'En curso':'Abrir y editar'}</button>`}</div>`).join('')
     :'<p class="muted" style="font-size:14px;margin:0">Aún no hay sesiones. Cada sesión se guarda sola al reportar la primera serie.</p>'}
 const RIRS=['0','1','2','3','4+'];
 function editorSesion(h){const d=histDraft;
@@ -1061,7 +1073,7 @@ function guardarHist(){escribirHist();
   revisarMedallas();renderHist();if(tab==='progreso')renderProg()}
 $('hist').addEventListener('click',e=>{const b=e.target.closest('[data-hed]');if(!b)return;const card=b.closest('[data-hid]'),id=card.dataset.hid,h=hist.find(x=>x.id===id);if(!h)return;
   const a=b.dataset.hed;
-  if(a==='abrir'){if(h.id===S.id&&enCurso())return;histEd=id;histDraft=clon(h.sets||[]);histBorrar=false;renderHist();return}
+  if(a==='abrir'){if(enUso(h.id))return;histEd=id;histDraft=clon(h.sets||[]);histBorrar=false;renderHist();return}
   if(a==='cancelar'){histEd=null;histDraft=null;renderHist();return}
   if(a==='quitar'){leerDraft(card);histDraft.splice(+b.closest('.hr').dataset.i,1);renderHist();return}
   if(a==='borrar'){if(!histBorrar){histBorrar=true;leerDraft(card);renderHist();return}
@@ -1069,6 +1081,7 @@ $('hist').addEventListener('click',e=>{const b=e.target.closest('[data-hed]');if
   if(a==='guardar'){leerDraft(card);const sets=histDraft;if(id===S.id||pila.some(p=>p.S.id===id))pila=[];
     if(!sinCal(sets).length){hist=hist.filter(x=>x.id!==id);if(S.id===id&&!enCurso())S=fresh();$('ioMsg').textContent='Sesión borrada: no le quedaban series.'}
     else{Object.assign(h,{sets,series:sinCal(sets).length,reps:repsDe(sets),efectivas:Math.round(efDe(sets)*100)/100});
+      if(h.desc)h.serC=serDe(sets);else if(h.fza)h.serC=sets.filter(r=>r.k==='act.').length;   // series completas o pesadas, como al guardar
       if(S.id===id&&S.st==='done'){S.sets=clon(sets);S.ef=efDe(sets)}$('ioMsg').textContent='Cambios guardados ✓'}
     histEd=null;histDraft=null;histBorrar=false;guardarHist()}});
 // Notas, molestias y cómo llegaste, debajo de cada sesión del historial (sesiones viejas: no muestra nada).
@@ -1124,7 +1137,7 @@ function render(){
     if(S.cal&&S.calI<S.cal.length)disc='Primero calentamiento: '+S.cal.map(c=>`${num(aU(c.kg))}×${c.reps}`).join(', ')+' '+uTxt()}
   else if(S.st==='done'){cls='done';kind='Sesión terminada · bajo congestión';big=fmt(S.tuc);const ok=metaHecha();
     sub=(rutPos>0?`Rutina: ${ef1(rutEf+S.ef)} efectivas en total · `:'')+(S.desc?`Descarga: ${serDe(S.sets)} de ${S.meta} series completas${ok?' ✓':' (no alcanzada)'} · ${ef1(S.ef)} efectivas`
-      :`${ef1(S.ef)} de ${S.meta} series efectivas${ok?' ✓':' (no alcanzada)'}`)+` · ${sinCal(S.sets).length} series · ${Math.round(S.iso)} s de isometría · guardada${S.antes?' como «terminada antes»':''}`}
+      :`${ef1(S.les?progLes(S.sets):S.ef)} de ${S.meta} series efectivas${ok?' ✓':' (no alcanzada)'}`)+` · ${sinCal(S.sets).length} series · ${Math.round(S.iso)} s de isometría · guardada${S.antes?' como «terminada antes»':''}`}
   if(SS||S.fza||(S.st==='idle'&&(ssSel.on||fzaActiva())))({kind,sub,big,disc,pav}=v18Pad({kind,sub,big,disc,pav,e,E}));   // v18
   {const sb=$('ssB'),v=!!SS&&enCurso();sb.hidden=!v;if(v){const o=1-SS.t,O=SS.otro,r=O.restDur-(now()-O.t0);
     sb.textContent=`${'AB'[o]} · ${ladoNom(o)}: ${SS.fin[o]?'terminado':r>0?'descansa '+fmt(r):'listo'} · ≈ ${durCorta(ssAhorro())} ahorrados`}}
@@ -1270,7 +1283,7 @@ const rangoZona=m=>{const G=MUS[m][1];if(zonasDe(G).length===1)return rangoGrupo
 const semRango=rangoGrupo;   // nombre antiguo, lo usan «qué toca», el resumen en imagen y las medallas
 /* Estado de un volumen frente a su objetivo → clase y color, el MISMO en el mapa, las barras de Progreso y el resumen en imagen
    (variables --m0/--mlo/--mok/--mhi de cada estilo, ver estilo.js). */
-const estadoVol=(x,[lo,hi])=>x<=0?'z0':x<lo?'zlo':x<=hi?'zok':'zhi';
+const estadoVol=(x,[lo,hi])=>x<=0?'z0':x<lo-.05?'zlo':x<=hi+.05?'zok':'zhi';   // ±0,05: redondeo de sumas de 0,2/0,6…
 const EST_MUS={z0:'sin series',zlo:'por debajo',zok:'en objetivo',zhi:'por encima'},EST_VAR={z0:'m0',zlo:'mlo',zok:'mok',zhi:'mhi'};
 const CORTO={biceps:'Bí',triceps:'Tr',espalda:'Es',pecho:'Pe',hombros:'Ho',abdominales:'Ab',piernas:'Pi'};
 const lunes=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
@@ -1390,12 +1403,15 @@ const MUS={biceps:['Bíceps','biceps',[8,16],'Bíceps'],antebrazo:['Braquial y a
 /* Nombres de pierna, espalda baja y otros habituales van ANTES de «curl», «extension», «press» y «elevaciones» (si no, «Curl de piernas» sería bíceps).
    Aductores: el mapa no tiene zona propia; el muslo interno se pinta en cuádriceps (convención). Abductores: glúteo medio → glúteos. */
 const REGLAS_MUS=[
- [/pallof|oblicu|rotaci|lenador/,{abdomen:1}],
- [/hiperextensi|extensi(on|ones) lumbar|lumbares|buenos dias/,{lumbar:1,gluteos:.5}],
+ [/rotaci(on|ones) (externa|interna)|manguito/,{del_post:1}],
+ [/pallof|oblicu|rotaci(on|ones) (de |del )?(tronco|torso)|giro ruso|russian|lenador/,{abdomen:1}],
+ // abdomen antes que «lateral» (hombro), «encogimiento» (trapecio) y «extensión» (tríceps)
+ [/abdominal|crunch|plancha|rueda|colgad|rodillas al pecho|elevaci.*pierna|(flexion|inclinacion)(es)? lateral/,{abdomen:1}],
+ [/hiperextensi|extensi(on|ones) lumbar|extensi(on|ones) (de )?espalda|lumbares|buenos dias/,{lumbar:1,gluteos:.5}],
  [/femoral|isquio|nordico|curl (de |con )?piernas?/,{isquios:1}],
  [/cuadriceps|extensi(on|ones) (de )?(piernas?|rodillas?)/,{cuads:1}],[/peso muerto|rumano/,{isquios:1,gluteos:.5,lumbar:.5}],
  [/abductor|abduccion/,{gluteos:1}],[/aductor|aduccion/,{cuads:1}],
- [/hip thrust|gluteo/,{gluteos:1,isquios:.25}],[/zancada|bulgara|estocada/,{cuads:1,gluteos:.75}],
+ [/hip thrust|gluteo|empuje de cadera|extensi(on|ones) de cadera|patada (trasera|de burro)/,{gluteos:1,isquios:.25}],[/zancada|bulgara|estocada/,{cuads:1,gluteos:.75}],
  [/sentadilla|prensa|hack|goblet|press (de |en )?piernas?/,{cuads:1,gluteos:.5}],[/talon|gemelo|pantorrilla/,{pantorrillas:1}],
  [/encogimient|shrug/,{trap_sup:1}],[/frontal/,{del_ant:1}],
  [/muneca|antebrazo/,{antebrazo:1}],
@@ -1403,10 +1419,10 @@ const REGLAS_MUS=[
  [/press frances|extension|pushdown|patada|triceps/,{triceps:1}],[/press cerrado/,{triceps:1,pecho_med:.5,del_ant:.25}],
  [/fondos/,g=>g==='triceps'?{triceps:1,pecho_med:.5,del_ant:.25}:{pecho_med:1,triceps:.5,del_ant:.25}],
  [/flexiones? (diamante|cerrad)/,{triceps:1,pecho_med:.5}],
- [/face pull|pajaro|posterior|cruce inverso/,{del_post:1,trap_med:.5}],[/menton/,{del_lat:1,trap_sup:.5}],[/lateral/,{del_lat:1}],
+ [/face pull|jalon a la cara|pajaro|posterior|(apertura|contractora|pec deck|cruce|mariposa).*invers/,{del_post:1,trap_med:.5}],[/menton|remo vertical/,{del_lat:1,trap_sup:.5}],[/lateral/,{del_lat:1}],
  [/jalon|dominada|pullover/,{dorsal:1,biceps:.5,trap_inf:.25}],[/remo/,{trap_med:1,dorsal:.5,del_post:.5,biceps:.5}],
  [/inclinad.*(press|banca)|(press|banca).*inclinad/,{pecho_sup:1,del_ant:.5,triceps:.5}],
- [/militar|press.*(hombro|sentado)|arnold/,{del_ant:1,del_lat:.5,triceps:.5,trap_sup:.25}],
+ [/militar|press(?!.*pecho).*(hombro|sentado)|arnold/,{del_ant:1,del_lat:.5,triceps:.5,trap_sup:.25}],
  [/press|banca|flexion|declinad/,g=>g==='hombros'?{del_ant:1,del_lat:.5,triceps:.5,trap_sup:.25}:{pecho_med:1,del_ant:.5,triceps:.5}],
  [/apertura|pec deck|cruce|contractora/,{pecho_med:1,pecho_sup:.25}],
  [/crunch|rueda|elevaci.*pierna|colgad|rodillas al pecho|plancha/,{abdomen:1}]];
@@ -1569,6 +1585,7 @@ function medallasGanadas(){const H=hist.filter(h=>h&&h.start).slice().sort((a,b)
   let seg=0,prev=null;Object.keys(sem).map(Number).sort((a,b)=>a-b).forEach(l=>{const v=volRango(l,l+7*864e5),ok=Object.keys(CAT).every(x=>(v[x]||0)>=semRango(x)[0]);
     seg=ok?(prev!=null&&Math.round((l-prev)/(7*864e5))===1&&seg?seg+1:1):0;prev=l;if(seg===4)pon('sem4',sem[l])});
   if(descarga.inicio&&descarga.fin&&Date.parse(descarga.fin)-Date.parse(descarga.inicio)>=6*864e5&&Date.now()>=Date.parse(descarga.fin))pon('desc1',descarga.fin);
+  if(finDescBloque())pon('desc1',new Date(finDescBloque()).toISOString());   // descarga de un bloque terminado
   return g}
 function revisarMedallas(){const g=medallasGanadas(),nuevas=Object.keys(g).filter(id=>!medVistas[id]);
   nuevas.forEach(id=>medVistas[id]=g[id]);if(nuevas.length)try{localStorage.setItem(MEDKEY,JSON.stringify(medVistas))}catch(e){}
@@ -1583,7 +1600,7 @@ function renderMedallas(){const g={...medallasGanadas(),...medVistas},n=MEDALLAS
 /* ---------- medidas (cm) ---------- */
 const MDKEY='reloj-anomalo-medidas',MEDIDAS=[['brazo','Brazo'],['pecho','Pecho'],['cintura','Cintura'],['muslo','Muslo']];
 let medidas=normMedidas(leerJSON(MDKEY,[]),descLeer);
-const guardarMedidas=()=>{medidas.sort((a,b)=>a.f.localeCompare(b.f));try{localStorage.setItem(MDKEY,JSON.stringify(medidas))}catch(e){}};
+const guardarMedidas=()=>{medidas.sort((a,b)=>a.f.localeCompare(b.f));return guardarObj(MDKEY,medidas)};
 const fCorta=k=>new Date(k+'T12:00:00').toLocaleDateString('es-DO',{day:'numeric',month:'short'});
 function spark(k,n){const p=medidas.filter(m=>m[k]>0);if(!p.length)return `<div class="mg"><span>${n}</span><span class="hint">sin datos</span><span></span></div>`;
   const ys=p.map(m=>m[k]),lo=Math.min(...ys),hi=Math.max(...ys),W=120,H=30,X=i=>p.length<2?W/2:4+(W-8)*i/(p.length-1),Y=v=>hi===lo?H/2:3+(H-6)*(1-(v-lo)/(hi-lo));
@@ -1600,7 +1617,7 @@ function renderMedidas(){const el=$('pMedidas');
   $('mdOk').onclick=()=>{const f=$('mdF').value||diaK(Date.now()),e={};let n=0,mal=0;
     MEDIDAS.forEach(([k])=>{const s=$('md_'+k).value.trim();if(!s)return;const v=parseFloat(s.replace(',','.'));if(v>=10&&v<=250){e[k]=Math.round(v*10)/10;n++}else mal++});
     if(!n){$('mdMsg').textContent=mal?'Revisa los números: van en centímetros (10–250).':'Escribe al menos una medida.';return}
-    const i=medidas.findIndex(m=>m.f===f);if(i>=0)medidas[i]={...medidas[i],...e};else medidas.push({f,...e});guardarMedidas();renderMedidas();$('mdMsg').textContent='Guardado ✓'};
+    const i=medidas.findIndex(m=>m.f===f);if(i>=0)medidas[i]={...medidas[i],...e};else medidas.push({f,...e});const ok=guardarMedidas();renderMedidas();$('mdMsg').textContent=ok?'Guardado ✓':'Sin espacio: no se guardó (mira el aviso)'};
   el.querySelectorAll('[data-mdx]').forEach(b=>b.onclick=()=>{medidas=medidas.filter(m=>m.f!==b.dataset.mdx);guardarMedidas();renderMedidas()})}
 /* ---------- fotos de progreso: solo en este teléfono (IndexedDB); no van en el historial exportado, solo en la copia de seguridad completa ---------- */
 const FDB='reloj-anomalo-fotos';let fdb=null,fotoURLs=[],fotoA=null,fotoB=null,fotoBorrar=null;
@@ -1667,7 +1684,7 @@ async function resumenImagen(){const W=1080,H=1350,cv=document.createElement('ca
   x.fillStyle=C.line;x.fillRect(M,414,W-2*M,2);
   let y=414+tit;txt('SERIES EFECTIVAS POR GRUPO',M,y,`500 26px ${fM}`,C.muted);y+=20;
   hs.forEach(h=>(h.sets||[]).forEach(r=>{if(r.pr&&r.kg>0)recs.push(r)}));
-  const mejores=[...new Map(recs.sort((p,q)=>e1(q)-e1(p)).map(r=>[r.ej,r])).values()].slice(0,comida?2:4);
+  const mejores=[...new Map(recs.sort((p,q)=>e1(p)-e1(q)).map(r=>[r.ej,r])).values()].sort((p,q)=>e1(q)-e1(p)).slice(0,comida?2:4);
   const fila=comida?50:62,X0=M+230,X1=W-M-225;
   const CE={z0:v('m0')||C.muted,zlo:v('mlo')||C.amb,zok:v('mok')||C.cap,zhi:v('mhi')||C.art};   // mismos colores de estado que el mapa y Progreso
   Object.keys(CAT).forEach(g=>{const val=w[g]||0,[lo,hi]=semRango(g),tope=hi*1.3,c=CE[estadoVol(val,[lo,hi])];y+=fila;
@@ -1765,7 +1782,7 @@ async function copiaJSON(){let fs=null;try{fs=await fotoTx('readonly',st=>st.get
   const fotos=[];for(const x of fs||[]){let b=x.blob;if(b&&b.type!=='image/jpeg')try{b=(await comprimir(b)).blob}catch(e){}
     if(b)fotos.push({f:x.f,t:x.t,w:x.w,h:x.h,data:await blobAData(b)})}
   return {app:'reloj-anomalo',tipo:'copia-completa',v:2,exportado:new Date().toISOString(),sesiones:hist,metas,ajustes:CFG,ejercicios:misEj,
-    rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,bloque,estilo,fotos,...(fs?{}:{sinFotos:true})}}
+    rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,fotos,...(fs?{}:{sinFotos:true})}}
 async function hacerCopia(msg=$('copiaMsg')){msg.textContent='Preparando la copia…';
   try{const d=await copiaJSON(),nombre=`reloj-anomalo-copia-${hoy()}.json`;
     const ok=await entregarBlob(nombre,new Blob([JSON.stringify(d)],{type:'application/json'}),msg);
@@ -1781,14 +1798,15 @@ async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw 
   hist.sort((a,b)=>Date.parse(b.start)-Date.parse(a.start));r.sinEspacio=!escribirHist();
   if(Array.isArray(d.medidas)){const fs=new Set(medidas.map(m=>m.f)),c={mal:0};normMedidas(d.medidas,c).forEach(m=>{if(!fs.has(m.f)){medidas.push(m);fs.add(m.f);r.med++}});r.mal+=c.mal+Math.max(0,d.medidas.length-MED_MAX);if(r.med)guardarMedidas()}
   if(esObj(d.bienestar)){const o=leerBien(),c={mal:0},nb=normBienMapa(d.bienestar,c);r.mal+=c.mal;
-    for(const k in nb){if(!o[k])r.bien++;o[k]={...nb[k],...(o[k]||{})}}try{localStorage.setItem(BKEY,JSON.stringify(o))}catch(e){}}
+    for(const k in nb){if(!o[k])r.bien++;o[k]={...nb[k],...(o[k]||{})}}if(!guardarObj(BKEY,o))r.sinEspacio=true}
   if(esObj(d.medallas)){const nm=normMedVistas(d.medallas);r.mal+=Object.keys(d.medallas).length-Object.keys(nm).length;
     medVistas={...nm,...(medVistas||{})};try{localStorage.setItem(MEDKEY,JSON.stringify(medVistas))}catch(e){}}
   // cada clave se valida con su normalizador; lo que no tiene ningún dato válido no se pone
   const sol=(k,v,n,norm)=>{if(v==null)return;if(!esObj(v)){r.mal++;return}const x=norm(v);if(!Object.keys(x).length){if(Object.keys(v).length)r.mal++;return}
-    if(localStorage.getItem(k)!=null){r.mant.push(n);return}try{localStorage.setItem(k,JSON.stringify(x));r.puestos.push(n)}catch(e){}};
+    if(localStorage.getItem(k)!=null){r.mant.push(n);return}if(guardarObj(k,x))r.puestos.push(n);else r.sinEspacio=true};
   sol(MKEY,d.metas,'metas',normMetas);sol(AKEY,d.ajustes,'ajustes',normCfg);sol(EJKEY,d.ejercicios,'ejercicios',normMisEj);sol(RKEY,d.rutina,'rutina',normRut);
   sol(DKEY,d.descarga,'descarga',normDescarga);sol(CKEY,d.calibracion,'calibración',normCalib);sol(BQKEY,d.bloque,'bloque',normBloque);
+  sol(FZKEY,d.fuerza,'fuerza',normFuerza);sol(LESKEY,d.lesion,'zona cuidada',normLesion);sol(SSKEY,d.superserie,'superserie',normSsSel);   // v18
   if(d.estilo!=null&&!(typeof d.estilo==='string'&&tiene(ESTILOS,d.estilo)))r.mal++;
   else if(d.estilo!=null&&localStorage.getItem(EKEY)==null){try{localStorage.setItem(EKEY,d.estilo)}catch(e){}aplicarEstilo(d.estilo);r.puestos.push('estilo')}
   recargar();
@@ -1804,6 +1822,7 @@ async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw 
 // vuelve a leer lo guardado en el teléfono (después de restaurar)
 function recargar(){metas={...META_DEF,...normMetas(leerJSON(MKEY,{}))};
   Object.assign(CFG,normCfg(leerJSON(AKEY,{})));
+  fzaCfg=normFuerza(leerJSON(FZKEY,{}));lesion=normLesion(leerJSON(LESKEY,{}));ssSel=normSsSel(leerJSON(SSKEY,{}));   // v18 (antes de aplicarEjercicios: la zona cuidada cambia los ejercicios)
   misEj=normMisEj(leerJSON(EJKEY,{}));aplicarEjercicios();
   {const x=normRut(leerJSON(RKEY,{}));rutI=x.i;miaLista=x.mia}
   descarga=leerObj(DKEY,normDescarga);calibC=leerObj(CKEY,normCalib);bloque=leerObj(BQKEY,normBloque);
@@ -1878,7 +1897,8 @@ function descartarRetomar(){retomar=null;firmaEC='';try{localStorage.removeItem(
 function retomarSesion(){const o=retomar;retomar=null;if(!o)return;
   S={...fresh(),...o.S};grupo=o.grupo;rutI=o.rutI;miaLista=o.miaLista;
   SS=o.ss?{...o.ss,otro:{...fresh(),...o.ss.otro}}:null;if(SS){ssSel.on=true;ssSel.p=SS.p;if(SS.p==='mia')ssSel.mia=SS.lados.map(l=>l.g);guardarObj(SSKEY,ssSel)}   // v18: superserie
-  rutPos=o.rutPos;rutEf=o.rutEf;pila=o.pila;   // ya validados en normEnCursorirPrev=null;nuevaConf=0;
+  rutPos=o.rutPos;rutEf=o.rutEf;pila=o.pila;   // ya validados en normEnCurso
+  rirPrev=null;nuevaConf=0;
   const t=now();
   if(S.st==='work'){if(S.phase==='hold'||S.phase==='vac')S.t0=t;   // la isometría o el vacío vuelven a empezar
     else Object.assign(S,{st:'report',workDur:Math.min(60,Math.max(5,t-S.t0)),hechas:S.phase==='act'?est().d:S.target,molR:null});S.last=t}   // la serie seguramente la terminaste: repórtala
