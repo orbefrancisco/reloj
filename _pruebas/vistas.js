@@ -446,6 +446,62 @@
     return { ok: !m.length, d: m.join(', ') };
   });
 
+  // ---------- 15. v29 · Fase 6: validación integral (escenarios de la lista; en memoria) ----------
+  prueba('Fase 6: usuario nuevo sin historial — nada se rompe y nada se inventa', () => conRec([], () => {
+    const m = [], R = evalRec();
+    if (R._.bien || kDe('biceps') !== 1) m.push('modelo activo sin datos');
+    if (anZona('biceps').prep.e !== 'nada') m.push('preparación inventada');
+    if (anComparables().length) m.push('comparables sin datos');
+    const a = auditarDatos(); if (a.errores.length) m.push('auditoría con errores: ' + a.errores.map(x => x.c));
+    for (const t of ['prep', 'est', 'vol']) { anTab = t; renderAnalisis(); if (/undefined|NaN/.test(document.getElementById('pAnal').textContent)) m.push('vista ' + t); }
+    return { ok: !m.length, d: m.join('; ') };
+  }));
+  prueba('Fase 6: varias sesiones en un día y una después de medianoche cuentan en su día local', () => {
+    const d = new Date(); d.setHours(0, 30, 0, 0); const t1 = d.getTime(), t0 = t1 - 864e5 + 22 * 36e5;   // ayer 22:30 y hoy 00:30
+    return conHist([sesF('m1', 'pecho', t0, [fil('pecho', 0, 10, 1, 30)]), sesF('m2', 'biceps', t0 + 36e5 / 2, [fil('biceps', 0, 10, 1, 12)]), sesF('m3', 'triceps', t1, [fil('triceps', 0, 10, 1, 10)])], () => {
+      const pd = porDia(), k0 = diaK(t0), k1 = diaK(t1);
+      const ok = k0 !== k1 && pd[k0] && pd[k0].size === 2 && pd[k1] && pd[k1].size === 1;
+      return { ok, d: JSON.stringify(Object.fromEntries(Object.entries(pd).map(([k, v]) => [k, [...v]]))) };
+    });
+  });
+  prueba('Fase 6: kilos y libras — ida y vuelta exacta y sin falsos avisos de conversión', () => {
+    const u0 = CFG.uni, m = [];
+    try {
+      CFG.uni = 'lb'; [45, 50, 52.5, 135, 225].forEach(lb => { if (Math.abs(aU(deU(lb)) - lb) > 1e-6) m.push(`${lb} lb`); });
+      const H = [sesF('k1', 'pecho', Date.now() - 864e5, [fil('pecho', 0, 10, 1, deU(135)), fil('pecho', 1, 10, 1, 20)])];
+      conHist(H, () => { if (auditarDatos().avisos.some(x => x.c === 'kg-lb')) m.push('aviso de conversión con pesos válidos'); });
+      conHist([sesF('k2', 'pecho', Date.now() - 864e5, [fil('pecho', 0, 10, 1, 20.123)])], () => { if (!auditarDatos().avisos.some(x => x.c === 'kg-lb')) m.push('no avisa de un peso imposible en kg y en lb'); });
+    } finally { CFG.uni = u0; }
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Fase 6: una mini-serie con otra carga que la serie principal no entra en el aprendizaje', () => {
+    const E = CAT.biceps.base[0], h = { id: 'cc', start: new Date(Date.now() - 864e5).toISOString(), g: 'biceps', grupo: 'Bíceps', completa: true, meta: 6,
+      sets: [{ ex: E.s, ej: E.n, k: 'act.', reps: '12', rir: '1', kg: 12 }, { ex: E.s, ej: E.n, k: 'myo', reps: '6', rir: '1', obj: 6, Cpre: .7, kc: 1, kg: 12 }, { ex: E.s, ej: E.n, k: 'myo', reps: '9', rir: '1', obj: 6, Cpre: .7, kc: 1, kg: 8 }] };
+    return conRec([h], () => { const n = obsRec().length; return { ok: n === 1, d: `observaciones: ${n} (esperada 1)` }; });
+  });
+  prueba('Fase 6: degradación — si tu respuesta cambia y el aprendido empieza a fallar, vuelve al fijo', () => {
+    const antes = sesRec(30, pf => Math.round(pf * .75)), despues = sesRec(40, pf => Math.round(pf * 1.15)).map((h, i) => ({ ...h, id: 'd' + i, start: new Date(Date.now() + (i + 1) * 36e5 - 50 * 864e5 + 40 * 864e5).toISOString() }));
+    const a = conRec(antes, () => evalRec()._.bien), b = conRec([...antes, ...despues], () => ({ bien: evalRec()._.bien, k: kDe('biceps') }));
+    return { ok: a === true && b.bien === false && b.k === 1, d: JSON.stringify({ antes: a, despues: b }) };
+  });
+  prueba('Fase 6: la auditoría detecta lo que debe (ids repetidos, efectivas que no salen de sus series, fecha futura) y no inventa errores', () => {
+    const ok1 = conHist([sesF('z1', 'pecho', Date.now() - 864e5, [fil('pecho', 0, 10, 1, 30)])], () => auditarDatos().errores.length === 0);
+    const malo = [sesF('z2', 'pecho', Date.now() - 864e5, [fil('pecho', 0, 10, 1, 30)]), sesF('z2', 'pecho', Date.now() - 2 * 864e5, [fil('pecho', 0, 10, 1, 30)]),
+      { ...sesF('z3', 'biceps', Date.now() + 5 * 864e5, [fil('biceps', 0, 10, 1, 12)]), efectivas: 9 }];
+    const cods = conHist(malo, () => auditarDatos().errores.map(x => x.c));
+    const ok = ok1 && ['id-duplicado', 'futuro', 'efectivas'].every(c => cods.includes(c));
+    return { ok, d: `limpio=${ok1} · detectados: ${cods.join(', ')}` };
+  });
+  prueba('Fase 6: retomar — el estado de una sesión interrumpida sobrevive a guardar y leer', () => {
+    const S0 = S, raw = localStorage.getItem(ENKEY), m = [];
+    try {
+      S = { ...fresh(), id: 'int1', start: new Date().toISOString(), st: 'rest', sets: [fil('biceps', 0, 10, 1, 12)], ef: 1, meta: 6, t0: now(), restDur: 60 };
+      guardarEnCurso(); const o = leerEnCurso();
+      if (!o || o.S.id !== 'int1' || o.S.st !== 'rest' || o.S.sets.length !== 1) m.push(JSON.stringify(o && o.S && { id: o.S.id, st: o.S.st }));
+    } finally { S = S0; if (raw == null) localStorage.removeItem(ENKEY); else localStorage.setItem(ENKEY, raw); }
+    return { ok: !m.length, d: m.join('; ') };
+  });
+
   // ---------- 7. Los datos originales no se tocan ----------
   prueba('Pintar todas las vistas no modifica las sesiones guardadas', () => localStorage.getItem(KEY) === crudoAntes);
 

@@ -52,12 +52,14 @@ function anFactores(s){const f=[],D=864e5,t1=s.pts[s.pts.length-1].t,vol=(a,b)=>
    Separa cuatro cosas que no son lo mismo: volumen acumulado (observado), fatiga declarada (sueño/energía, general), recuperación
    estimada (solo si hay datos comparables tras distintos descansos; si no, «sin estimación fiable») y preparación para entrenar,
    que es una REGLA prudente (cuidado activo o molestias → cuidar; estímulo directo hace < N h → esperar; si no, sin señales en contra). */
-function anZona(m,o={}){const D=864e5,ahora=Date.now(),dias=o.dias||7,reglaH=o.reglaH||AN_REGLA_H;
+// caché de músculos por ejercicio (musculos() evalúa reglas de texto; el mapa la llamaba miles de veces)
+const anMusC=new Map();function anMus(ej,g){const k=g+'|'+ej;if(!anMusC.has(k))anMusC.set(k,musculos(ej,g));return anMusC.get(k)}
+function anZona(m,o={}){const D=864e5,ahora=Date.now(),dias=o.dias||7,reglaH=o.reglaH||AN_REGLA_H,musculos=anMus;
   let ult=0,ultDir=0,n=0,conKg=0,rirs=[],dir=0,ind=0;const ejs={};
   hist.forEach(h=>{const g=gDe(h),t=Date.parse(h.start);if(!g||!CAT[g])return;(h.sets||[]).forEach(r=>{const c=efectiva(r);if(!c)return;const ej=nomFila(r,g),f=musculos(ej,g)[m];if(!f)return;
     if(t>ult)ult=t;if(f>=1&&t>ultDir)ultDir=t;
     if(t>=ahora-dias*D){n++;if(r.kg!=null)conKg++;if(!/\+|—/.test(r.rir||''))rirs.push(rirN(r.rir));if(f>=1)dir+=c*f;else ind+=c*f;if(f>=1)ejs[ej]=g}})});
-  const vol=d=>volumen(ahora-d*D,ahora+D).zona(m);
+  const vol=d=>(o.VW&&o.VW[d]?o.VW[d]:volumen(ahora-d*D,ahora+D)).zona(m);   // VW: volúmenes ya calculados para todas las zonas
   const rend=anComparables().filter(s=>ejs[s.ej]||Object.entries(musculos(s.ej,s.g)).some(([k,f])=>k===m&&f>=1)).map(s=>({ej:s.ej,carga:s.carga,c:anClasifica(s.pts)}));
   // molestias anotadas en partes que caen en esta zona (o zona entera) y cuidados activos que la cubren
   const zonaDe=(z,p)=>LES_MUS[z+'|'+(p||'entero')]||LES_MUS[z+'|'+(LES_P[z]||[])[0]]||[];
@@ -114,7 +116,8 @@ function anRegistraDecision(g){try{const p=anPlanGrupo(g);if(p.acc==='mantener'|
 /* ---------- vistas ---------- */
 const AN_PREP={listo:['lpl','sin señales en contra'],espera:['lpe','esperar (regla de horas)'],cuidar:['lpc','cuidar o molestias'],nada:['lpn','sin registros']};
 let anTab='prep',anSelZ='',anDias=7,anRegla=AN_REGLA_H,anSelG='biceps',anPlanVer=false;
-function anPrepHTML(){const Z={};Object.keys(MUS).forEach(m=>Z[m]=anZona(m,{dias:anDias,reglaH:anRegla}));
+function anPrepHTML(){const Z={},D=864e5,t=Date.now(),VW={};[7,14,28,90].forEach(d=>VW[d]=volumen(t-d*D,t+D));   // 4 pasadas para las 18 zonas
+  Object.keys(MUS).forEach(m=>Z[m]=anZona(m,{dias:anDias,reglaH:anRegla,VW}));
   const zona=(m,d)=>`<path d="${d}" data-anz="${m}" class="${AN_PREP[Z[m].prep.e][0]}${m===anSelZ?' sel':''}"><title>${esc(MUS[m][0])}: ${esc(Z[m].prep.txt)}</title></path>`;
   let h=`<p class="hint">Toca una zona. Preparación = regla prudente, no una medida de recuperación. Periodo del volumen:
     ${[7,14,28,90].map(d=>`<button type="button" class="chipb" data-andias="${d}" aria-pressed="${d===anDias}">${d} d</button>`).join('')}

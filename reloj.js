@@ -981,10 +981,11 @@ $('cTempoAdd').onclick=()=>{const v=$('cTempoN').value.trim().replace(/[\s/.,]+/
              (pesa n_g/(n_g+8)); un grupo con pocos datos hereda sobre todo el común. Acotado a [0,7, 1,3].
    Evaluación PREQUENTIAL: se recorren las mini-series en orden temporal y cada una se predice solo con las anteriores (de todos los
    grupos). Métricas: error absoluto medio en reps, sesgo, y prueba de signo pareada (en cuántas acierta mejor cada modelo).
-   Selección (conservadora): se usa rec-2p solo si, con ≥ 20 predicciones evaluadas, su error medio es ≥ 5 % menor que el del fijo Y
-   la prueba de signo da p < 0,10; además el grupo no puede ir peor que con el fijo en sus propias predicciones. Si deja de cumplirse,
-   se vuelve al fijo (detección de degradación). Cambios de modelo o de k > 0,02: registro con fecha, motivo y errores. */
-const CALIB_MIN=8,REC2_MIN=4,REC_GANA=.05,REC_NEV=20,REC_P=.10,MODKEY='reloj-anomalo-modelo',REC_MODS=['fijo','rec-2p'];
+   Selección (conservadora): se usa rec-2p solo si, en las ÚLTIMAS 30 predicciones evaluadas (al menos 20), su error medio es ≥ 5 %
+   menor que el del fijo Y la prueba de signo da p < 0,10; además el grupo no puede ir peor que con el fijo en sus propias predicciones.
+   Si deja de cumplirse, se vuelve al fijo (detección de degradación). Mini-series con otra carga que la serie principal: fuera.
+   Cambios de modelo o de k > 0,02: registro con fecha, motivo y errores. */
+const CALIB_MIN=8,REC2_MIN=4,REC_GANA=.05,REC_NEV=20,REC_P=.10,REC_DEC=30,MODKEY='reloj-anomalo-modelo',REC_MODS=['fijo','rec-2p'];
 const normModelo=o=>{const r={sel:{},log:[]};if(!esObj(o))return r;
   if(esObj(o.sel))for(const g of Object.keys(CAT)){const x=o.sel[g];if(esObj(x)&&REC_MODS.includes(x.m)){const k=vNum(x.k,.5,2);if(k!=null)r.sel[g]={m:x.m,k}}}
   if(Array.isArray(o.log))r.log=o.log.slice(-200).filter(x=>esObj(x)&&esG(x.g)&&vFecha(x.t)).map(x=>({t:x.t,g:x.g,de:vTxt(x.de,40)||'',a:vTxt(x.a,40)||'',por:vTxt(x.por,300)||''}));
@@ -996,8 +997,10 @@ const clK=x=>Math.min(1.3,Math.max(.7,x));
 function obsRec(){const out=[],desde=calibC.desde?Date.parse(calibC.desde):0;
   hist.slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)).forEach(h=>{const g=gDe(h),t=Date.parse(h.start);if(!g||!CAT[g]||(desde&&t<=desde))return;
     const rtf={};(h.sets||[]).forEach((x,i)=>{const ej=x.ej||x.ex,R=parseInt(x.reps,10);
-      if(x.k==='act.'){rtf[ej]={v:R+rirN(x.rir),cens:/\+/.test(x.rir||'')};return}
+      if(x.k==='act.'){rtf[ej]={v:R+rirN(x.rir),cens:/\+/.test(x.rir||''),kg:x.kg};return}
       if(x.k!=='myo'||!(+x.obj>0)||!(+x.Cpre>0)||!rtf[ej]||!(R>=0))return;
+      // (v29) si la mini-serie se hizo con otra carga que la serie principal, no es comparable: un cambio de carga no es recuperación
+      if(x.kg!=null&&rtf[ej].kg!=null&&Math.abs(x.kg-rtf[ej].kg)>1e-6)return;
       const kc=+x.kc||1,Cf=+x.Cpre/kc,pf=rtf[ej].v*Cf,cens=rtf[ej].cens||/\+/.test(x.rir||'');
       if(!(pf>=1))return;out.push({t:t+i,g,ej,pf:Math.round(pf*100)/100,obs:R+rirN(x.rir),r:R,obj:+x.obj,kc,cens,mod:x.mod||'rec-1'})})});
   return out.sort((a,b)=>a.t-b.t)}
@@ -1014,14 +1017,25 @@ function pSigno(w,n){if(!n)return 1;let p=0,c=1;for(let i=0;i<=n;i++){if(i>0)c=c
 function compara(ev,a,b){let w=0,l=0;ev.forEach(e=>{const ea=Math.abs(e.obs-e[a]),eb=Math.abs(e.obs-e[b]);if(ea<eb-1e-9)w++;else if(eb<ea-1e-9)l++});return {w,l,p:pSigno(w,w+l)}}
 const maeDe=(L,k)=>L.length?L.reduce((a,e)=>a+Math.abs(e.obs-e[k]),0)/L.length:null,sesgoDe=(L,k)=>L.length?L.reduce((a,e)=>a+(e.obs-e[k]),0)/L.length:null;
 // evaluación en orden temporal (todos los grupos juntos: el modelo agrupado aprende también de los demás grupos)
-function evalRec(){const O=obsRec(),ev=[];
-  O.forEach((x,i)=>{if(x.cens)return;const tr=O.slice(0,i),trg=tr.filter(y=>y.g===x.g);
-    ev.push({t:x.t,g:x.g,ej:x.ej,obs:x.obs,p0:x.pf,p1:x.pf*kRec1(trg),p2:x.pf*kRec2(trg),p3:x.pf*kPool(tr,x.g).k,ntr:logsDe(trg).length})});
+// (v29) incremental: listas ORDENADAS de lo ya visto (todos y por grupo) con inserción binaria; la mediana se lee en O(1).
+// Mismo resultado que reajustar con O.slice(0, i) en cada paso (kRec1/kRec2/kPool), pero sin el coste cuadrático por ordenar.
+const insOrd=(a,v)=>{let lo=0,hi=a.length;while(lo<hi){const m=(lo+hi)>>1;if(a[m]<v)lo=m+1;else hi=m}a.splice(lo,0,v)};
+const medOrd=a=>{const n=a.length;return n?(n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2):null};
+function evalRec(){const O=obsRec(),ev=[],todos=[],lg={},r1={};
+  O.forEach(x=>{const g=x.g,vg=lg[g]||(lg[g]=[]),vr=r1[g]||(r1[g]=[]);
+    if(!x.cens){const n1=vr.length,k1=n1<CALIB_MIN?1:clK(1+(clK(medOrd(vr))-1)*n1/(n1+CALIB_MIN));
+      const n=vg.length,k2=n<REC2_MIN?1:clK(Math.exp(medOrd(vg)*n/(n+CALIB_MIN)));
+      const N=todos.length,m0=N?medOrd(todos)*N/(N+CALIB_MIN):0,m=n?(n*medOrd(vg)+CALIB_MIN*m0)/(n+CALIB_MIN):m0,k3=clK(Math.exp(m));
+      ev.push({t:x.t,g,ej:x.ej,obs:x.obs,p0:x.pf,p1:x.pf*k1,p2:x.pf*k2,p3:x.pf*k3,ntr:n})}
+    insOrd(vr,x.r/x.obj*x.kc);if(!x.cens&&x.obs>0){const l=Math.log(x.obs/x.pf);insOrd(vg,l);insOrd(todos,l)}});
   const G={n:ev.length,mae0:maeDe(ev,'p0'),mae1:maeDe(ev,'p1'),mae2:maeDe(ev,'p2'),mae3:maeDe(ev,'p3'),sesgo0:sesgoDe(ev,'p0'),sesgo3:sesgoDe(ev,'p3'),s3:compara(ev,'p3','p0'),s2:compara(ev,'p2','p0')};
-  G.bien=G.n>=REC_NEV&&G.mae3<=G.mae0*(1-REC_GANA)&&G.s3.p<REC_P;
-  G.por=G.n<REC_NEV?`solo ${G.n} mini-series evaluadas en orden temporal (hacen falta ${REC_NEV})`
-    :G.bien?`con ${G.n} mini-series en orden temporal, el aprendido se equivocó ${num(G.mae3)} reps de media frente a ${num(G.mae0)} del fijo y acertó mejor en ${G.s3.w} de ${G.s3.w+G.s3.l} (prueba de signo p = ${num2(G.s3.p)})`
-    :`el aprendido no mejora con claridad al fijo (${num(G.mae3)} frente a ${num(G.mae0)} reps; mejor en ${G.s3.w} de ${G.s3.w+G.s3.l}, p = ${num2(G.s3.p)}): se usa el fijo`;
+  // (v29) la DECISIÓN se toma con las últimas REC_DEC predicciones: si el aprendido empieza a fallar (tu respuesta cambia), se vuelve al fijo
+  const U=ev.slice(-REC_DEC),u={n:U.length,mae0:maeDe(U,'p0'),mae3:maeDe(U,'p3'),s3:compara(U,'p3','p0')};G.u=u;
+  G.bien=u.n>=REC_NEV&&u.mae3<=u.mae0*(1-REC_GANA)&&u.s3.p<REC_P;
+  const donde=u.n<G.n?`en tus últimas ${u.n} mini-series`:`con ${u.n} mini-series en orden temporal`;
+  G.por=u.n<REC_NEV?`solo ${G.n} mini-series evaluadas en orden temporal (hacen falta ${REC_NEV})`
+    :G.bien?`${donde}, el aprendido se equivocó ${num(u.mae3)} reps de media frente a ${num(u.mae0)} del fijo y acertó mejor en ${u.s3.w} de ${u.s3.w+u.s3.l} (prueba de signo p = ${num2(u.s3.p)})`
+    :`${donde}, el aprendido no mejora con claridad al fijo (${num(u.mae3)} frente a ${num(u.mae0)} reps; mejor en ${u.s3.w} de ${u.s3.w+u.s3.l}, p = ${num2(u.s3.p)}): se usa el fijo`;
   const R={_:G};
   for(const g of Object.keys(CAT)){const o=O.filter(x=>x.g===g),e=ev.filter(x=>x.g===g),k=kPool(O,g),m0=maeDe(e,'p0'),m3=maeDe(e,'p3');
     const peor=e.length>=5&&m3>m0;const usa=G.bien&&!peor;
@@ -1199,7 +1213,7 @@ $('copiaAv').onclick=e=>{const b=e.target.closest('[data-copia]');if(!b)return;
   if(b.dataset.copia==='luego'){copiaC={...copiaC,pos:Date.now()+3*864e5};guardarObj(COPKEY,copiaC);render();return}
   hacerCopia($('copiaAv').querySelector('span'))};
 $('tReloj').onclick=()=>{tab='reloj';render()};
-$('tHist').onclick=()=>{tab='historial';if(histSucio)renderHist();else renderAlmacen();render()};
+$('tHist').onclick=()=>{tab='historial';if(histSucio)renderHist();else renderAlmacen();if(typeof renderAuditoria==='function')renderAuditoria();render()};   // Fase 6: auditoría (auditoria.js)
 $('tEstilo').onclick=()=>{tab='estilo';renderEstilos();render()};
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>aplicarEstilo(estilo));
 function renderEstilos(){

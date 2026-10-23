@@ -268,6 +268,8 @@ html[data-recto] *{border-radius:3px!important}
 .anest{border-top:1px solid var(--line);padding:6px 0} .anest summary{cursor:pointer;font-size:14px} .anest.caida summary b{color:var(--mal)} .anest.mejora summary b{color:var(--mok)}
 .anplan .top{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px} .anplan.reducir,.anplan.modificar{border-color:var(--mlo)} .anplan.aplazar{border-color:var(--mal)}
 .anmot{margin:6px 0 0;padding-left:18px;font-size:13px}
+/* Fase 6: auditoría de datos (Historial) */
+.audl{margin:4px 0;padding-left:18px;font-size:13px} .audl.err li{color:var(--mal)} .audl.av li{color:var(--fg)} .audl.inf li{color:var(--muted)}
 .recg{width:100%;max-width:280px;display:block;margin:6px auto} .recg .rect{font-family:var(--mono);font-size:8px;fill:var(--muted)}
 .mpt{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px var(--mborde)}
 .mpt.z0{background:var(--m0)} .mpt.zlo{background:var(--mlo)} .mpt.zok{background:var(--mok)} .mpt.zhi{background:var(--mhi)} .mpt.zal{background:var(--mal)}
@@ -569,6 +571,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
       <span id="copiaMsg" class="hint" aria-live="polite"></span>
       <p class="hint" id="almacen"></p>
     </div>
+    <details class="card" style="gap:8px"><summary style="cursor:pointer;font-weight:600">Auditoría de datos</summary><div id="hAudit"></div></details>
     <div id="hist"></div>
   </section>
 
@@ -646,5 +649,6 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 <script src="anim.js"></script>
 <script src="reloj.js"></script>
 <script src="analisis.js"></script>
+<script src="auditoria.js"></script>
 </body>
 </html>
