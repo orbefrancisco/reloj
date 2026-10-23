@@ -157,6 +157,49 @@
     const ok = ['z0', 'zlo', 'zok', 'zhi'].every(e => est.has(e)) && !/te pasaste|en rango/.test(txt) && /orientativ/.test(txt) && /estimaci/.test(txt);
     return { ok, d: `estados en el mapa: ${[...est].map(e => EST_MUS[e]).join(', ')}` };
   });
+  // ---------- 8. Cinco estados del volumen (v22): límites, umbral dinámico del 30 %, fuente única de colores ----------
+  const fallan = (rango, casos) => casos.filter(([x, e]) => estadoVol(x, rango) !== e).map(([x, e]) => `[${rango}] ${x}→${estadoVol(x, rango)} (esperado ${e})`);
+  prueba('Cinco estados con objetivo 12–20 en enteros: 0 gris · 1–11 ámbar · 12–20 jade · 21–26 azul · 27+ coral', () => {
+    const casos = [[0, 'z0'], [1, 'zlo'], [11, 'zlo'], [12, 'zok'], [16, 'zok'], [20, 'zok'], [21, 'zhi'], [26, 'zhi'], [27, 'zal'], [40, 'zal']];
+    const m = fallan([12, 20], casos); return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Límites con decimales: se compara el valor mostrado (una decimal), así el color no contradice el número', () => {
+    const casos = [[0.04, 'z0'], [0.06, 'zlo'], [11.94, 'zlo'], [11.96, 'zok'], [20.04, 'zok'], [20.06, 'zhi'], [26.04, 'zhi'], [26.06, 'zal']];
+    const m = fallan([12, 20], casos); return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('El umbral del 30 % se calcula con el máximo de cada rango (no es un número fijo)', () => {
+    const m = [...fallan([8, 16], [[16, 'zok'], [16.1, 'zhi'], [20.8, 'zhi'], [20.9, 'zal']]),
+      ...fallan([2, 8], [[8, 'zok'], [10.4, 'zhi'], [10.5, 'zal']]),
+      ...fallan([6, 12], [[15.6, 'zhi'], [15.7, 'zal']])];
+    // y con los rangos reales de la app: grupo y zonas, cada uno con su propio 1,3·máx
+    for (const g of Object.keys(CAT)) { const [lo, hi] = rangoGrupo(g), t = Math.round(hi * VOL_ALERTA * 10) / 10;
+      if (estadoVol(t, [lo, hi]) !== 'zhi' || estadoVol(t + .1, [lo, hi]) !== 'zal') m.push(`${g}: 1,3·${hi} = ${t}`); }
+    for (const z of Object.keys(MUS)) { const [lo, hi] = rangoZona(z), t = Math.round(hi * VOL_ALERTA * 10) / 10;
+      if (estadoVol(t, [lo, hi]) !== 'zhi' || estadoVol(t + .1, [lo, hi]) !== 'zal') m.push(`${z}: 1,3·${hi} = ${t}`); }
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Colores de estado: salen de VOL_ESTADOS en el tema principal y en un estilo oscuro y uno claro', () => {
+    const m = [], css = () => getComputedStyle(document.documentElement), col = k => css().getPropertyValue('--' + k).trim().toUpperCase();
+    const revisa = (nombre, osc) => VOL_ESTADOS.forEach(s => { const esp = (osc ? s.osc : s.claro).toUpperCase(); if (col(s.v) !== esp) m.push(`${nombre} ${s.v}=${col(s.v)} (esperado ${esp})`); });
+    const antes = estilo;
+    revisa('principal', matchMedia('(prefers-color-scheme: dark)').matches);
+    aplicarEstilo('medianoche'); revisa('medianoche', true);
+    aplicarEstilo('sol'); revisa('sol', false);
+    aplicarEstilo(antes);
+    if (new Set(VOL_ESTADOS.map(s => s.osc)).size !== 5 || new Set(VOL_ESTADOS.map(s => s.claro)).size !== 5) m.push('colores repetidos');
+    const oscUsuario = { z0: '#7A879B', zlo: '#E5A15B', zok: '#41BFA3', zhi: '#6CA9DD', zal: '#DB6B78' };
+    VOL_ESTADOS.forEach(s => { if (s.osc !== oscUsuario[s.k]) m.push(`${s.k} oscuro ${s.osc} ≠ ${oscUsuario[s.k]}`); });
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Leyenda con los cinco estados y su etiqueta; ninguna etiqueta habla de lesión, fatiga ni sobreentrenamiento', () => {
+    const ley = [...document.querySelectorAll('#pMapa .mleg span')].map(s => [[...s.querySelector('i').classList].find(c => /^z/.test(c)), s.textContent.trim()]);
+    const m = [];
+    if (ley.length !== 5 || VOL_ESTADOS.some((s, i) => !ley[i] || ley[i][0] !== s.k || ley[i][1] !== s.n)) m.push(`leyenda: ${JSON.stringify(ley)}`);
+    if (VOL_ESTADOS.some(s => /lesi|fatig|sobreentren|peligro|riesgo/i.test(s.n))) m.push('etiqueta con diagnóstico');
+    const clases = new Set([...document.querySelectorAll('#mapa [data-m]')].map(p => [...p.classList].find(c => /^z/.test(c))));
+    clases.forEach(c => { if (!EST_MUS[c]) m.push(`zona con estado desconocido ${c}`); });
+    return { ok: !m.length, d: m.join('; ') || `mapa: ${[...clases].map(c => EST_MUS[c]).join(', ')}` };
+  });
 
   // ---------- 7. Los datos originales no se tocan ----------
   prueba('Pintar todas las vistas no modifica las sesiones guardadas', () => localStorage.getItem(KEY) === crudoAntes);

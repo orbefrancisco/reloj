@@ -907,8 +907,7 @@ $('tHist').onclick=()=>{tab='historial';if(histSucio)renderHist();else renderAlm
 $('tEstilo').onclick=()=>{tab='estilo';renderEstilos();render()};
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>aplicarEstilo(estilo));
 function renderEstilos(){
-  const fb={bg:'#f4efef',fg:'#1d1416',muted:'#78676b',line:'#e3d8d9',art:'#b3172c',ven:'#2e4a8c',cap:'#1d7658'};
-  const osc=matchMedia('(prefers-color-scheme: dark)').matches?{bg:'#140d0f',fg:'#f2e7e9',muted:'#a8959a',line:'#2e2225',art:'#f0435a',ven:'#7f9be2',cap:'#4fc99d'}:fb;
+  const osc=PRINCIPAL[matchMedia('(prefers-color-scheme: dark)').matches?'oscuro':'claro'];   // vista previa del tema principal (estilo.js)
   $('estilos').innerHTML=Object.entries(ESTILOS).map(([id,E])=>{const v={...osc,...(E.v||{})};
     const st=`--e-bg:${v.bg};--e-fg:${v.fg};--e-muted:${v.muted};--e-line:${v.line};--e-art:${v.art};--e-disp:${v.disp||'"Big Shoulders Display",Impact,sans-serif'};--e-body:${v.body||'"IBM Plex Sans",system-ui,sans-serif'}${E.recto?';border-radius:3px':''}`;
     return `<button type="button" class="est" data-e="${id}" aria-pressed="${id===estilo}" style='${st}'><span class="en">${E.n}</span><span class="eb">1:24</span>
@@ -1281,10 +1280,15 @@ const rangoGrupo=g=>normRango(tiene(RANGO_PERSONAL.g,g)?RANGO_PERSONAL.g[g]:null
 const rangoZona=m=>{const G=MUS[m][1];if(zonasDe(G).length===1)return rangoGrupo(G);
   return normRango(tiene(RANGO_PERSONAL.z,m)?RANGO_PERSONAL.z[m]:null)||MUS[m][2].slice()};
 const semRango=rangoGrupo;   // nombre antiguo, lo usan «qué toca», el resumen en imagen y las medallas
-/* Estado de un volumen frente a su objetivo → clase y color, el MISMO en el mapa, las barras de Progreso y el resumen en imagen
-   (variables --m0/--mlo/--mok/--mhi de cada estilo, ver estilo.js). */
-const estadoVol=(x,[lo,hi])=>x<=0?'z0':x<lo-.05?'zlo':x<=hi+.05?'zok':'zhi';   // ±0,05: redondeo de sumas de 0,2/0,6…
-const EST_MUS={z0:'sin series',zlo:'por debajo',zok:'en objetivo',zhi:'por encima'},EST_VAR={z0:'m0',zlo:'mlo',zok:'mok',zhi:'mhi'};
+/* Estado de un volumen frente a su objetivo [mín, máx] → clase, etiqueta y color, el MISMO en el mapa (zonas, leyenda y lista),
+   las barras de Progreso, el detalle de una zona y el resumen en imagen. Estados, nombres y colores: VOL_ESTADOS en estilo.js.
+     0 → sin series · 0 < v < mín → por debajo · mín ≤ v ≤ máx → en objetivo · máx < v ≤ 1,30·máx → por encima · v > 1,30·máx → más de +30 %
+   El 1,30·máx (VOL_ALERTA) se calcula con el máximo de cada grupo o zona. Se compara el volumen tal como se muestra (una
+   decimal, ef1), para que el color nunca contradiga el número: 11,96 se ve «12» y cuenta como en objetivo. Orientativo, no diagnóstico. */
+const ALERTA_VOL=VOL_ALERTA;
+const r1=x=>Math.round(x*10)/10;
+const estadoVol=(x,[lo,hi])=>{const v=r1(x);return v<=0?'z0':v<lo?'zlo':v<=hi?'zok':v<=r1(hi*VOL_ALERTA)?'zhi':'zal'};
+const EST_MUS=Object.fromEntries(VOL_ESTADOS.map(s=>[s.k,s.n])),EST_VAR=Object.fromEntries(VOL_ESTADOS.map(s=>[s.k,s.v]));
 const CORTO={biceps:'Bí',triceps:'Tr',espalda:'Es',pecho:'Pe',hombros:'Ho',abdominales:'Ab',piernas:'Pi'};
 const lunes=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()};
 const efH=h=>h.efectivas!=null?h.efectivas:efDe(h.sets||[]);
@@ -1301,7 +1305,7 @@ function renderProg(){
   const V=volSemana(0),w1=semana(1),dias=new Set(hist.filter(h=>Date.parse(h.start)>=lunes(Date.now())).map(h=>diaK(Date.parse(h.start)))).size;
   $('pSem').innerHTML=`<p class="hint">Series efectivas desde el lunes · ${dias} ${dias===1?'día':'días'} entrenados. Objetivo orientativo por grupo para ganar músculo: ${rangoGrupo('pecho').join('–')} (abdomen ${rangoGrupo('abdominales').join('–')}); la raya lo marca. Es una guía de entrenamiento, no un límite científico: estar por debajo o por encima no dice por sí solo si un músculo crece.</p>
     <p class="hint"><b>Cómo se cuenta:</b> <b>directas</b> = series de ejercicios cuyo músculo principal es del grupo. <b>Indirectas</b> = una estimación ponderada de lo que ayudan otros ejercicios (press inclinado: hombros ½, tríceps ½); no equivalen fisiológicamente a series directas. Cada serie cuenta una sola vez por grupo; en el mapa, una serie puede sumar a dos zonas del mismo grupo, por eso las zonas pueden sumar más.</p>`
-    +Object.keys(CAT).map(g=>{const o=V.grupos[g]||{dir:0,ind:0,solape:0,sinDetalle:0},v=V.grupo(g),[lo,hi]=semRango(g),tope=hi*1.3,est=estadoVol(v,[lo,hi]),zs=zonasDe(g);
+    +Object.keys(CAT).map(g=>{const o=V.grupos[g]||{dir:0,ind:0,solape:0,sinDetalle:0},v=V.grupo(g),[lo,hi]=semRango(g),tope=hi*ALERTA_VOL,est=estadoVol(v,[lo,hi]),zs=zonasDe(g);
       const zTxt=zs.map(m=>`${esc(MUS[m][3])} ${ef1(V.zona(m))}`).join(' + '),sz=zs.reduce((s,m)=>s+V.zona(m),0);
       const det=[`<b>directas ${ef1(o.dir)}</b> · indirectas (estimadas) ${ef1(o.ind)}`];
       if(zs.length>1||o.solape>.05)det.push(`zonas: ${zTxt}${o.solape>.05?` = ${ef1(sz)} (${ef1(o.solape)} es la misma serie en dos zonas)`:''}`);
@@ -1535,7 +1539,7 @@ function mapaSVG(){
   let det='<p class="hint" style="text-align:center">Toca una zona para ver de qué ejercicios vienen sus series.</p>';
   if(mapaSel&&MUS[mapaSel]){const [n,G]=MUS[mapaSel],r=rangoZona(mapaSel),x=v[mapaSel]||0,zo=V.zonas[mapaSel]||{dir:0,ind:0,deDir:{},deInd:{}},una=zonasDe(G).length===1;
     const lista=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([e,c])=>`${esc(e)} ${ef1(c)}`).join(' · ');
-    det=`<p style="margin:0;font-size:14px"><b>${esc(n)}</b>: ${ef1(x)} series efectivas · objetivo orientativo ${r.join('–')} · ${x<=0?'sin series':x<r[0]?`faltan ${ef1(r[0]-x)}`:x<=r[1]?'en objetivo':'por encima'}</p>
+    det=`<p style="margin:0;font-size:14px"><b>${esc(n)}</b>: ${ef1(x)} series efectivas · objetivo orientativo ${r.join('–')} · ${(e=>e==='zlo'?`${EST_MUS[e]}: faltan ${ef1(r[0]-x)}`:EST_MUS[e])(estadoVol(x,r))}</p>
       <p class="hint" data-desg="${mapaSel}"><b>Directas ${ef1(zo.dir)}</b>${Object.keys(zo.deDir).length?': '+lista(zo.deDir):''}</p>
       <p class="hint" data-desgi="${mapaSel}"><b>Indirectas ${ef1(zo.ind)}</b> (estimación ponderada de lo que ayudan otros ejercicios, no equivale a series directas)${Object.keys(zo.deInd).length?': '+lista(zo.deInd):''}</p>
       ${x<=0?'<p class="hint">Ningún ejercicio de esta semana la trabajó.</p>':''}
@@ -1667,7 +1671,7 @@ function datosComida(a,b,conPeso=!!CFG.resPeso){let C=null;try{C=JSON.parse(loca
   return out.prot!=null||out.peso?out:null}
 async function resumenImagen(){const W=1080,H=1350,cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
   const cs=getComputedStyle(document.documentElement),v=k=>cs.getPropertyValue('--'+k).trim();
-  const C={bg:v('bg')||'#140d0f',fg:v('fg')||'#f2e7e9',muted:v('muted')||'#999',line:v('line')||'#333',soft:v('soft')||'#222',art:v('art')||'#f0435a',ven:v('ven')||'#7f9be2',cap:v('cap')||'#4fc99d',amb:v('amb')||'#c98a00'};
+  const P=PRINCIPAL.oscuro,C=Object.fromEntries(['bg','fg','muted','line','soft','art','ven','cap','amb'].map(k=>[k,v(k)||P[k]]));
   const fD=v('disp')||'Impact,sans-serif',fB=v('body')||'system-ui,sans-serif',fM=v('mono')||'monospace';
   try{await Promise.all([`800 90px ${fD}`,`600 34px ${fB}`,`500 28px ${fM}`].map(f=>document.fonts.load(f)))}catch(e){}
   const a=lunes(Date.now()),b=a+7*864e5,w=semana(0),hs=hist.filter(h=>{const t=Date.parse(h.start);return t>=a&&t<b});
@@ -1686,8 +1690,8 @@ async function resumenImagen(){const W=1080,H=1350,cv=document.createElement('ca
   hs.forEach(h=>(h.sets||[]).forEach(r=>{if(r.pr&&r.kg>0)recs.push(r)}));
   const mejores=[...new Map(recs.sort((p,q)=>e1(p)-e1(q)).map(r=>[r.ej,r])).values()].sort((p,q)=>e1(q)-e1(p)).slice(0,comida?2:4);
   const fila=comida?50:62,X0=M+230,X1=W-M-225;
-  const CE={z0:v('m0')||C.muted,zlo:v('mlo')||C.amb,zok:v('mok')||C.cap,zhi:v('mhi')||C.art};   // mismos colores de estado que el mapa y Progreso
-  Object.keys(CAT).forEach(g=>{const val=w[g]||0,[lo,hi]=semRango(g),tope=hi*1.3,c=CE[estadoVol(val,[lo,hi])];y+=fila;
+  const CE=Object.fromEntries(VOL_ESTADOS.map(s=>[s.k,v(s.v)||s.osc]));   // mismos colores de estado que el mapa y Progreso
+  Object.keys(CAT).forEach(g=>{const val=w[g]||0,[lo,hi]=semRango(g),tope=hi*ALERTA_VOL,c=CE[estadoVol(val,[lo,hi])];y+=fila;
     txt(CAT[g].n,M,y,`600 34px ${fB}`,C.fg);rr(X0,y-24,X1-X0,24,12,C.soft);
     x.strokeStyle=C.muted;x.lineWidth=3;[lo,hi].forEach(q=>{const X=X0+(X1-X0)*q/tope;x.beginPath();x.moveTo(X,y-32);x.lineTo(X,y+8);x.stroke()});
     if(val>0)rr(X0,y-24,Math.max(24,(X1-X0)*Math.min(1,val/tope)),24,12,c);
