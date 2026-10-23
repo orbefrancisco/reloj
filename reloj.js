@@ -77,6 +77,13 @@ function normSet(r){if(!esObj(r))return null;const o={ex:vTxt(r.ex)??'',k:vTxt(r
   {const m=vTxt(r.mod,20);if(m)o.mod=m}
   if(r.pr===true){o.pr=true;if(r.prT==='reps')o.prT='reps'}const mol=r.mol?vTxt(r.mol,40):null;if(mol){o.mol=mol;if(LES_P[mol]&&LES_P[mol].includes(r.molP))o.molP=r.molP}
   if(r.recta===true)o.recta=true;   // v18: serie recta por cuidar una zona
+  // v31 · carga: procedencia (cal = de «Mis cargas», mod = cambiada en la sesión, man = anotada a mano, hist = sugerida por el historial),
+  // carga planificada si se cambió, especificación (por mancuerna, total, lastre, corporal), unidad declarada, nivel de máquina,
+  // modalidad de fuerza y carga distinta de la serie principal (mini-serie no comparable)
+  if(['cal','mod','man','hist'].includes(r.kgSrc))o.kgSrc=r.kgSrc;
+  {const p=vNum(r.kgPlan,0,1000);if(p!=null)o.kgPlan=p;const n=vNum(r.niv,0,100);if(n!=null)o.niv=n}
+  if(['mancuerna','total','extra','corporal'].includes(r.tc))o.tc=r.tc;if(['kg','lb','nivel'].includes(r.u))o.u=r.u;
+  if(r.m==='f')o.m='f';if(r.kgCambio===true)o.kgCambio=true;
   return o}
 // una sesión del historial: hace falta id y fecha válidos; las series raras se descartan
 function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha(s.start);
@@ -306,7 +313,11 @@ function fresh(){return {st:'idle',P:0,C:1,tauC:35,P0:0,C0:1,sec:0,nIn:0,R1:0,RT
   t0:0,last:0,restDur:0,lastSec:-1,workDur:0,hechas:0,label:'',sets:[],tuc:0,iso:0,id:null,start:null,
   meta:0,metaE:[],ef:0,efE:0,ronda:1,esRonda:false,kg:null,sug:null,aviso:'',pr:0,prTxt:'',prK:'',rutTrans:false,
   cal:null,calI:0,calHecho:false,calRest:false,molAv:'',molDicho:false,molR:null,molP:null,nota:'',bien:null,kRec:1,Cpre:null,tempoHasta:0,
-  desc:false,serE:0,antes:false}}   // desc: sesión en modo descarga; serE: series completas del ejercicio; antes: terminada antes de la meta
+  desc:false,serE:0,antes:false,   // desc: sesión en modo descarga; serE: series completas del ejercicio; antes: terminada antes de la meta
+  // v31 · carga (cargas.js): referencia de «Mis cargas» en uso (cgK), procedencia de la carga actual, carga planificada, nivel de máquina,
+  // carga de la serie principal (kgA, cgA: para no confundir un cambio de carga con fatiga), cambio solo para una serie (cgOne) y factor
+  // de carga con que se calculó el objetivo de la mini-serie (rPre)
+  cgK:'',kgSrc:'',kgPlan:null,niv:null,kgA:null,cgA:null,cgOne:null,rPre:1}}
 S=fresh();
 const estsDe=()=>S.fza?S.fza.e:CAT[grupo].e;   // en fuerza, sus 1–2 estaciones propias
 const est=()=>estsDe()[S.sec];
@@ -367,8 +378,13 @@ function regla(E,r){const [lo,hi]=rango(E.r),R=parseInt(r.reps,10)||0,n=rirN(r.r
   return {kg,txt:R>=hi?`repite ${kgTxt(kg)}`:`repite ${kgTxt(kg)} y busca ${hi} reps`,cambio:false}}
 function sugerir(g,E){if(E.levy)return null;const p=previas(g,E.n).find(x=>!x.fza);return p?{...regla(E,p),prev:p}:null}   // un día de fuerza no marca el peso de hipertrofia
 function prepEstacion(){if(S.fza)return prepFuerza();const E=est();S.sug=sugerir(grupo,E);S.kg=S.sug?S.sug.kg:null;S.molAv=avisoEst(grupo,E);S.molDicho=false;
-  // calentamiento solo antes del primer ejercicio con peso conocido del grupo en esta sesión
-  S.cal=CFG.cal&&S.phase==='act'&&!E.levy&&S.kg>0&&!S.calHecho&&!S.sets.some(r=>r.k==='act.'&&r.kg>0)?planCal(S.kg,E):null;S.calI=0}
+  if(typeof cgPrep==='function')cgPrep(E);   // v31: la carga de «Mis cargas» de esta semana manda sobre la sugerida por el historial
+  S.cal=planCalE(E);S.calI=0}
+/* calentamiento: hasta v30, solo antes del primer ejercicio con peso de la sesión (50/70/85 %). v31 (cargas.js): según la carga de
+   trabajo ya conocida, lo pesado y complejo del ejercicio y su posición en la sesión; nunca dos veces el mismo ejercicio. */
+function planCalE(E){const prim=!S.calHecho&&!S.sets.some(r=>r.k==='act.'&&r.kg>0);
+  if(!CFG.cal||S.phase!=='act'||!E||E.levy||!(S.kg>0)||S.sets.some(r=>r.ej===E.n&&(r.k==='act.'||r.k==='cal.'||r.k==='apr.')))return null;
+  return typeof cgPlanCal==='function'?cgPlanCal(S.kg,E,prim):prim?planCal(S.kg,E):null}
 /* ---------- calentamiento y discos ---------- */
 const CALP=[[.5,10],[.7,5],[.85,2]];
 // discos y barra en la unidad de la pantalla (cada unidad tiene su lista)
@@ -416,8 +432,8 @@ function recordE1(row){if(!(row.kg>0))return false;
   const antes=previas(grupo,row.ej,S.id).map(p=>p.mejor);if(!antes.length)return false;
   const hoy=S.sets.filter(r=>r.ej===row.ej&&r.k==='act.'&&r.kg>0).map(e1);
   return e1(row)>Math.max(...antes,...hoy)*1.005}
-function recordReps(row){if(row.kg==null)return false;const R=parseInt(row.reps,10)||0,n=rirN(row.rir);
-  const comp=r=>r.ej===row.ej&&r.k==='act.'&&r.kg!=null&&Math.abs(r.kg-row.kg)<1e-6&&rirN(r.rir)<=n;
+function recordReps(row){const c0=cargaDe(row,grupo);if(c0==null)return false;const R=parseInt(row.reps,10)||0,n=rirN(row.rir);   // v31: carga conocida (no un 0 dudoso)
+  const comp=r=>r.ej===row.ej&&r.k==='act.'&&cargaDe(r,grupo)===c0&&rirN(r.rir)<=n;
   const prev=[];hist.forEach(h=>{if(h.id!==S.id&&gDe(h)===grupo)(h.sets||[]).forEach(r=>{if(comp(r))prev.push(parseInt(r.reps,10)||0)})});
   if(!prev.length)return false;S.sets.forEach(r=>{if(comp(r))prev.push(parseInt(r.reps,10)||0)});
   if(R>Math.max(...prev)){row.prT='reps';return true}return false}
@@ -487,13 +503,18 @@ function avanzar(ev){
   bump(R,p,ev.dur,ph==='ext');S.nIn++;
   const row={ex:E.s,ej:E.n,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir>=4?'4+':String(rir),
     kg:ph==='ext'&&E.ext==='flat'?null:S.kg,P:S.P,rest:0};
+  if(typeof cgFila==='function')cgFila(row,ph,E);   // v31: procedencia de la carga, cambio de una sola serie y carga distinta de la principal
+  if(ph==='act'){S.kgA=row.kg;S.cgA=cargaDe(row,grupo)}
+  // v31: con otra carga que la serie principal, las reps esperables cambian (Epley con reserva): no es fatiga ni falta de recuperación
+  const rHecha=ph==='myo'?ratioCarga(S.kgA,row.kg,S.RTF):1;
   // para calibrar: objetivo que dio el motor, capacidad prevista y factor de recuperación usado
   // v26: + predF (reps hasta el fallo que predijo el modelo antes de la serie, RTF × capacidad) y mod (versión del modelo):
   // con R + RIR se puede medir el error sin la censura del objetivo (la mini-serie se reporta por defecto con el objetivo)
-  if(ph==='myo'&&S.Cpre!=null){row.obj=S.target;row.Cpre=Math.round(S.Cpre*1000)/1000;row.kc=S.kRec||1;row.predF=Math.round(S.RTF*S.Cpre*10)/10;row.mod=S.modRec||'fijo'}
+  if(ph==='myo'&&S.Cpre!=null){row.obj=S.target;row.Cpre=Math.round(S.Cpre*1000)/1000;row.kc=S.kRec||1;row.predF=Math.round(S.RTF*(S.rPre||1)*S.Cpre*10)/10;row.mod=S.modRec||'fijo'}
   const c=efectiva(row);S.efE+=c;S.ef+=c;
   if(ph==='act'&&row.kg>0)S.calHecho=true;   // ya se trabajó con peso: los ejercicios siguientes no vuelven a calentar (la fila aún no está en S.sets)
-  if(ph==='act'&&row.kg!=null&&S.ronda===1&&!S.fza){const rg=regla(E,row);if(rg.cambio)S.aviso=`Próxima vez en ${E.s}: ${rg.txt}`}
+  // con carga de «Mis cargas» la progresión es semanal (revisión de la semana): aquí no se sugiere cambiarla serie a serie
+  if(ph==='act'&&row.kg!=null&&S.ronda===1&&!S.fza&&!S.cgK){const rg=regla(E,row);if(rg.cambio)S.aviso=`Próxima vez en ${E.s}: ${rg.txt}`}
   if(S.fza)return avanzarFuerza(R,row);
   if(E.lesM&&!S.desc)row.recta=true;   // cuidar una zona: serie recta, sin fallo
   if(S.desc||E.lesM)return avanzarDescarga(R,row);
@@ -502,14 +523,27 @@ function avanzar(ev){
   if(!faltaE())return siguienteEstacion(row);
   if(ph==='act'&&S.ronda>1&&c<1/3)return siguienteEstacion(row);
   // recuperación aprendida (k = 1 sin datos): el descanso se estira ×1/k y la capacidad prevista se escala ×k
-  const kr=S.kRec||1,ts=kr===1?restStar():Math.min(150,Math.max(10,restStar()/kr)),Cp=kr*recC(S.C,S.tauC,ts),pred=S.RTF*Cp;
-  if((ph==='myo'&&R<.5*S.R1)||pred*.65<3||S.nIn>MAXMYO){
+  // v31: la próxima mini-serie se hace con la carga del resto del ejercicio (S.kg); si no es la de la principal, su objetivo se reescala
+  const rProx=ratioCarga(S.kgA,S.kg,S.RTF),kr=S.kRec||1,ts=kr===1?restStar():Math.min(150,Math.max(10,restStar()/kr)),Cp=kr*recC(S.C,S.tauC,ts),pred=S.RTF*rProx*Cp;
+  if((ph==='myo'&&R<.5*S.R1*rHecha)||pred*.65<3||S.nIn>MAXMYO){
     row.rest=SHIFT;
     if(E.ext==='hold')S.phase='hold';
     else{S.phase='ext';S.target=Math.max(5,Math.round(S.RTF*E.k*recC(S.C,S.tauC,SHIFT)*.9))}
     return {row,mode:'shift',rest:SHIFT}}
-  S.phase='myo';S.target=Math.max(3,Math.round(pred*(.65+.25*Math.random())));S.Cpre=Cp;row.rest=Math.round(ts);
+  S.phase='myo';S.target=Math.max(3,Math.round(pred*(.65+.25*Math.random())));S.Cpre=Cp;S.rPre=rProx;row.rest=Math.round(ts);
   return {row,mode:'rest',rest:ts}}
+/* v31 · reps hasta el fallo esperables con la carga b si con la carga a eran rtf (Epley con reserva, el mismo 1RM estimado), como
+   factor sobre rtf. Sin las dos cargas conocidas y positivas (peso corporal, nivel de máquina o sin anotar) no se puede estimar: 1.
+   Es una aproximación (Epley pierde precisión lejos de 10 reps); las mini-series con otra carga se marcan y no entran en el aprendizaje. */
+function ratioCarga(a,b,rtf){if(!(a>0)||!(b>0)||Math.abs(a-b)<1e-6||!(rtf>0))return 1;
+  const r=30*(a*(1+rtf/30)/b-1);return Math.min(3,Math.max(.1,Math.max(.5,r)/rtf))}
+// v31 · clave de la carga de una serie para comparar series entre sí: 'k:<kg>' anotada, 'n:<nivel>' de máquina, 'c' peso corporal (0 en
+// un ejercicio de peso corporal) o null = DESCONOCIDA: sin anotar, o un 0 en un ejercicio con carga externa (hasta v30, «−» desde el peso
+// vacío ponía 0 = peso corporal sin querer). Dos series sin carga conocida NO se dan por iguales.
+function cargaDe(r,g){if(!r)return null;if(r.niv!=null)return 'n:'+r.niv;if(r.kg==null)return null;if(r.kg>0)return 'k:'+Math.round(r.kg*1000)/1000;
+  return r.tc==='corporal'||r.tc==='extra'||esCorporal(r.ej||nomFila(r,g))?'c':null}   // lastre 0 = solo el cuerpo
+// ejercicios que se hacen con el propio cuerpo (sin máquina, polea ni lastre): ahí 0 kg sí significa «peso corporal»
+const esCorporal=n=>{const t=sinTilde(n);return !/maquina|polea|lastrad|asistid/.test(t)&&/fondos|dominadas|flexiones|plancha|rueda|colgado|rodillas al pecho|remo invertido|crunch en el suelo|crunch inverso|nordico|elevacion de piernas en banco/.test(t)};
 /* Semana de descarga (S.desc, fijado al empezar): series rectas, sin mini-series, parciales, variante ni isometría al fallo; 2–3 en reserva;
    descanso fijo de 2 min (o el t* si fuera mayor) y la meta del ejercicio en SERIES COMPLETAS (5 reps o más, cualquier reserva), sin otras rondas.
    Si una serie no llega a 5 reps no cuenta; como mucho 2 intentos de más por ejercicio. Sin descarga el motor no pasa por aquí. */
@@ -596,13 +630,15 @@ function planFuerza(g){if(!fzaDisponible(g))return null;const L=FZA_PRIN[g].filt
   const e=[{n,s:FZA_CORTO[n]||n.split(' ')[0],r:`${Math.max(3,reps-1)}–${Math.min(6,reps+1)}`,d:reps,tempo:'baja controlado · sube con fuerza',ext:'flat',extN:'',extH:'',k:1,fz:'p'}];
   const no=x=>!x.levy&&x.n!==n,a=fzaCfg.acc!==false?CAT[g].e.find(x=>no(x)&&!FZA_PRIN[g].includes(x.n))||CAT[g].e.find(no):null;   // accesorio: mejor uno que no sea otro compuesto
   if(a)e.push({n:a.n,s:a.s,r:'6–10',d:8,tempo:a.tempo||'controlado',ext:a.ext||'part',extN:a.extN||'',extH:a.extH||'',k:a.k||1,fz:'a'});
+  if(typeof cgFzaPlan==='function')cgFzaPlan(g,e[0]);   // v31: con referencia de fuerza en «Mis cargas», su rango de reps
   return {pct,rm:rm?Math.round(rm*10)/10:null,reps,nP:pct<.84?5:4,nA:a?3:0,rest:pct>=.85?210:180,e}}
 const fzaKg=F=>F.rm?redondeaKg(F.pct*F.rm,F.e[0]):null;
 function prepFuerza(){const E=est(),F=S.fza;S.sug=null;S.molAv=avisoEst(grupo,E);S.molDicho=false;S.cal=null;S.calI=0;
-  if(E.fz==='p'){S.kg=fzaKg(F);if(CFG.cal&&S.kg>0&&!S.calHecho)S.cal=planCal(S.kg,E,CALF)}
-  else{S.sug=sugerir(grupo,E);S.kg=S.sug?S.sug.kg:null}}
+  if(E.fz==='p'){S.kg=fzaKg(F);if(typeof cgPrep==='function')cgPrep(E);if(CFG.cal&&S.kg>0&&!S.calHecho)S.cal=planCal(S.kg,E,CALF)}   // v31: la referencia de fuerza manda
+  else{S.sug=sugerir(grupo,E);S.kg=S.sug?S.sug.kg:null;if(typeof cgPrep==='function')cgPrep(E);S.cal=planCalE(E)}}
 function avanzarFuerza(R,row){const E=est(),F=S.fza,m=E.fz==='p'?F.nP:F.nA;
-  if(E.fz==='p'&&!F.rm&&row.kg>0){F.rm=Math.round(e1(row)*10)/10;S.kg=fzaKg(F);S.aviso=`1RM estimado ${kgTxt(F.rm)}: sigue con ${kgTxt(S.kg)}`}   // sin 1RM: lo da la 1.ª serie
+  // sin 1RM: lo da la 1.ª serie. Con carga de «Mis cargas» no se toca: la carga de trabajo se mantiene en todas las series
+  if(E.fz==='p'&&!F.rm&&row.kg>0){F.rm=Math.round(e1(row)*10)/10;if(!S.cgK){S.kg=fzaKg(F);S.aviso=`1RM estimado ${kgTxt(F.rm)}: sigue con ${kgTxt(S.kg)}`}}
   if(S.nIn>=m){if(E.fz==='p')fzaProgresion(row);return siguienteEstacion(row)}
   const r=E.fz==='p'?F.rest:FZA_REST_A;row.rest=r;return {row,mode:'rest',rest:r}}
 // al cerrar el compuesto: todas las series con las reps y 2+ en reserva → +2 puntos; alguna muy corta al fallo → −2; si no, igual
@@ -934,10 +970,12 @@ let nuevaConf=0;
 $('nueva').onclick=()=>{if(enCurso()&&Date.now()>nuevaConf){nuevaConf=Date.now()+5000;render();setTimeout(render,5100);return}
   nuevaConf=0;rutPos=0;rutEf=0;pideBien=false;pila=[];rirPrev=null;if(enRutina())grupo=rutLista()[0];SS=null;fzaHoy=false;if(ssSel.on){const L=ssLados();if(L)grupo=L[0].g}S=fresh();$('save').textContent='Sin guardar aún';renderGrupos();render();intentaRecarga()};
 // Peso: − y + dan un paso; tocando el número se escribe (en blanco = sin anotar, 0 = peso corporal). Sin peso previo, + empieza en la barra o en un paso.
-$('kgMas').onclick=()=>{const E=est();S.kg=S.kg==null?deU(esBarra(E)?barraU():incU(0)):cambiaKg(E,S.kg,1);render()};
-$('kgMenos').onclick=()=>{const E=est();if(S.kg==null)S.kg=0;else S.kg=cambiaKg(E,S.kg,-1);render()};
+// v31: anotado a mano (kgSrc 'man'). Desde «sin anotar», «−» solo pone 0 (= peso corporal) en ejercicios de peso corporal: en uno con
+// carga externa un 0 no es un dato (hasta v30 se colaba así y se confundía con peso corporal)
+$('kgMas').onclick=()=>{const E=est();S.kg=S.kg==null?deU(esBarra(E)?barraU():incU(0)):cambiaKg(E,S.kg,1);S.kgSrc='man';render()};
+$('kgMenos').onclick=()=>{const E=est();if(S.kg==null){if(!esCorporal(E.n))return;S.kg=0}else S.kg=cambiaKg(E,S.kg,-1);S.kgSrc='man';render()};
 $('kgv').addEventListener('input',()=>{const t=$('kgv').value.trim().replace(',','.');if(S.st!=='report')return;
-  if(t===''){S.kg=null;render();return}const v=parseFloat(t);if(/^\d*\.?\d*$/.test(t)&&v>=0&&v<=(esLb()?1100:500)){S.kg=deU(v);render()}});
+  if(t===''){S.kg=null;S.kgSrc='';render();return}const v=parseFloat(t);if(/^\d*\.?\d*$/.test(t)&&v>=0&&v<=(esLb()?1100:500)){S.kg=deU(v);S.kgSrc='man';render()}});
 $('kgv').addEventListener('focus',()=>{try{$('kgv').select()}catch(e){}});
 $('kgv').addEventListener('keydown',e=>{if(e.key==='Enter')$('kgv').blur()});
 $('barraT').onclick=()=>{const E=est();CFG.barraEj={...(CFG.barraEj||{}),[E.n]:!esBarra(E)};guardarCfg();render()};
@@ -989,28 +1027,39 @@ const CALIB_MIN=8,REC2_MIN=4,REC_GANA=.05,REC_NEV=20,REC_P=.10,REC_DEC=30,MODKEY
 const normModelo=o=>{const r={sel:{},log:[]};if(!esObj(o))return r;
   if(esObj(o.sel))for(const g of Object.keys(CAT)){const x=o.sel[g];if(esObj(x)&&REC_MODS.includes(x.m)){const k=vNum(x.k,.5,2);if(k!=null)r.sel[g]={m:x.m,k}}}
   if(Array.isArray(o.log))r.log=o.log.slice(-200).filter(x=>esObj(x)&&esG(x.g)&&vFecha(x.t)).map(x=>({t:x.t,g:x.g,de:vTxt(x.de,40)||'',a:vTxt(x.a,40)||'',por:vTxt(x.por,300)||''}));
+  {const c=vTxt(o.cal,60);if(c)r.cal=c}   // (v31) firma de la calidad de la carga con la que se evaluó
   return r};
 let modState=normModelo(leerJSON(MODKEY,{}));
 const mediana=v=>{if(!v.length)return null;const s=v.slice().sort((a,b)=>a-b),n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2};
 const clK=x=>Math.min(1.3,Math.max(.7,x));
 // observaciones en orden temporal: una por mini-serie con objetivo y capacidad prevista guardados (desde v18)
-function obsRec(){const out=[],desde=calibC.desde?Date.parse(calibC.desde):0;
+/* (v31) CALIDAD de la carga de cada observación, comparando la mini-serie con la serie principal del mismo ejercicio (cargaDe):
+     'v' verificada: las dos con la misma carga conocida (anotada, nivel o peso corporal).
+     'p' presunta: ninguna de las dos tiene carga conocida (registros sin peso). El motor hasta v30 copiaba en la mini-serie la carga de la
+         principal y no se registró ningún cambio, así que la misma carga es lo más probable, pero no está verificada: cuenta la MITAD
+         (REC_PRES) en el encogimiento (n_ef = verificadas + ½ presuntas). La mediana no cambia; solo cuánto se fía el modelo de ella.
+     fuera: una conocida y la otra no, cargas distintas, o mini-serie marcada con otra carga (kgCambio): un cambio de carga no es recuperación.
+   Antes (v29) solo se descartaba cuando las DOS cargas estaban anotadas y eran distintas: una sin anotar y otra con 0 pasaba. */
+const REC_PRES=.5;
+function obsRec(){const out=[],desde=calibC.desde?Date.parse(calibC.desde):0,ex={cambio:0,mixta:0};
   hist.slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)).forEach(h=>{const g=gDe(h),t=Date.parse(h.start);if(!g||!CAT[g]||(desde&&t<=desde))return;
     const rtf={};(h.sets||[]).forEach((x,i)=>{const ej=x.ej||x.ex,R=parseInt(x.reps,10);
-      if(x.k==='act.'){rtf[ej]={v:R+rirN(x.rir),cens:/\+/.test(x.rir||''),kg:x.kg};return}
+      if(x.k==='act.'){rtf[ej]={v:R+rirN(x.rir),cens:/\+/.test(x.rir||''),kg:x.kg,c:cargaDe(x,g)};return}
       if(x.k!=='myo'||!(+x.obj>0)||!(+x.Cpre>0)||!rtf[ej]||!(R>=0))return;
-      // (v29) si la mini-serie se hizo con otra carga que la serie principal, no es comparable: un cambio de carga no es recuperación
-      if(x.kg!=null&&rtf[ej].kg!=null&&Math.abs(x.kg-rtf[ej].kg)>1e-6)return;
+      const ca=rtf[ej].c,cb=cargaDe(x,g);
+      if(x.kgCambio||(ca!=null&&cb!=null&&ca!==cb)){ex.cambio++;return}
+      if((ca==null)!==(cb==null)){ex.mixta++;return}
       const kc=+x.kc||1,Cf=+x.Cpre/kc,pf=rtf[ej].v*Cf,cens=rtf[ej].cens||/\+/.test(x.rir||'');
-      if(!(pf>=1))return;out.push({t:t+i,g,ej,pf:Math.round(pf*100)/100,obs:R+rirN(x.rir),r:R,obj:+x.obj,kc,cens,mod:x.mod||'rec-1'})})});
-  return out.sort((a,b)=>a.t-b.t)}
+      if(!(pf>=1))return;out.push({t:t+i,g,ej,pf:Math.round(pf*100)/100,obs:R+rirN(x.rir),r:R,obj:+x.obj,kc,cens,mod:x.mod||'rec-1',q:ca!=null?'v':'p'})})});
+  out.sort((a,b)=>a.t-b.t);out.excl=ex;return out}
 const logsDe=L=>L.filter(o=>!o.cens&&o.obs>0).map(o=>Math.log(o.obs/o.pf));
+const pesoObs=o=>o.q==='p'?REC_PRES:1,nEf=L=>L.filter(o=>!o.cens&&o.obs>0).reduce((a,o)=>a+pesoObs(o),0);
 function kRec1(tr){const v=tr.map(o=>o.r/o.obj*o.kc),n=v.length;if(n<CALIB_MIN)return 1;const m=clK(mediana(v));return clK(1+(m-1)*n/(n+CALIB_MIN))}
-function kRec2(tr){const v=logsDe(tr),n=v.length;if(n<REC2_MIN)return 1;return clK(Math.exp(mediana(v)*n/(n+CALIB_MIN)))}
+function kRec2(tr){const v=logsDe(tr),n=v.length,ne=nEf(tr);if(n<REC2_MIN)return 1;return clK(Math.exp(mediana(v)*ne/(ne+CALIB_MIN)))}
 // agrupado: común encogido hacia 0 y grupo encogido hacia el común; intervalo aproximado con la dispersión (MAD) del grupo o, si tiene pocos, de todos
-function kPool(tr,g){const va=logsDe(tr),N=va.length,vg=logsDe(tr.filter(o=>o.g===g)),n=vg.length;
-  const m0=N?mediana(va)*N/(N+CALIB_MIN):0,m=n?(n*mediana(vg)+CALIB_MIN*m0)/(n+CALIB_MIN):m0;
-  const base=n>=REC2_MIN?vg:va,mb=base.length?mediana(base):0,se=base.length?1.4826*mediana(base.map(x=>Math.abs(x-mb)))*1.253/Math.sqrt(base.length):null;
+function kPool(tr,g){const tg=tr.filter(o=>o.g===g),va=logsDe(tr),N=va.length,vg=logsDe(tg),n=vg.length,Ne=nEf(tr),ne=nEf(tg);
+  const m0=N?mediana(va)*Ne/(Ne+CALIB_MIN):0,m=n?(ne*mediana(vg)+CALIB_MIN*m0)/(ne+CALIB_MIN):m0;
+  const base=n>=REC2_MIN?vg:va,nb=n>=REC2_MIN?ne:Ne,mb=base.length?mediana(base):0,se=base.length&&nb>0?1.4826*mediana(base.map(x=>Math.abs(x-mb)))*1.253/Math.sqrt(nb):null;   // (v31) con n efectivo
   return {k:clK(Math.exp(m)),n,N,lo:se==null?null:clK(Math.exp(m-1.96*se)),hi:se==null?null:clK(Math.exp(m+1.96*se))}}
 // cola de la binomial (prueba de signo, una cola): P(X ≥ w | n, ½)
 function pSigno(w,n){if(!n)return 1;let p=0,c=1;for(let i=0;i<=n;i++){if(i>0)c=c*(n-i+1)/i;if(i>=w)p+=c}return Math.min(1,p/Math.pow(2,n))}
@@ -1021,14 +1070,16 @@ const maeDe=(L,k)=>L.length?L.reduce((a,e)=>a+Math.abs(e.obs-e[k]),0)/L.length:n
 // Mismo resultado que reajustar con O.slice(0, i) en cada paso (kRec1/kRec2/kPool), pero sin el coste cuadrático por ordenar.
 const insOrd=(a,v)=>{let lo=0,hi=a.length;while(lo<hi){const m=(lo+hi)>>1;if(a[m]<v)lo=m+1;else hi=m}a.splice(lo,0,v)};
 const medOrd=a=>{const n=a.length;return n?(n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2):null};
-function evalRec(){const O=obsRec(),ev=[],todos=[],lg={},r1={};
+function evalRec(){const O=obsRec(),ev=[],todos=[],lg={},r1={},neG={};let NE=0;   // (v31) neG, NE: n efectivo (presuntas cuentan ½)
   O.forEach(x=>{const g=x.g,vg=lg[g]||(lg[g]=[]),vr=r1[g]||(r1[g]=[]);
     if(!x.cens){const n1=vr.length,k1=n1<CALIB_MIN?1:clK(1+(clK(medOrd(vr))-1)*n1/(n1+CALIB_MIN));
-      const n=vg.length,k2=n<REC2_MIN?1:clK(Math.exp(medOrd(vg)*n/(n+CALIB_MIN)));
-      const N=todos.length,m0=N?medOrd(todos)*N/(N+CALIB_MIN):0,m=n?(n*medOrd(vg)+CALIB_MIN*m0)/(n+CALIB_MIN):m0,k3=clK(Math.exp(m));
-      ev.push({t:x.t,g,ej:x.ej,obs:x.obs,p0:x.pf,p1:x.pf*k1,p2:x.pf*k2,p3:x.pf*k3,ntr:n})}
-    insOrd(vr,x.r/x.obj*x.kc);if(!x.cens&&x.obs>0){const l=Math.log(x.obs/x.pf);insOrd(vg,l);insOrd(todos,l)}});
-  const G={n:ev.length,mae0:maeDe(ev,'p0'),mae1:maeDe(ev,'p1'),mae2:maeDe(ev,'p2'),mae3:maeDe(ev,'p3'),sesgo0:sesgoDe(ev,'p0'),sesgo3:sesgoDe(ev,'p3'),s3:compara(ev,'p3','p0'),s2:compara(ev,'p2','p0')};
+      const n=vg.length,ne=neG[g]||0,k2=n<REC2_MIN?1:clK(Math.exp(medOrd(vg)*ne/(ne+CALIB_MIN)));
+      const N=todos.length,m0=N?medOrd(todos)*NE/(NE+CALIB_MIN):0,m=n?(ne*medOrd(vg)+CALIB_MIN*m0)/(ne+CALIB_MIN):m0,k3=clK(Math.exp(m));
+      ev.push({t:x.t,g,ej:x.ej,obs:x.obs,p0:x.pf,p1:x.pf*k1,p2:x.pf*k2,p3:x.pf*k3,ntr:n,q:x.q})}
+    insOrd(vr,x.r/x.obj*x.kc);if(!x.cens&&x.obs>0){const l=Math.log(x.obs/x.pf),w=pesoObs(x);insOrd(vg,l);insOrd(todos,l);neG[g]=(neG[g]||0)+w;NE+=w}});
+  const G={n:ev.length,mae0:maeDe(ev,'p0'),mae1:maeDe(ev,'p1'),mae2:maeDe(ev,'p2'),mae3:maeDe(ev,'p3'),sesgo0:sesgoDe(ev,'p0'),sesgo3:sesgoDe(ev,'p3'),s3:compara(ev,'p3','p0'),s2:compara(ev,'p2','p0'),
+    // (v31) calidad de los datos: verificadas, presuntas y descartadas por la carga
+    cal:{v:O.filter(o=>o.q==='v').length,p:O.filter(o=>o.q==='p').length,cambio:O.excl.cambio,mixta:O.excl.mixta}};
   // (v29) la DECISIÓN se toma con las últimas REC_DEC predicciones: si el aprendido empieza a fallar (tu respuesta cambia), se vuelve al fijo
   const U=ev.slice(-REC_DEC),u={n:U.length,mae0:maeDe(U,'p0'),mae3:maeDe(U,'p3'),s3:compara(U,'p3','p0')};G.u=u;
   G.bien=u.n>=REC_NEV&&u.mae3<=u.mae0*(1-REC_GANA)&&u.s3.p<REC_P;
@@ -1039,7 +1090,7 @@ function evalRec(){const O=obsRec(),ev=[],todos=[],lg={},r1={};
   const R={_:G};
   for(const g of Object.keys(CAT)){const o=O.filter(x=>x.g===g),e=ev.filter(x=>x.g===g),k=kPool(O,g),m0=maeDe(e,'p0'),m3=maeDe(e,'p3');
     const peor=e.length>=5&&m3>m0;const usa=G.bien&&!peor;
-    R[g]={n:o.length,nUt:logsDe(o).length,nEval:e.length,ev:e,k,mae0:m0,mae1:maeDe(e,'p1'),mae2:maeDe(e,'p2'),mae3:m3,sesgo0:sesgoDe(e,'p0'),sesgo3:sesgoDe(e,'p3'),s3:compara(e,'p3','p0'),
+    R[g]={n:o.length,nUt:logsDe(o).length,nV:o.filter(x=>x.q==='v').length,nP:o.filter(x=>x.q==='p').length,nEval:e.length,ev:e,k,mae0:m0,mae1:maeDe(e,'p1'),mae2:maeDe(e,'p2'),mae3:m3,sesgo0:sesgoDe(e,'p0'),sesgo3:sesgoDe(e,'p3'),s3:compara(e,'p3','p0'),
       usa,kUsa:usa?Math.round(k.k*1000)/1000:1,modelo:usa?'rec-2p':'fijo',
       por:!G.bien?G.por:peor?`en tus ${e.length} mini-series de este grupo el aprendido fue peor que el fijo (${num(m3)} frente a ${num(m0)} reps): se usa el fijo`
         :`${G.por}; en este grupo: ${e.length?`${num(m3)} frente a ${num(m0)} reps en ${e.length} mini-series`:'sin mini-series propias aún, hereda el sesgo común'}`}}
@@ -1051,10 +1102,14 @@ const MODELO_REC='rec-2p';   // procedimiento vigente; cada mini-serie guarda en
 const kDe=g=>{const r=recEval()[g];return r?r.kUsa:1};
 const modDe=g=>{const r=recEval()[g];return r?r.modelo:'fijo'};
 // registro de cambios: se compara la selección actual con la guardada (al arrancar y al cerrar cada sesión)
-function recRegistra(){const R=recEval(),t=new Date().toISOString();let cambio=false;
+function recRegistra(){const R=recEval(),t=new Date().toISOString(),c=R._.cal,firma=`v${c.v} p${c.p} x${c.cambio+c.mixta}`;let cambio=false;
+  // (v31) la primera evaluación con la calidad de la carga queda anotada aunque k cambie poco: los datos se reclasificaron
+  const reval=!modState.cal&&Object.keys(modState.sel).length>0;
   for(const g of Object.keys(CAT)){const a={m:R[g].modelo,k:R[g].kUsa},d=modState.sel[g]||{m:'fijo',k:1};
-    if(a.m!==d.m||Math.abs(a.k-d.k)>.02){modState.log.push({t,g,de:`${d.m} k=${num2(d.k)}`,a:`${a.m} k=${num2(a.k)}`,por:R[g].por});cambio=true}
+    if(a.m!==d.m||Math.abs(a.k-d.k)>.02||(reval&&Math.abs(a.k-d.k)>.001)){modState.log.push({t,g,de:`${d.m} k=${num2(d.k)}`,a:`${a.m} k=${num2(a.k)}`,
+      por:(reval?`v31: confianza reevaluada por la calidad de la carga (${c.v} mini-series verificadas, ${c.p} presuntas sin peso que cuentan la mitad, ${c.cambio+c.mixta} fuera por cambio de carga). `:'')+R[g].por});cambio=true}
     modState.sel[g]=a}
+  if(modState.cal!==firma){modState.cal=firma;cambio=true}
   if(cambio){modState.log=modState.log.slice(-200);guardarObj(MODKEY,modState)}else if(!leerJSON(MODKEY,null))guardarObj(MODKEY,modState)}
 // gráfico predicho frente a hecho (fijo en gris, aprendido en color), con la diagonal de acierto exacto
 function recGraf(ev){if(!ev.length)return '';const mx=Math.max(4,...ev.map(e=>Math.max(e.obs,e.p0,e.p3)))*1.08,W=220,P=26,x=v=>P+v/mx*(W-P-6),y=v=>W-P-v/mx*(W-P-6);
@@ -1076,7 +1131,7 @@ function renderCalib(){const R=recEval(),G=R._,pc=k=>Math.round(Math.abs(1/k-1)*
     const kU=x.kUsa,efecto=!x.usa?'Se usa el modelo fijo.':Math.abs(kU-1)<.005?'Te recuperas como predice el modelo fijo.':kU<1?`Efecto: descansos ${Math.round(Math.abs(1/kU-1)*100)} % más largos y objetivo de mini-serie más bajo.`:`Efecto: descansos ${Math.round(Math.abs(1/kU-1)*100)} % más cortos y objetivo más alto.`;
     det=`<div class="recdet"><p><b>${CAT[recSel].n}: ¿por qué?</b> ${esc(x.por)}. ${efecto}</p>
       <p class="hint">Qué mide y qué no: el modelo fijo sobrestima o infraestima tus reps tras el descanso; el factor lo corrige. No distingue si la causa es recuperación más lenta, fatiga acumulada en la sesión o cómo estimas la reserva: solo que, con tus datos, así se predice mejor.</p>
-      <p class="hint">Datos: ${x.n} mini-series con predicción guardada, ${x.nUt} utilizables (las de reserva «3+»/«4+» son cotas y no cuentan), ${x.nEval} evaluadas en orden temporal.
+      <p class="hint">Datos: ${x.n} mini-series con predicción guardada (${x.nV} con la carga verificada y ${x.nP} presuntas, sin peso anotado: cuentan la mitad), ${x.nUt} utilizables (las de reserva «3+»/«4+» son cotas y no cuentan), ${x.nEval} evaluadas en orden temporal.
       Error medio en reps hasta el fallo: fijo ${x.mae0==null?'—':num(x.mae0)} · aprendido ${x.mae3==null?'—':num(x.mae3)} · anterior, reps/objetivo ${x.mae1==null?'—':num(x.mae1)}.
       Sesgo (hecho − predicho): fijo ${x.sesgo0==null?'—':num(x.sesgo0)} · aprendido ${x.sesgo3==null?'—':num(x.sesgo3)} reps. Acertó mejor el aprendido en ${x.s3.w} y el fijo en ${x.s3.l}.
       Factor estimado: ${num2(k.k)}${k.lo!=null?` (intervalo aproximado al 95 %: ${num2(k.lo)}–${num2(k.hi)})`:''}${x.usa?'':' — no se aplica'}.</p>
@@ -1084,6 +1139,7 @@ function renderCalib(){const R=recEval(),G=R._,pc=k=>Math.round(Math.abs(1/k-1)*
       ${modState.log.filter(c=>c.g===recSel).slice(-5).reverse().map(c=>`<p class="hint">${new Date(c.t).toLocaleDateString('es-DO',{day:'numeric',month:'short'})}: ${esc(c.de)} → ${esc(c.a)}. ${esc(c.por)}.</p>`).join('')}</div>`}
   $('cCalib').innerHTML=`<p class="muted" style="font-size:13px;margin:0 0 6px">El reloj predice cuántas reps hasta el fallo te quedan en cada mini-serie (reps + reserva) y comprueba después lo que hiciste. Solo usa lo aprendido si, en orden temporal, predice mejor que el modelo fijo con evidencia suficiente; si no, sigue con el fijo y lo dice. Toca un grupo para ver por qué.</p>
     <p class="hint"><b>Evidencia global:</b> ${esc(G.por)}.</p>
+    <p class="hint"><b>Calidad de la carga:</b> ${G.cal.v} mini-series con la misma carga verificada que su serie principal · ${G.cal.p} presuntas (ni la principal ni la mini-serie tienen peso anotado: se asume la misma carga porque el reloj no registró ningún cambio, y cuentan la mitad al decidir cuánto fiarse) · fuera del aprendizaje: ${G.cal.cambio} con otra carga y ${G.cal.mixta} con una carga anotada y la otra no. Un cambio de carga no se confunde con fatiga ni con recuperación.</p>
     <div class="tbl"><table><thead><tr><th>Grupo</th><th>Modelo</th><th>Factor</th><th>Datos</th><th>Error (reps)<br>fijo → aprendido</th></tr></thead><tbody>${O.map(fila).join('')}</tbody></table></div>${det}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><button id="calibRes" type="button" class="btn2${calibBorrar?' peligro':''}">${calibBorrar?'¿Seguro? Toca otra vez':'Reiniciar calibración'}</button>
     <span class="hint">${calibC.desde?'Cuenta desde el '+new Date(calibC.desde).toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'}):'Cuenta todas tus sesiones'} · procedimiento ${MODELO_REC}</span></div>`;
@@ -1391,9 +1447,11 @@ function renderHist(){histSucio=false;renderAlmacen();if(typeof renderFiltrosHis
 const RIRS=['0','1','2','3','4+'];
 function editorSesion(h){const d=histDraft;
   const filas=d.map((r,i)=>{const seg=r.rir==='—',v=parseInt(r.reps,10)||0;
-    const ro=seg?`<select disabled aria-label="Reserva"><option>—</option></select>`:`<select data-f="rir" aria-label="Reserva">${[...new Set([...RIRS,r.rir])].map(x=>`<option${x===r.rir?' selected':''}>${esc(x)}</option>`).join('')}</select>`;
-    return `<div class="hr" data-i="${i}"><div class="t"><span>${i+1}. ${esc(r.ex)} <span class="muted">${esc(r.k)}</span> · ef. ${ef1(efectiva(r))}</span><button type="button" class="x" data-hed="quitar" aria-label="Borrar la serie ${i+1}">✕</button></div>
-      <label>${seg&&r.k!=='cal.'?'Segundos':'Reps'}<input class="in" data-f="reps" inputmode="numeric" value="${v}"></label>
+    const ro=seg?`<select disabled aria-label="Reserva"><option>—</option></select>`:`<select data-f="rir" aria-label="Reserva">${[...new Set([...(r.rir==='?'?['?']:[]),...RIRS,r.rir])].map(x=>`<option value="${esc(x)}"${x===r.rir?' selected':''}>${x==='?'?'elige':esc(x)}</option>`).join('')}</select>`;
+    // v31: una aproximación que terminó cerca del fallo se puede reclasificar (y viceversa); hay que elegir su reserva, no se inventa
+    const tipo=r.k==='cal.'||r.k==='apr.'?`<label>Tipo<select data-f="tipo"><option value="cal."${r.k==='cal.'?' selected':''}>calentamiento (no cuenta)</option><option value="apr."${r.k==='apr.'?' selected':''}>aproximación intensa (cuenta)</option></select></label>`:'';
+    return `<div class="hr" data-i="${i}"><div class="t"><span>${i+1}. ${esc(r.ex)} <span class="muted">${esc(r.k)}${r.kgSrc==='cal'?' · carga de «Mis cargas»':r.kgSrc==='mod'?' · carga cambiada en la sesión':''}</span> · ef. ${ef1(efectiva(r))}</span><button type="button" class="x" data-hed="quitar" aria-label="Borrar la serie ${i+1}">✕</button></div>
+      ${tipo}<label>${seg&&r.k!=='cal.'?'Segundos':'Reps'}<input class="in" data-f="reps" inputmode="numeric" value="${v}"></label>
       <label>${esLb()?'Lb':'Kg'}<input class="in" data-f="kg" inputmode="decimal" value="${r.kg!=null?esc(String(aU(r.kg)).replace('.',',')):''}" placeholder="—"></label>
       <label>Reserva${ro}</label>
       <label>Molestia<select data-f="mol"><option value="">no</option>${['sin zona',...ZONAS].map(z=>`<option${r.mol===z?' selected':''}>${z}</option>`).join('')}</select></label></div>`}).join('');
@@ -1406,7 +1464,10 @@ function leerDraft(card){card.querySelectorAll('.hr').forEach(el=>{const r=histD
   const v=parseInt(el.querySelector('[data-f="reps"]').value,10);if(v>=0&&v<=999)r.reps=r.rir==='—'&&r.k!=='cal.'?v+' s':String(v);
   const k=el.querySelector('[data-f="kg"]').value.trim().replace(',','.');   // en la unidad de la pantalla; si no lo tocaste, el valor guardado no cambia
   if(k==='')r.kg=r.kg==null?null:r.kg;else if(+k>=0&&+k<=(esLb()?1100:500)&&(r.kg==null||Math.abs(aU(r.kg)-(+k))>1e-9))r.kg=deU(+k);
-  const ri=el.querySelector('[data-f="rir"]');if(ri)r.rir=ri.value;const m=el.querySelector('[data-f="mol"]').value;if(m){if(r.mol!==m)delete r.molP;r.mol=m}else{delete r.mol;delete r.molP}})}
+  const ri=el.querySelector('[data-f="rir"]');if(ri)r.rir=ri.value;const m=el.querySelector('[data-f="mol"]').value;if(m){if(r.mol!==m)delete r.molP;r.mol=m}else{delete r.mol;delete r.molP}
+  const ti=el.querySelector('[data-f="tipo"]');if(ti&&ti.value!==r.k){if(ti.value==='apr.'){r.k='apr.';r.rir='?'}else if(ti.value==='cal.'){r.k='cal.';r.rir='—'}}})}
+// v31: al cambiar el tipo de una aproximación, el editor se redibuja para pedir (o quitar) su reserva
+$('hist').addEventListener('change',e=>{const s=e.target.closest('[data-f="tipo"]');if(!s)return;const card=s.closest('[data-hid]');if(!card||!histDraft)return;leerDraft(card);renderHist()});
 function guardarHist(){escribirHist();
   if(pila.some(p=>!hist.some(h=>h.id===p.S.id))||!hist.some(h=>h.id===S.id))pila=[];   // no se puede deshacer hacia una sesión borrada
   revisarMedallas();renderHist();if(tab==='progreso')renderProg()}
@@ -1418,6 +1479,7 @@ $('hist').addEventListener('click',e=>{const b=e.target.closest('[data-hed]');if
   if(a==='borrar'){if(!histBorrar){histBorrar=true;leerDraft(card);renderHist();return}
     hist=hist.filter(x=>x.id!==id);histEd=null;histDraft=null;histBorrar=false;if(S.id===id&&!enCurso()){S=fresh();$('save').textContent='Sin guardar aún'}guardarHist();$('ioMsg').textContent='Sesión borrada.';return}
   if(a==='guardar'){leerDraft(card);const sets=histDraft;if(id===S.id||pila.some(p=>p.S.id===id))pila=[];
+    const sinRir=sets.filter(r=>r.k==='apr.'&&r.rir==='?');sinRir.forEach(r=>{r.k='cal.';r.rir='—'});   // v31: sin reserva elegida sigue siendo calentamiento
     if(!sinCal(sets).length){hist=hist.filter(x=>x.id!==id);if(S.id===id&&!enCurso())S=fresh();$('ioMsg').textContent='Sesión borrada: no le quedaban series.'}
     else{Object.assign(h,{sets,series:sinCal(sets).length,reps:repsDe(sets),efectivas:Math.round(efDe(sets)*100)/100});
       if(h.desc)h.serC=serDe(sets);else if(h.fza)h.serC=sets.filter(r=>r.k==='act.').length;   // series completas o pesadas, como al guardar
@@ -1432,16 +1494,18 @@ function histExtra(h){const mols=[...new Map((h.sets||[]).filter(r=>r.mol).map(r
     h.super?`<b>Superserie</b> ${h.super.split('+').map(g=>esc(CAT[g].n)).join(' + ')}${h.lado?` · lado ${esc(h.lado)}`:''}`:'',h.fza?'<b>Día de fuerza</b>':'',h.cuida?`Cuidando ${esc(h.cuidaL?lesQueN(h.cuidaL):lesTxt(h.cuida,h.cuidaP)+(h.cuidaN?` · ${LES_NN[h.cuidaN]}`:''))}`:''].filter(Boolean);
   return x.length?`<div class="hist-x">${x.join('<br>')}</div>`:''}
 let lastG=null,lastEn=null,lastPlan='',lastRows='';
-function subInicio(E){const s=sugerir(grupo,E);
+function subInicio(E){const R=typeof cgRef==='function'?cgRef(grupo,E.n,'h'):null;
+  if(R&&cgTieneCarga(R))return `${E.n} · hipertrofia · carga sugerida: ${cgTxt(R)}${R.ok?'':' (por confirmar en Mis cargas)'}`;   // v31
+  const s=sugerir(grupo,E);
   return s?`${E.n} · última vez ${kgTxt(s.prev.kg)} × ${s.prev.reps} (reserva ${s.prev.rir}) → ${s.txt}`:`${E.n} · peso con el que ${E.r} reps te dejen a 1 del fallo`}
 function render(){
   lesRefresca();if(typeof renderPlanHoy==='function')renderPlanHoy();   // Fase 5: plan de hoy (solo en reposo; memorizado)
   const G=CAT[grupo],E=est(),e=Math.max(0,now()-S.t0),pad=$('pad');
   // Fase 3: 5 destinos en la barra (Reloj, Hoy, Progreso, Historial, Más); Ajustes, Aprendizaje y Auditoría cuelgan de «Más»
   [['vReloj','tReloj','reloj'],['vHoy','tHoy','hoy'],['vProg','tProg','progreso'],['vHist','tHist','historial'],['vMas','tMas','mas'],
-   ['vEstilo','tMas','estilo'],['vApr','tMas','aprendizaje'],['vAud','tMas','auditoria']].forEach(([v,t,k])=>{const el=$(v);if(!el)return;
+   ['vEstilo','tMas','estilo'],['vApr','tMas','aprendizaje'],['vAud','tMas','auditoria'],['vCargas','tMas','cargas']].forEach(([v,t,k])=>{const el=$(v);if(!el)return;
     el.hidden=tab!==k;el.style.display=tab===k?'flex':'none'});
-  const enMas=['mas','estilo','aprendizaje','auditoria'].includes(tab);
+  const enMas=['mas','estilo','aprendizaje','auditoria','cargas'].includes(tab);
   [['tReloj','reloj'],['tHoy','hoy'],['tProg','progreso'],['tHist','historial'],['tMas','mas']].forEach(([t,k])=>{const b=$(t);if(b)b.setAttribute('aria-current',tab===k||(k==='mas'&&enMas)?'page':'false')});
   $('gnom').textContent=SS?`${ladoNom(SS.t)} ⇄ ${ladoNom(1-SS.t)}`:S.st==='idle'&&ssSel.on?ssNom():G.n+(enRutina()?` ${rutPos+1}/${rutLista().length}`:'');
   const FP=S.st==='idle'&&!ssSel.on&&fzaActiva()?planFuerza(grupo):null,PE=S.fza?S.fza.e:FP?FP.e:G.e,NE=PE.length;   // v18: en fuerza, sus estaciones
@@ -1464,14 +1528,16 @@ function render(){
     if(sinGrupo()){kind='Elige al menos un grupo';sub='Rutina «La mía»: toca arriba los grupos en el orden en que los quieres hacer.';disc='';pav=''}
     else if(pausaInicio()){kind='En pausa';big='—';sub=`Cuidando ${lesQue()} con dolor extremo: ${ssSel.on?'un grupo de la superserie':CAT[grupo].n.toLowerCase()} no tiene ejercicios que no la carguen. Elige otro grupo.`;disc='';pav=''}
     else if(descargaActiva()&&!pideBien)kind+=' · semana de descarga'}
+  // v31: con carga de «Mis cargas», «carga sugerida: 40 lb por mancuerna» (en la unidad y la especificación que configuraste)
+  const cgT=()=>typeof cgCargaS==='function'&&S.cgK?' · carga sugerida '+cgCargaS():S.kg!=null?` · ${kgTxt(S.kg)}`:'';
   if(S.st==='work'){cls='work';
     if(S.phase==='act'&&(S.desc||E.lesM)){const m=Math.max(1,S.metaE[S.sec]||0);kind=`${E.s} · ${S.desc?'descarga':'cuidado'} · serie ${Math.min(S.nIn+1,m+2)}${S.nIn<m?' de '+m:''} · ${fmt(e)}`;big=E.r;
-      sub=`${E.n} · serie recta: deja 2–3 en reserva, sin llegar al fallo`+(S.kg!=null?` · ${kgTxt(S.kg)}`:'')+(S.sug&&S.nIn===0?` (última vez ${kgTxt(S.sug.prev.kg)} × ${S.sug.prev.reps})`:'')+tempoSub();
+      sub=`${E.n} · serie recta: deja 2–3 en reserva, sin llegar al fallo`+cgT()+(S.sug&&S.nIn===0&&!S.cgK?` (última vez ${kgTxt(S.sug.prev.kg)} × ${S.sug.prev.reps})`:'')+tempoSub();
       disc=discTxt(S.kg,E);if(S.nIn===0)pav=S.molAv}
     else if(S.phase==='act'){kind=`${E.s} · activación · ${fmt(e)}`;big=E.r;sub=`${E.n} · ${E.tempo} · deja 1 en reserva`
-      +(S.kg!=null?` · ${kgTxt(S.kg)}`:'')+(S.sug&&S.ronda===1?` (última vez ${kgTxt(S.sug.prev.kg)} × ${S.sug.prev.reps})`:'')+tempoSub();
+      +cgT()+(S.sug&&S.ronda===1&&!S.cgK?` (última vez ${kgTxt(S.sug.prev.kg)} × ${S.sug.prev.reps})`:'')+tempoSub();
       disc=discTxt(S.kg,E);if(S.ronda===1)pav=S.molAv}
-    else if(S.phase==='myo'){kind=`Mini-serie ${S.nIn} · ${E.s} · ${fmt(e)}`;big=S.target;sub=`${E.tempo} · toca al terminar`+tempoSub()}
+    else if(S.phase==='myo'){kind=`Mini-serie ${S.nIn} · ${E.s} · ${fmt(e)}`;big=S.target;sub=`${E.tempo} · toca al terminar`+(S.cgK&&typeof cgCargaS==='function'?' · '+cgCargaS():'')+tempoSub()}
     else if(S.phase==='ext'){kind=`${E.extN} · ${fmt(e)}`;big=S.target;sub=`${E.extH} · llega a 0–1 en reserva`+tempoSub()}
     else if(S.phase==='hold'){kind=E.extN;big=Math.floor(e);sub=`${E.extH} · toca al soltar`}
     else{kind=`Vacío ${S.levyN+1}/3 · objetivo ${S.levyT} s`;big=Math.floor(e);sub=e>=S.levyT?'Objetivo cumplido · suelta cuando quieras y toca':'Exhala todo, ombligo a la columna · toca al soltar'}}
@@ -1501,9 +1567,11 @@ function render(){
   document.querySelectorAll('.rir button').forEach(b=>b.setAttribute('aria-pressed',S.st==='report'&&rirPrev!=null&&+b.dataset.r===Math.min(4,rirPrev)));
   renderBloque();renderCopiaAv();
   $('report').hidden=S.st!=='report';$('done').textContent=S.hechas;
-  $('kgFila').hidden=S.phase==='ext'&&E&&E.ext==='flat';
+  // v31: con carga de «Mis cargas» no se vuelve a preguntar el peso: se asume el sugerido y se cambia con «Cambiar peso» (cargas.js)
+  $('kgFila').hidden=(S.phase==='ext'&&E&&E.ext==='flat')||(!!S.cgK&&typeof cgRenderPeso==='function');
   if(document.activeElement!==$('kgv'))$('kgv').value=S.kg==null?'':num(aU(S.kg));
   $('kgU').textContent=S.kg==null?`${uTxt()} · sin anotar`:S.kg>0?uTxt():'peso corporal';$('thKg').textContent=esLb()?'Lb':'Kg';
+  if(typeof cgRenderPeso==='function')cgRenderPeso();   // v31: carga de hoy y «Cambiar peso»
   if(S.st==='report'){const dt=discTxt(S.kg,E),barra=!$('kgFila').hidden&&!E.levy;$('discos').hidden=!barra;
     $('discosT').textContent=dt||(esBarra(E)?'Anota el peso total con la barra':'');$('barraT').textContent=esBarra(E)?'Con barra ✓':'¿Es con barra?';
     $('molB').innerHTML=`<button type="button" data-z="" aria-pressed="${S.molR!=null}">Molestia${S.molR!=null?':':''}</button>`
@@ -1517,7 +1585,7 @@ function render(){
   $('fC').style.width=(S.C*100)+'%';$('vC').textContent=S.C.toFixed(2);
   $('tuc').textContent=fmt(S.tuc);$('tot').textContent=repsDe(S.sets);$('iso').textContent=Math.round(S.iso)+' s';
   $('efv').textContent=S.st==='idle'?`meta ${metaHoy(grupo)}${descargaActiva()?' series completas':''}`:S.fza?`${fzaHechas()} / ${S.meta} series · ${ef1(S.ef)} ef.`:S.les&&!S.desc?`${ef1(progLes(S.sets))} / ${S.meta}`:S.desc?`${ef1(S.ef)} · ${serDe(S.sets)} / ${S.meta} series completas`:`${ef1(S.ef)} / ${S.meta}`;
-  const rows=S.sets.slice().reverse().map(r=>`<tr><td>${r.pr?'★ ':''}${r.mol?'⚠ ':''}${esc(r.ex)} <span class="muted">${esc(r.k)}</span></td><td>${esc(r.reps)}</td><td>${r.kg!=null?(r.kg>0?num(aU(r.kg)):'c'):'—'}</td><td>${esc(r.rir)}</td><td>${(+r.P||0).toFixed(2)}</td><td>${r.rest?esc(r.rest)+' s':'—'}</td><td>${ef1(efectiva(r))}</td></tr>`).join('');
+  const rows=S.sets.slice().reverse().map(r=>`<tr><td>${r.pr?'★ ':''}${r.mol?'⚠ ':''}${esc(r.ex)} <span class="muted">${esc(r.k)}</span></td><td>${esc(r.reps)}</td><td>${r.niv!=null?'n'+num(r.niv):r.kg!=null?(r.kg>0?num(aU(r.kg)):'c'):'—'}${r.kgSrc==='mod'?'*':''}</td><td>${esc(r.rir)}</td><td>${(+r.P||0).toFixed(2)}</td><td>${r.rest?esc(r.rest)+' s':'—'}</td><td>${ef1(efectiva(r))}</td></tr>`).join('');
   const rh=rows||'<tr><td colspan="7" class="muted" style="text-align:left">Las series aparecen aquí al reportarlas.</td></tr>';
   if(rh!==lastRows){lastRows=rh;$('rows').innerHTML=rh}   // la tabla solo se reescribe cuando cambia
   renderRetomar();guardarEnCurso();
@@ -2118,8 +2186,10 @@ $('expJson').onclick=()=>{
 $('expCsv').onclick=()=>{
   if(!hist.length){$('ioMsg').textContent='No hay sesiones que exportar.';return}
   const q=v=>{let t=String(v);if(/^[=+\-@\t\r]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};   // sin fórmulas de Excel
-  const filas=[['fecha','grupo','sesion','serie_n','estacion','ejercicio','tipo','reps_o_segundos','kg','rir','congestion_P','descanso_s','efectiva','molestia','sueno_h','energia','nota_sesion'].join(',')];
-  hist.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>filas.push([q(new Date(h.start).toLocaleString('es-DO')),q(h.grupo),q(h.id),i+1,q(r.ex),q(r.ej||''),q(r.k),q(r.reps),r.kg!=null?r.kg:'',q(r.rir),(+r.P).toFixed(3),r.rest||0,efectiva(r).toFixed(2),q(r.mol||''),h.bien?h.bien.sueno:'',h.bien?h.bien.energia:'',q(h.nota||'')].join(','))));
+  // v31: + procedencia de la carga, carga planificada, especificación, unidad declarada, nivel de máquina y carga cambiada en la mini-serie
+  const filas=[['fecha','grupo','sesion','serie_n','estacion','ejercicio','tipo','reps_o_segundos','kg','rir','congestion_P','descanso_s','efectiva','molestia','sueno_h','energia','nota_sesion','carga_origen','kg_planificado','carga_tipo','unidad_declarada','nivel','carga_distinta_principal'].join(',')];
+  hist.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>filas.push([q(new Date(h.start).toLocaleString('es-DO')),q(h.grupo),q(h.id),i+1,q(r.ex),q(r.ej||''),q(r.k),q(r.reps),r.kg!=null?r.kg:'',q(r.rir),(+r.P).toFixed(3),r.rest||0,efectiva(r).toFixed(2),q(r.mol||''),h.bien?h.bien.sueno:'',h.bien?h.bien.energia:'',q(h.nota||''),
+    q(r.kgSrc||''),r.kgPlan!=null?r.kgPlan:'',q(r.tc||''),q(r.u||''),r.niv!=null?r.niv:'',r.kgCambio?'si':''].join(','))));
   entregar(`series-${hoy()}.csv`,'﻿'+filas.join('\n'),'text/csv');
 };
 $('impJson').onclick=()=>$('impFile').click();
@@ -2154,7 +2224,8 @@ async function copiaJSON(){let fs=null;try{fs=await fotoTx('readonly',st=>st.get
   const fotos=[];for(const x of fs||[]){let b=x.blob;if(b&&b.type!=='image/jpeg')try{b=(await comprimir(b)).blob}catch(e){}
     if(b)fotos.push({f:x.f,t:x.t,w:x.w,h:x.h,data:await blobAData(b)})}
   return {app:'reloj-anomalo',tipo:'copia-completa',v:2,exportado:new Date().toISOString(),sesiones:hist,metas,ajustes:CFG,ejercicios:misEj,
-    rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,modelo:modState,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,fotos,...(fs?{}:{sinFotos:true})}}
+    rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,modelo:modState,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,
+    ...(typeof cgCopia==='function'?{cargas:cgCopia()}:{}),fotos,...(fs?{}:{sinFotos:true})}}   // v31: «Mis cargas» (todas las semanas)
 async function hacerCopia(msg=$('copiaMsg')){msg.textContent='Preparando la copia…';
   try{const d=await copiaJSON(),nombre=`reloj-anomalo-copia-${hoy()}.json`;
     const ok=await entregarBlob(nombre,new Blob([JSON.stringify(d)],{type:'application/json'}),msg);
@@ -2179,6 +2250,8 @@ async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw 
   sol(MKEY,d.metas,'metas',normMetas);sol(AKEY,d.ajustes,'ajustes',normCfg);sol(EJKEY,d.ejercicios,'ejercicios',normMisEj);sol(RKEY,d.rutina,'rutina',normRut);
   sol(DKEY,d.descarga,'descarga',normDescarga);sol(CKEY,d.calibracion,'calibración',normCalib);sol(MODKEY,d.modelo,'modelo de recuperación',normModelo);sol(BQKEY,d.bloque,'bloque',normBloque);
   sol(FZKEY,d.fuerza,'fuerza',normFuerza);sol(LESKEY,d.lesion,'zona cuidada',normLesion);sol(SSKEY,d.superserie,'superserie',normSsSel);   // v18
+  // v31: «Mis cargas» se FUSIONA: semanas y ejercicios que este teléfono no tiene; lo que ya tiene no se toca
+  if(d.cargas!=null&&typeof cgFusiona==='function'){const c=cgFusiona(d.cargas);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} cargas de referencia`);if(c.sinEspacio)r.sinEspacio=true}
   if(d.estilo!=null&&!(typeof d.estilo==='string'&&tiene(ESTILOS,d.estilo)))r.mal++;
   else if(d.estilo!=null&&localStorage.getItem(EKEY)==null){try{localStorage.setItem(EKEY,d.estilo)}catch(e){}aplicarEstilo(d.estilo);r.puestos.push('estilo')}
   recargar();
@@ -2198,6 +2271,7 @@ function recargar(){metas={...META_DEF,...normMetas(leerJSON(MKEY,{}))};
   misEj=normMisEj(leerJSON(EJKEY,{}));aplicarEjercicios();
   {const x=normRut(leerJSON(RKEY,{}));rutI=x.i;miaLista=x.mia}
   descarga=leerObj(DKEY,normDescarga);calibC=leerObj(CKEY,normCalib);modState=normModelo(leerJSON(MODKEY,{}));recMemo={k:'',v:null};bloque=leerObj(BQKEY,normBloque);
+  if(typeof cgRecargar==='function')cgRecargar();   // v31
   if(S.st==='idle'){rutPos=0;rutEf=0;if(enRutina())grupo=rutLista()[0];S=fresh()}lastPlan='';renderGrupos();renderCfg();pintarHist();revisarMedallas();render()}
 $('restBtn').onclick=()=>{if(enCurso()){$('copiaMsg').textContent='Termina la sesión en curso antes de restaurar.';return}$('restFile').click()};
 $('restFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const msg=$('copiaMsg');
@@ -2227,6 +2301,8 @@ function normS(x){if(!esObj(x))return null;const f=fresh(),o={};
     else if(typeof d==='boolean')o[k]=v===true;
     else if(typeof d==='string'){const t=vTxt(v,300);if(t!=null)o[k]=t}}
   o.id=vTxt(x.id,80);o.start=vFecha(x.start);o.kg=x.kg==null?null:vNum(x.kg,0,1000);
+  for(const k of ['kgPlan','kgA'])o[k]=x[k]==null?null:vNum(x[k],0,1000);o.niv=x.niv==null?null:vNum(x.niv,0,100);o.cgA=x.cgA==null?null:vTxt(x.cgA,40);   // v31
+  o.cgOne=esObj(x.cgOne)?{kg:x.cgOne.kg==null?null:vNum(x.cgOne.kg,0,1000),niv:x.cgOne.niv==null?null:vNum(x.cgOne.niv,0,100)}:null;
   if(!o.id||!o.start||!Array.isArray(x.sets)||!FASES.includes(o.phase??'act'))return null;
   o.sets=vLista(x.sets,SETS_MAX,normSet);o.metaE=vLista(x.metaE,EST_MAX,v=>vNum(v,0,100)??0);
   const cal=vLista(x.cal,5,c=>esObj(c)&&vNum(c.kg,0,1000)!=null&&vNum(c.reps,0,100)!=null?{kg:+c.kg,reps:+c.reps,f:vNum(c.f,0,1)??.5}:null);o.cal=cal.length?cal:null;

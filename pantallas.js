@@ -1,16 +1,16 @@
 // Fase 3 (v30) · pantallas: Hoy (mi entrenamiento), Progreso → Volumen detallado y Por ejercicio, Historial con filtros y calendario,
 // y la navegación de «Más». Se carga al final: usa reloj.js, analisis.js y auditoria.js. Todo se calcula desde los registros.
 'use strict';
-const PS_TIPOS=[['act.','serie principal'],['myo','mini-serie'],['parc.','parcial'],['final','variante final'],['isom.','isometría'],['cal.','calentamiento']];
+const PS_TIPOS=[['act.','serie principal'],['myo','mini-serie'],['parc.','parcial'],['final','variante final'],['isom.','isometría'],['cal.','calentamiento'],['apr.','aproximación intensa']];
 const psTipo=k=>(PS_TIPOS.find(t=>t[0]===k)||[k,k])[1];
 const psHace=t=>{if(!t)return 'nunca';const h=(Date.now()-t)/36e5;return h<48?`hace ${Math.round(h)} h`:`hace ${Math.round(h/24)} días`};
 const psF=t=>new Date(t).toLocaleDateString('es-DO',{day:'numeric',month:'short'});
 
 /* ---------- navegación ---------- */
 let progSub='res';
-function irA(t){tab=t;if(t==='hoy')renderHoy();if(t==='aprendizaje')renderCalib();if(t==='auditoria')renderAuditoria();if(t==='estilo')renderEstilos();render();window.scrollTo(0,0)}
+function irA(t){tab=t;if(t==='hoy')renderHoy();if(t==='cargas'&&typeof renderCargas==='function')renderCargas();if(t==='aprendizaje')renderCalib();if(t==='auditoria')renderAuditoria();if(t==='estilo')renderEstilos();render();window.scrollTo(0,0)}
 {const tp=$('tProg').onclick;$('tProg').onclick=()=>{tp();renderProgSub()}}   // Progreso abre en su subpestaña actual
-$('tHoy').onclick=()=>irA('hoy');$('tMas').onclick=()=>irA('mas');$('tApr').onclick=()=>irA('aprendizaje');$('tAud').onclick=()=>irA('auditoria');
+$('tHoy').onclick=()=>irA('hoy');$('tMas').onclick=()=>irA('mas');if($('tCargas'))$('tCargas').onclick=()=>irA('cargas');$('tApr').onclick=()=>irA('aprendizaje');$('tAud').onclick=()=>irA('auditoria');
 function renderProgSub(){document.querySelectorAll('[data-psub]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.psub===progSub));
   [['res','pgRes'],['anal','pgAnal'],['vol','pgVol'],['ej','pgEj']].forEach(([k,id])=>{const el=$(id);if(el)el.hidden=k!==progSub});
   if(progSub==='anal')renderAnalisis();else if(progSub==='vol')renderVolDet();else if(progSub==='ej')renderEjDet()}
@@ -36,7 +36,7 @@ function renderHoy(){const P=anPlan(),D=864e5;
       +gs.map(p=>{const E=CAT[p.g].e.filter(x=>!x.levy&&!x.lesFuera),abierto=hoyVer[p.g];
         return `<div class="hoyg ${p.acc}"><div class="top"><b>${esc(CAT[p.g].n)}</b><span class="hoyacc">${AN_ACC[p.acc]}</span></div>
           <p class="hint" style="margin:2px 0">Volumen recomendado: <b>${p.meta} series efectivas</b> en ${E.length} ${E.length===1?'ejercicio':'ejercicios'}</p>
-          <ul class="hoyej">${E.map(x=>{const al=psAlternativas(p.g,x);return `<li>${esc(x.n)}${x.lesDe?` <span class="muted">(en lugar de ${esc(x.lesDe)})</span>`:''}${al.length?`<br><span class="muted">alternativas: ${al.map(esc).join(' · ')}</span>`:''}</li>`}).join('')}</ul>
+          <ul class="hoyej">${E.map(x=>{const al=psAlternativas(p.g,x),cgt=typeof cgTxtEj==='function'?cgTxtEj(p.g,x.n):'';return `<li>${esc(x.n)}${cgt?` <span class="muted">· ${esc(cgt)}</span>`:''}${x.lesDe?` <span class="muted">(en lugar de ${esc(x.lesDe)})</span>`:''}${al.length?`<br><span class="muted">alternativas: ${al.map(esc).join(' · ')}</span>`:''}</li>`}).join('')}</ul>
           <div class="acc"><button type="button" data-entrenar="${P.rut!=null&&gs.length>1?'r:'+P.rut:'g:'+p.g}">${P.rut!=null&&gs.length>1?'Entrenar la rutina':'Entrenar '+esc(CAT[p.g].n.toLowerCase())}</button><button type="button" data-hoypor="${p.g}">${abierto?'Ocultar':'¿Por qué?'}</button></div>
           ${abierto?`<ul class="anmot">${p.mot.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}</div>`}).join('')}
   $('hoyPlan').innerHTML=h;
@@ -89,15 +89,15 @@ function renderEjDet(){const el=$('pEjDet');if(!el)return;const L=psEjercicios()
   if(!L.includes(ejSel))ejSel=L[0];
   const ses=hist.slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)).map(h=>{const g=gDe(h);if(!g||!CAT[g])return null;const S2=h.sets||[],ix=S2.findIndex(r=>nomFila(r,g)===ejSel&&r.k==='act.');if(ix<0)return null;
     const filas=S2.filter(r=>nomFila(r,g)===ejSel&&r.k!=='cal.'),r=S2[ix],prev=ix>0?S2[ix-1]:null,trab=filas.reduce((s,x)=>s+(x.kg>0?x.kg*(parseInt(x.reps,10)||0):0),0);
-    return {t:Date.parse(h.start),r,n:filas.length,trab,desc:prev&&prev.rest?prev.rest:null,pr:filas.some(x=>x.pr),e1:r.kg>0?e1(r):null,rtf:/\+/.test(r.rir||'')?null:(parseInt(r.reps,10)||0)+rirN(r.rir)}}).filter(Boolean);
+    return {t:Date.parse(h.start),g,r,n:filas.length,trab,desc:prev&&prev.rest?prev.rest:null,pr:filas.some(x=>x.pr),e1:r.kg>0?e1(r):null,rtf:/\+/.test(r.rir||'')?null:(parseInt(r.reps,10)||0)+rirN(r.rir)}}).filter(Boolean);
   const comp=anComparables().filter(s=>s.ej===ejSel),cl=comp.map(s=>({s,c:anClasifica(s.pts)}));
   const mejor=ses.reduce((m,x)=>x.e1!=null&&(m==null||x.e1>m)?x.e1:m,null);
   let h=`<p class="hint"><select id="ejSel" aria-label="Ejercicio">${L.map(n=>`<option${n===ejSel?' selected':''}>${esc(n)}</option>`).join('')}</select></p>
     <div class="tbl"><table class="psdet"><thead><tr><th style="text-align:left">Fecha</th><th>Carga × reps · reserva</th><th>Medida</th><th>Series · desc.</th></tr></thead><tbody>${ses.slice().reverse().map(x=>
-      `<tr><td style="text-align:left">${psF(x.t)}${x.pr?' ★':''}</td><td>${x.r.kg>0?num(aU(x.r.kg))+' '+uTxt():x.r.kg===0?'corporal':'sin carga'} × ${esc(x.r.reps)} · ${esc(x.r.rir)}</td>`
+      `<tr><td style="text-align:left">${psF(x.t)}${x.pr?' ★':''}</td><td>${x.r.niv!=null?'nivel '+num(x.r.niv):x.r.kg>0?num(aU(x.r.kg))+' '+uTxt():cargaDe(x.r,x.g)==='c'?'corporal':'sin carga'} × ${esc(x.r.reps)} · ${esc(x.r.rir)}</td>`
       +`<td>${x.e1!=null?`1RM ${num(aU(x.e1))}${x.e1===mejor?' ↑':''}`:x.rtf!=null?`${x.rtf} al fallo`:'—'}${x.trab?`<br><span class="muted">trabajo ${num(aU(x.trab))}</span>`:''}</td><td>${x.n}${x.desc?` · ${x.desc} s`:''}</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">Primera serie principal de cada sesión. Medida: 1RM estimado si hay peso; si no, reps al fallo (reps + reserva; con «3+»/«4+» no se calcula). Trabajo = reps × carga de todas sus series con peso. Series del ejercicio en la sesión · descanso antes de la primera. ★ récord · ↑ mejor 1RM estimado.</p>`;
-  h+=cl.length?cl.map(({s,c})=>`<p><b>${s.carga==='peso'?'Fuerza (1RM estimado)':s.carga==='pc'?'Resistencia con peso corporal (reps al fallo)':'Reps al fallo con carga sin anotar'}:</b> ${esc(AN_EST[c.estado])} — ${esc(c.txt)}${c.cv!=null?` · variabilidad ±${Math.round(c.cv*100)} %`:''}.</p>`+psGraf(s.pts)).join('')
+  h+=cl.length?cl.map(({s,c})=>`<p><b>${s.carga==='peso'?'Fuerza (1RM estimado)':s.carga==='pc'?'Resistencia con peso corporal (reps al fallo)':s.carga==='na'?'Carga sin anotar (no comparable)':'Reps al fallo con el nivel '+esc(s.carga.slice(2))}:</b> ${esc(AN_EST[c.estado])} — ${esc(c.txt)}${c.cv!=null?` · variabilidad ±${Math.round(c.cv*100)} %`:''}.</p>`+psGraf(s.pts)).join('')
     :'<p class="hint">Sin medidas comparables todavía.</p>';
   el.innerHTML=h;const s=$('ejSel');if(s)s.onchange=()=>{ejSel=s.value;renderEjDet()}}
 // gráfico de una serie comparable: puntos observados y línea de tendencia (Theil–Sen) en otro estilo: lo estimado no se confunde con lo medido
@@ -133,9 +133,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-hdia],[dat
   if(d.hdia)histF.dia=histF.dia===d.hdia?'':d.hdia;else if(d.hcal)hCalOff=Math.min(0,hCalOff+(+d.hcal));else if(d.hfx)histF={g:'',ej:'',k:'',dias:0,dia:''};
   else if(d.hexp){const L=histVisibles();
     if(d.hexp==='json')entregar(`sesiones-filtradas-${hoy()}.json`,JSON.stringify({app:'reloj-anomalo',v:1,exportado:new Date().toISOString(),filtros:histF,sesiones:L},null,1),'application/json');
-    else{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`,fil=[['fecha','grupo','sesion','n','ejercicio','tipo','reps','reserva','kg','efectiva','molestia']];
+    else{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`,fil=[['fecha','grupo','sesion','n','ejercicio','tipo','reps','reserva','kg','efectiva','molestia','carga_origen','carga_tipo','nivel']];
       L.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>{if(histF.k&&r.k!==histF.k)return;const g=gDe(h),ej=nomFila(r,g);if(histF.ej&&ej!==histF.ej)return;
-        fil.push([new Date(h.start).toLocaleString('es-DO'),h.grupo,h.id,i+1,ej,r.k,r.reps,r.rir,r.kg??'',num2(efectiva(r)),r.mol||''])}));
+        fil.push([new Date(h.start).toLocaleString('es-DO'),h.grupo,h.id,i+1,ej,r.k,r.reps,r.rir,r.kg??'',num2(efectiva(r)),r.mol||'',r.kgSrc||'',r.tc||'',r.niv??''])}));
       entregar(`series-filtradas-${hoy()}.csv`,'﻿'+fil.map(f=>f.map(q).join(',')).join('\n'),'text/csv')}
     return}
   renderHist()});

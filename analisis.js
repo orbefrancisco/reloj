@@ -13,7 +13,8 @@ const anFecha=t=>new Date(t).toLocaleDateString('es-DO',{day:'numeric',month:'sh
 /* ---------- rendimiento comparable ----------
    Una medida por sesión y ejercicio: la PRIMERA serie principal del ejercicio (la más fresca y comparable).
    Con peso anotado: 1RM estimado (Epley con la reserva). Sin peso: reps hasta el fallo (reps + reserva), que solo se comparan entre
-   sesiones con la misma carga (peso corporal con peso corporal; «sin anotar» con «sin anotar», suponiendo la misma carga: se avisa).
+   sesiones con la misma carga (peso corporal con peso corporal, mismo nivel de máquina). (v31) Las series SIN carga conocida (sin anotar,
+   o un 0 en un ejercicio con carga externa: ver cargaDe) siguen en la lista pero NO se comparan entre sí: no se sabe si la carga fue la misma.
    Reservas «3+»/«4+» son cotas: no entran en la tendencia. */
 let anCompMemo={k:'',v:null};
 function anComparables(){const k=hist.length+':'+(hist[0]?hist[0].id+(hist[0].sets||[]).length+(hist[0].editada||''):'');   // memoria: se usa mucho
@@ -22,11 +23,13 @@ function anComparablesCalc(){const S={};
   hist.slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)).forEach(h=>{const g=gDe(h);if(!g||!CAT[g])return;const vistos=new Set();
     (h.sets||[]).forEach(r=>{if(r.k!=='act.')return;const ej=nomFila(r,g);if(!ej||vistos.has(ej))return;vistos.add(ej);
       if(/\+/.test(r.rir||''))return;const R=parseInt(r.reps,10);if(!(R>0))return;
-      const conPeso=r.kg>0,carga=conPeso?'peso':r.kg===0?'pc':'na',v=conPeso?e1(r):R+rirN(r.rir);
+      const ck=cargaDe(r,g),conPeso=!!ck&&ck.startsWith('k:'),carga=conPeso?'peso':ck==='c'?'pc':ck?ck:'na',v=conPeso?e1(r):R+rirN(r.rir);
       const k=ej+'|'+carga;(S[k]=S[k]||{ej,g,carga,pts:[]}).pts.push({t:Date.parse(h.start),v,R,rir:rirN(r.rir),kg:r.kg,id:h.id})})});
-  return Object.values(S)}
+  const L=Object.values(S);L.forEach(s=>{if(s.carga==='na')s.pts.nc=true});return L}   // nc: no comparables entre sí
 // clasificación de una serie temporal de rendimiento comparable
-function anClasifica(pts){const n=pts.length,y=pts.map(p=>p.v);if(n<AN_MIN)return {estado:'insuficiente',n,txt:`solo ${n} ${n===1?'sesión comparable':'sesiones comparables'} (hacen falta ${AN_MIN})`};
+function anClasifica(pts){const n=pts.length,y=pts.map(p=>p.v);
+  if(pts.nc)return {estado:'insuficiente',n,txt:`carga sin anotar en ${n} ${n===1?'sesión':'sesiones'}: no se comparan entre sí porque no se sabe si usaste la misma carga`};
+  if(n<AN_MIN)return {estado:'insuficiente',n,txt:`solo ${n} ${n===1?'sesión comparable':'sesiones comparables'} (hacen falta ${AN_MIN})`};
   const med=anMed(y),sl=anTheilSen(y),rel=sl*(n-1)/med,cv=1.4826*anMad(y)/med,thr=Math.max(.04,cv);
   const ini=anMed(y.slice(0,2)),ult=y.slice(-2),bajan=ult.every(v=>v<ini),suben=ult.every(v=>v>ini);
   const base={n,rel,cv,pend:sl,thr};
@@ -141,8 +144,8 @@ function anEstHTML(){const L=anComparables().map(s=>({s,c:anClasifica(s.pts)})).
   const cnt={};L.forEach(x=>cnt[x.c.estado]=(cnt[x.c.estado]||0)+1);
   let h=`<p class="hint">Cada ejercicio se compara consigo mismo con la misma carga: primera serie principal de cada sesión (1RM estimado con peso; reps hasta el fallo sin peso). Hacen falta ${AN_MIN} sesiones comparables. Resumen: ${Object.entries(cnt).map(([k,v])=>`${AN_EST[k]} ${v}`).join(' · ')}.</p>`;
   h+=L.map(({s,c})=>{const vals=s.pts.map(p=>`${anFecha(p.t)} ${num(p.v)}`).join(' · '),fac=c.estado==='caida'?anFactores(s):[];
-    return `<details class="anest ${c.estado}"><summary><b>${esc(s.ej)}</b> <span class="muted">${s.carga==='peso'?'1RM est.':s.carga==='pc'?'peso corporal, reps al fallo':'carga sin anotar, reps al fallo'}</span> — ${esc(AN_EST[c.estado])}</summary>
-      <p class="hint">${esc(c.txt)}.${s.carga==='na'?' Supone la misma carga en todas las sesiones porque no la anotaste: anótala para comparar con seguridad.':''}</p><p class="hint">Datos: ${esc(vals)}</p>
+    return `<details class="anest ${c.estado}"><summary><b>${esc(s.ej)}</b> <span class="muted">${s.carga==='peso'?'1RM est.':s.carga==='pc'?'peso corporal, reps al fallo':s.carga==='na'?'carga sin anotar: no comparable':'nivel '+esc(s.carga.slice(2))+' de máquina, reps al fallo'}</span> — ${esc(AN_EST[c.estado])}</summary>
+      <p class="hint">${esc(c.txt)}.${s.carga==='na'?' Configura su carga en «Mis cargas» (o anótala) para poder comparar sesiones.':''}</p><p class="hint">Datos: ${esc(vals)}</p>
       ${c.estado==='caida'?`<p class="hint"><b>Hipótesis, no conclusiones.</b> ${fac.length?'Factores que coinciden: '+esc(fac.join('; '))+'.':'No hay otros datos que coincidan.'} La fatiga acumulada es una posible explicación, pero los datos no permiten identificar una causa. Muchas series por sí solas no indican sobreentrenamiento.</p>`:''}</details>`}).join('');
   return h}
 function anVolHTML(){const R=anVolumen(anSelG);

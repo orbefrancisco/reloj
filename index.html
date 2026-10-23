@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- Política de seguridad (CSP). GitHub Pages no deja poner cabeceras, por eso va en <meta>. Sin scripts en línea ni eval: todo el JS está en estilo.js, anim.js y reloj.js.
+<!-- Política de seguridad (CSP). GitHub Pages no deja poner cabeceras, por eso va en <meta>. Sin scripts en línea ni eval: todo el JS está en archivos (estilo.js, anim.js, reloj.js, analisis.js, auditoria.js, pantallas.js y cargas.js).
      frame-ancestors (impedir que otra página la meta en un marco) NO funciona en <meta>: solo como cabecera HTTP. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob:; media-src 'none'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
@@ -380,6 +380,56 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 .catl button{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:4px 4px 6px;font-size:11.5px;line-height:1.25;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;text-align:center;color:var(--fg)}
 .catl .anim{width:100%;height:auto;color:var(--art)}
 @media (prefers-reduced-motion: reduce){.anim *{animation:none!important}}
+/* v31 · Mis cargas (cargas.js): encuesta semanal, carga de hoy y «Cambiar peso». Controles de 40 px o más para el dedo. */
+.cgav{border:2px solid var(--amb);border-radius:14px;padding:12px;background:var(--surface);display:flex;flex-direction:column;gap:6px;font-size:14px}
+.cgav b{color:var(--amb)} .cgav span{color:var(--muted);font-size:13px}
+.cgbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden} .cgbar i{display:block;height:100%;background:var(--cap)}
+.cgprog{margin:0;font-size:14px} .cgmsg{margin:0;font-size:13px;color:var(--cap)}
+.cgpeso{border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--surface);display:flex;flex-direction:column;gap:6px;font-size:14px}
+.cgpeso .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px} .cgpeso .cgc{margin:0}
+.cgl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.cgl li{display:flex;justify-content:space-between;gap:10px;align-items:baseline} .cgl li b{text-align:right;font-weight:600}
+.cgscope{display:flex;flex-direction:column;gap:6px} .cgscope button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:14px;text-align:left;padding:6px 12px}
+.cgsec{display:flex;flex-direction:column;gap:8px} .cgsec h3{font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:.04em;text-transform:uppercase;margin:8px 0 0}
+.cgrow{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--surface);min-width:0}
+.cgrow.pend,.cgrow.calibrar{border-style:dashed} .cgrow.cgx{opacity:.85}
+.cgt{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;font-size:14px;line-height:1.3}
+.cgm{font-family:var(--mono);font-size:11px;color:var(--muted)} .cgm.f{color:var(--art)}
+.cgst{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:6px;border:1px solid var(--line);white-space:nowrap}
+.cgst.completa,.cgst.carga{border-color:var(--cap);color:var(--cap)} .cgst.pend,.cgst.calibrar{border-color:var(--amb);color:var(--amb)} .cgst.heredada{color:var(--muted)}
+.cgf{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;min-width:0}
+.cgf.cgpf{flex-wrap:nowrap;align-items:center} .cgf.cgpf .cgl2{flex:1}
+.cg4{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.cg2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.cgl2{display:flex;flex-direction:column;gap:2px;min-width:0;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.cgl2 select,.cgl2 .in{width:100%;height:42px;font-family:var(--body);font-size:15px;letter-spacing:0;text-transform:none}
+.cgpm{width:44px;height:44px;flex:none;border:1px solid var(--line);border-radius:10px;font-size:22px;line-height:1;background:var(--bg)}
+.cgw{flex:1;min-width:0;height:44px}
+.cgcorp{font-size:14px;color:var(--muted);padding:10px 0}
+.cgprev{margin:0;font-size:13px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center} .cgprev .btn2{height:40px}
+.cgprop{border-left:3px solid var(--amb);padding:2px 0 2px 8px;font-size:13px;display:flex;flex-direction:column;gap:4px} .cgprop .btn2{height:40px}
+.cgrp{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:8px}
+.cgwarn{margin:0;font-size:12.5px;color:var(--amb)}
+.cgwiz{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--surface)}
+.cgrir{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.cgrir button{height:44px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:15px}
+.cgrir button[aria-pressed="true"],.cgcn button[aria-pressed="true"]{background:var(--cap);border-color:var(--cap);color:var(--bg);font-weight:600}
+.cgcn button{flex:1 1 30%;padding:0 8px}
+.cgest{margin:0;font-size:13px}
+.cgmas summary{cursor:pointer;font-size:14px;padding:8px 0} .cgmas{display:flex;flex-direction:column;gap:8px} .cgmas[open]>*{margin-bottom:6px}
+.cgnav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .cgnav button{min-height:46px;border-radius:12px;border:1px solid var(--line);font-size:14px;background:var(--bg);padding:4px 8px}
+.cgnav button:disabled{opacity:.4} .cgfin button:last-child{border:2px solid var(--cap);color:var(--cap);font-weight:600}
+.cgsin{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.cgcomp{gap:4px;padding:8px 10px}
+.cgres{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;min-width:0} .cgres>span:first-child{min-width:0}
+.cgacc{display:flex;gap:6px;flex:none} .cgacc .btn2{height:40px;padding:0 12px} .cgok{border:2px solid var(--cap)!important;color:var(--cap)}
+.cgp2{display:grid;grid-template-columns:44px minmax(0,1fr) 44px minmax(0,1.25fr);gap:6px;align-items:center} .cgp2.corp{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}
+.cgp2 select{width:100%;height:44px;font-size:14.5px;padding:0 6px}
+.cg3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cgpie{align-items:center;gap:4px 14px}
+.cgsum{display:flex;flex-direction:column;gap:2px} .cgsum ul{list-style:none;margin:0;padding:0}
+.cgsum li{display:flex;flex-direction:column;gap:1px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px} .cgsn{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+@media (max-width:360px){.cg4,.cg2{grid-template-columns:minmax(0,1fr)}}
 </style>
 <script src="estilo.js"></script>
 </head>
@@ -390,6 +440,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
   <section id="vReloj" style="display:flex;flex-direction:column;gap:14px">
     <div id="retomarAv" class="aviso-d" hidden></div>
     <div id="cuotaAv" class="aviso-d" hidden></div>
+    <div id="cgAviso" class="cgav" hidden></div>
     <button id="hoyCard" type="button" class="hoy" hidden></button>
     <div id="planHoy" class="card anplan" hidden></div>
     <div id="rutinas" role="group" aria-label="Rutina"></div>
@@ -494,6 +545,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <button id="mas30" type="button" class="btn2" hidden>+30 s de descanso</button>
     <button id="calSalta" type="button" class="btn2" hidden>Saltar calentamiento</button>
     <button id="deshacer" type="button" class="btn2" hidden>Deshacer última serie</button>
+    <div id="cgPeso" hidden></div>
     <section id="report" hidden>
       <div class="step" id="kgFila">
         <button id="kgMenos" type="button" aria-label="Menos peso">−</button>
@@ -529,7 +581,8 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button id="notaOk" type="button" class="btn2">Guardar nota</button><span id="notaMsg" class="hint" aria-live="polite"></span></div>
     </section>
     <p class="nota"><b>Cómo decide.</b> La congestión decae como e^(−t/110 s) y la capacidad se recupera como 1 − A·e^(−t/τ_C). El descanso es el que maximiza C·P: t* = τ_C·ln[A(τ_C+τ_P)/τ_C], con un ruido log-normal pequeño. Las mini-series tienen objetivo aleatorio entre 65 y 90 % de RTF·C. Cuando ya no da, el reloj no te deja parar: cambia a una variante más fácil en 10 s. El core cierra con 3 vacíos de duración sorteada por una ley de potencias entre 15 y 50 s. Con 8 mini-series o más de un grupo, el reloj aprende cómo te recuperas: si sueles hacer menos reps de las previstas alarga el descanso (×1/k) y baja el objetivo (×k); si haces más, al revés (Ajustes → Recuperación aprendida).</p>
-    <p class="nota"><b>Peso y progresión.</b> Al reportar la primera serie de cada ejercicio, anota el peso: toca el número y escríbelo, o usa − y +. Con mancuernas, el peso de una. La próxima vez el reloj te dice con cuánto empezar: si hiciste el tope del rango con 1 o más en reserva, o te sobraron 4 o más, sube (1 kg si usas menos de 10 kg, 2 kg hasta 40 kg, 2,5 kg por encima; en libras, 2,5 lb por debajo de 25 lb y 5 lb de ahí en adelante; con barra, un par de los discos más pequeños); si no llegaste al mínimo del rango al fallo, baja. Un récord es superar tu mejor 1RM estimado: peso × (1 + (reps + reserva)/30).</p>
+    <p class="nota"><b>Mis cargas (v31).</b> Una vez por semana configuras o confirmas en «Más → Mis cargas» la carga de cada ejercicio (hipertrofia y fuerza por separado). Al entrenar, el reloj ya la sabe: no te pregunta el peso y registra cada serie con esa carga («de tu configuración»). «Cambiar peso» la cambia solo para una serie, para el resto del ejercicio o también en tu referencia; las series ya hechas no se tocan. Una mini-serie con otra carga recalcula su objetivo y no se confunde con fatiga. Al empezar la semana, el reloj revisa la anterior y propone subir, mantener, bajar o recalibrar con su porqué; decides tú.</p>
+    <p class="nota"><b>Peso y progresión.</b> Si un ejercicio no tiene carga configurada, al reportar la primera serie anota el peso: toca el número y escríbelo, o usa − y +. Con mancuernas, el peso de una. La próxima vez el reloj te dice con cuánto empezar: si hiciste el tope del rango con 1 o más en reserva, o te sobraron 4 o más, sube (1 kg si usas menos de 10 kg, 2 kg hasta 40 kg, 2,5 kg por encima; en libras, 2,5 lb por debajo de 25 lb y 5 lb de ahí en adelante; con barra, un par de los discos más pequeños); si no llegaste al mínimo del rango al fallo, baja. Un récord es superar tu mejor 1RM estimado: peso × (1 + (reps + reserva)/30).</p>
     <p class="nota"><b>Series efectivas.</b> Cada sesión tiene una meta de series efectivas que se reparte entre los ejercicios. Una serie completa con 5 reps o más vale 1 si te quedaban 0–1 en reserva, ¾ con 2, ¼ con 3 y nada con 4 o más: una serie suave no suma. Una mini-serie vale la mitad (con 4 reps o más). Los parciales y la variante fácil del final de cada ejercicio cuentan como una serie más, con la misma regla que una serie completa (hasta 1). Una isometría hasta el fallo vale ½ si dura 30 s. Los vacíos y el calentamiento no cuentan. Si al cerrar un ejercicio falta meta, el reloj te da un descanso largo y otra ronda (hasta 3); si en una ronda nueva ya no logras ni ⅓ de serie efectiva, pasa al siguiente.</p>
     <p class="nota"><b>Superseries.</b> Eliges un par (bíceps + tríceps, pecho + espalda, las estaciones de piernas entre sí, hombros + abdomen o el tuyo) y el reloj alterna una serie de cada lado con ~20 s para cambiar de máquina. Cada lado tiene su propio modelo de congestión y capacidad, su meta y su descanso, contado desde SU última serie: mientras trabajas B, A se recupera. Las mini-series se alternan igual (su objetivo se ajusta al descanso real que tuvieron); el paso a parciales, isometría o variante va seguido, sin alternar, porque aprovecha la congestión. Se guardan dos sesiones, una por grupo, y al final ves el tiempo que ahorraste frente a hacerlas por separado.</p>
     <p class="nota"><b>Día de fuerza.</b> Un compuesto pesado del grupo (4–5 series de 3–6 reps al 80–88 % de tu 1RM estimado, con 1–2 en reserva y descanso fijo de 3–3,5 min, sin mini-series ni fallo) y, si quieres, un accesorio. Calentamiento más largo: 40, 60, 75 y 85 %. Si completas todas las series con 2 o más en reserva, la próxima vez sube 2 puntos el %. Como mucho uno por grupo a la semana; en descarga no hay.</p>
@@ -578,6 +631,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 
   <!-- Fase 3: Hoy (mi entrenamiento) -->
   <section id="vHoy" hidden style="display:flex;flex-direction:column;gap:10px">
+    <div id="cgAvisoHoy" class="cgav" hidden></div>
     <h2>Mi entrenamiento</h2>
     <div id="hoyPlan" class="card"></div>
     <h2>Todos los grupos</h2>
@@ -590,10 +644,16 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
   <section id="vMas" hidden style="display:flex;flex-direction:column;gap:10px">
     <h2>Más</h2>
     <div class="masl">
+      <button id="tCargas" type="button"><b>Mis cargas</b><span>Carga de referencia de cada ejercicio esta semana (hipertrofia y fuerza), encuesta semanal y propuestas de progresión</span></button>
       <button id="tEstilo" type="button"><b>Ajustes</b><span>Entrenamiento, cuidar una zona, voz, tempo, unidades y estilo visual</span></button>
       <button id="tApr" type="button"><b>Aprendizaje</b><span>Qué ha aprendido el reloj de tu recuperación, con qué datos y cuánto acierta</span></button>
       <button id="tAud" type="button"><b>Auditoría de datos</b><span>Integridad de tus registros, solo lectura, exportable</span></button>
     </div>
+  </section>
+  <section id="vCargas" hidden style="display:flex;flex-direction:column;gap:10px">
+    <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
+    <h2>Mis cargas</h2>
+    <div id="vCargasC" style="display:flex;flex-direction:column;gap:10px"></div>
   </section>
   <section id="vApr" hidden style="display:flex;flex-direction:column;gap:10px">
     <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
@@ -630,7 +690,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
   <section id="vEstilo" hidden style="display:flex;flex-direction:column;gap:10px">
     <h2>Entrenamiento</h2>
     <div class="tog"><button id="cCal" type="button" aria-pressed="true">Calentamiento: sí</button></div>
-    <p class="muted" style="font-size:13px;margin:0">Antes del primer ejercicio con peso de cada grupo, el reloj propone 3 series de aproximación: 50 % × 10, 70 % × 5 y 85 % × 2 de tu peso de trabajo. No cuentan como series efectivas ni para récords.</p>
+    <p class="muted" style="font-size:13px;margin:0">Antes de las series efectivas, aproximaciones calculadas con tu carga de trabajo (la de «Mis cargas» o la que anotes), redondeadas a los pesos que existen: en el primer ejercicio con peso de la sesión, 50 % × 8, 70 % × 5 y 85 % × 2 si es compuesto o 50 % × 10 y 75 % × 4 si es aislado; en los siguientes, 60 % × 5 y 80 % × 2 solo si es compuesto. No cuentan como series efectivas ni para récords. Si una termina cerca del fallo, puedes reclasificarla como «aproximación intensa» y entonces sí cuenta.</p>
     <span class="lbl">Unidad de peso</span>
     <div class="tog" id="cUni"><button type="button" data-u="kg">Kilos (kg)</button><button type="button" data-u="lb">Libras (lb)</button></div>
     <p class="muted" style="font-size:13px;margin:0" id="cUniTxt">Todo se guarda igual por dentro; solo cambia cómo lo ves y lo escribes. En libras los pasos son de 2,5 lb (menos de 25 lb) y de 5 lb; la barra y los discos tienen su propia lista en libras.</p>
@@ -705,5 +765,6 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 <script src="analisis.js"></script>
 <script src="auditoria.js"></script>
 <script src="pantallas.js"></script>
+<script src="cargas.js"></script>
 </body>
 </html>

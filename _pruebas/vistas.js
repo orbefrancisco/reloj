@@ -344,7 +344,11 @@
     const prueba1 = (kg, rirAntes, rirHoy, reps) => conHist([sesF('c5', 'biceps', Date.now() - 2 * 864e5, [fil('biceps', 0, 10, rirAntes, kg)])], () => {
       grupo = 'biceps'; S = { ...fresh(), id: 'hoy', sets: [] }; const r = fil('biceps', 0, reps, rirHoy, kg); return esRecord(r) ? (r.prT || 'e1') : 'no'; });
     if (prueba1(12, 1, 1, 11) === 'no') m.push('12 kg 10→11 reps con RIR igual: debería ser récord');
-    if (prueba1(0, 1, 1, 11) !== 'reps') m.push('peso corporal 10→11: debería ser récord de reps');
+    // v31: 0 kg solo es «peso corporal» en un ejercicio de peso corporal; en un curl con mancuernas es una carga desconocida
+    const pc = (g, i) => conHist([sesF('c5b', g, Date.now() - 2 * 864e5, [fil(g, i, 10, 1, 0)])], () => {
+      grupo = g; S = { ...fresh(), id: 'hoy', sets: [] }; const r = fil(g, i, 11, 1, 0); return esRecord(r) ? (r.prT || 'e1') : 'no'; });
+    if (pc('triceps', 2) !== 'reps') m.push('peso corporal (fondos) 10→11: debería ser récord de reps');
+    if (prueba1(0, 1, 1, 11) !== 'no') m.push('0 en un curl con mancuernas es una carga dudosa (desconocida): no hay récord de reps');
     if (prueba1(12, 1, 0, 11) === 'reps') m.push('más reps pero con menos reserva (más esfuerzo): no es récord de reps comparable');
     if (prueba1(null, 1, 1, 11) !== 'no') m.push('sin peso anotado no hay carga con qué comparar');
     const sinBase = conHist([], () => { grupo = 'biceps'; S = { ...fresh(), id: 'hoy', sets: [] }; return esRecord(fil('biceps', 0, 20, 1, 12)); });

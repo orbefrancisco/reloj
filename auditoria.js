@@ -3,7 +3,7 @@
 // No repara nada: cualquier reparación futura pedirá confirmación y hará antes una copia de seguridad.
 // Se carga después de reloj.js y analisis.js.
 'use strict';
-const AUD_VERSION='aud-1';
+const AUD_VERSION='aud-2';   // v31: calidad de la carga
 function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.push({c,t,ids}),av=(c,t,ids)=>A.push({c,t,ids});
   // --- sesiones ---
   const porId={};hist.forEach(h=>{(porId[h.id]=porId[h.id]||[]).push(h)});
@@ -29,6 +29,13 @@ function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.p
   if(kgRaro)err('kg-rango',`${kgRaro} series con un peso fuera de rango (negativo o más de 500 kg)`,[...idsKg]);
   if(lbRaro)av('kg-lb',`${lbRaro} series cuyo peso no es un múltiplo de ¼ ni en kg ni en lb: posible error de conversión`,[...idsLb]);
   if(repet)av('serie-repetida',`${repet} series idénticas a la anterior en todos sus valores (posible doble toque)`,[...idsRep]);
+  // (v31) calidad de la carga: series de trabajo sin carga conocida (no se comparan entre sesiones ni entran en el aprendizaje como verificadas)
+  // y ceros dudosos (0 = peso corporal en un ejercicio con carga externa: el antiguo «−» desde vacío). Nada se borra: solo se marca.
+  let sinCarga=0,cero=0,conCfg=0,cambiada=0;const idsCero=new Set(),idsCamb=new Set();
+  hist.forEach(h=>{const g=gDe(h);(h.sets||[]).forEach(r=>{if(!['act.','myo','parc.','apr.'].includes(r.k))return;
+    if(r.kgSrc==='cal')conCfg++;if(r.kgCambio){cambiada++;idsCamb.add(h.id)}
+    if(cargaDe(r,g)==null){if(r.kg===0){cero++;idsCero.add(h.id)}else sinCarga++}})});
+  if(cero)av('cero-dudoso',`${cero} series con 0 (= peso corporal) en ejercicios con carga externa: se tratan como carga desconocida y no se comparan`,[...idsCero]);
   // sesiones casi simultáneas del mismo grupo (posible duplicado por importación)
   const cerca=[];const H=hist.slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
   for(let i=1;i<H.length;i++)if(gDe(H[i])===gDe(H[i-1])&&Date.parse(H[i].start)-Date.parse(H[i-1].start)<5*6e4)cerca.push(H[i].id);
@@ -45,6 +52,8 @@ function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.p
   I.push({c:'resumen',t:`${hist.length} sesiones · ${nSer} filas · ${conKg} con peso anotado (${nSer?Math.round(conKg*100/nSer):0} %) · ${cens} con reserva «3+»/«4+» (cotas)`});
   I.push({c:'esquema',t:'versiones de esquema: '+Object.entries(esq).map(([v,n])=>`v${v}: ${n}`).join(' · ')+' (v1 = anterior a v26, sin fechas de registro ni edición)'});
   I.push({c:'modelo',t:`recuperación: ${R._.bien?'aprendido en uso':'modelo fijo'} — ${R._.por}`});
+  {const c=R._.cal;I.push({c:'carga',t:`calidad de la carga (v31): ${sinCarga} series de trabajo sin carga conocida (se conservan; no se comparan entre sesiones) · ${conCfg} con la carga de «Mis cargas» · ${cambiada} mini-series con otra carga que su serie principal (${idsCamb.size} sesiones) · aprendizaje: ${c.v} mini-series con carga verificada, ${c.p} presuntas (cuentan ½), ${c.cambio+c.mixta} fuera por cambio o mezcla de carga`})}
+  if(typeof cgResumenTxt==='function')I.push({c:'cargas',t:cgResumenTxt()});
   I.push({c:'cuidar',t:lesOn()?`cuidando ${lesQueN()}`:'sin zonas cuidadas activas'});
   const dec=leerJSON(DECKEY,[]);if(Array.isArray(dec)&&dec.length)I.push({c:'decisiones',t:`${dec.length} veces entrenaste contra la recomendación del plan (anotadas)`});
   return {app:'reloj-anomalo',tipo:'auditoria',version:AUD_VERSION,esquema:ESQUEMA,fecha:new Date().toISOString(),errores:E,avisos:A,info:I}}
