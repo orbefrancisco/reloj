@@ -396,6 +396,56 @@
     return { ok: !r.sel.biceps && !r.sel.triceps && r.sel.pecho.k === .88 && r.log.length === 0, d: JSON.stringify(r) };
   });
 
+  // ---------- 14. v28 · Fase 5: estancamiento, preparación, respuesta al volumen y plan (en memoria) ----------
+  const pts = v => v.map((x, i) => ({ t: i * 864e5, v: x }));
+  prueba('Fase 5: clasificación de tendencias (insuficiente, mejora, caída, estable, variable, estancamiento)', () => {
+    const c = v => anClasifica(pts(v)).estado, m = [];
+    const casos = [[[10, 11, 12], 'insuficiente'], [[10, 11, 12, 13, 14], 'mejora'], [[14, 13, 12, 11, 10], 'caida'], [[12, 12.2, 11.9, 12.1], 'estable'],
+      [[10, 14, 9, 15, 10, 14], 'variable'], [[12, 12.1, 11.9, 12, 12.05, 11.95, 12], 'estancado']];
+    casos.forEach(([v, e]) => { if (c(v) !== e) m.push(`${v.join(',')} → ${c(v)} (esperado ${e})`); });
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Fase 5: la pendiente de Theil–Sen no la arrastra un dato raro', () => {
+    const a = anTheilSen([10, 11, 12, 13, 14]), b = anTheilSen([10, 11, 40, 13, 14]);
+    return { ok: Math.abs(a - 1) < 1e-9 && Math.abs(b - 1) < .6, d: `${a} / ${b}` };
+  });
+  prueba('Fase 5: rendimiento comparable solo con la misma carga; «3+» no entra; sin peso se comparan reps hasta el fallo', () => conHist([
+    sesF('a1', 'biceps', Date.now() - 4 * 864e5, [fil('biceps', 0, 10, 1, 12), fil('biceps', 1, 10, '3+', null)]),
+    sesF('a2', 'biceps', Date.now() - 2 * 864e5, [fil('biceps', 0, 11, 1, 12), fil('biceps', 1, 12, 1, null)]),
+    sesF('a3', 'biceps', Date.now() - 1 * 864e5, [fil('biceps', 0, 9, 1, 14)])], () => {
+    const C = anComparables(), e0 = CAT.biceps.base[0].n, e1n = CAT.biceps.base[1].n;
+    const conPeso = C.find(s => s.ej === e0 && s.carga === 'peso'), sinPeso = C.find(s => s.ej === e1n);
+    const ok = conPeso && conPeso.pts.length === 3 && sinPeso && sinPeso.pts.length === 1 && sinPeso.pts[0].v === 13;
+    return { ok, d: JSON.stringify(C.map(s => [s.ej.slice(0, 12), s.carga, s.pts.length])) };
+  }));
+  prueba('Fase 5: preparación por zona — cuidar si hay cuidado activo, esperar tras estímulo directo reciente, recuperación nunca inventada', () => conHist([
+    sesF('p1', 'biceps', Date.now() - 5 * 36e5, [fil('biceps', 0, 10, 1, 12)])], () => {
+    const m = [], z = anZona('biceps');
+    if (z.prep.e !== 'espera') m.push(`bíceps entrenado hace 5 h: ${z.prep.e}`);
+    if (z.recup.fiable !== false || !/Sin estimación fiable/.test(z.recup.txt)) m.push('recuperación inventada');
+    if (anZona('biceps', { reglaH: 4 }).prep.e !== 'listo') m.push('cambiar el supuesto (regla 4 h) no cambia la evaluación');
+    const L0 = lesion; try { lesion = { zs: [{ z: 'brazo', p: 'biceps_prox', n: 'leve', ...dentro() }] }; if (anZona('biceps').prep.e !== 'cuidar') m.push('cuidado activo no marca cuidar'); } finally { lesion = L0; }
+    return { ok: !m.length, d: m.join('; ') };
+  }));
+  prueba('Fase 5: respuesta al volumen — sin 4 pares de semanas no hay correlación; Spearman correcto', () => conHist([sesF('v1', 'pecho', Date.now() - 864e5, [fil('pecho', 0, 10, 1, 30)])], () => {
+    const r = anVolumen('pecho'), s1 = anSpearman([1, 2, 3, 4], [10, 20, 30, 40]), s2 = anSpearman([1, 2, 3, 4], [4, 3, 2, 1]);
+    return { ok: r.rho === null && Math.abs(s1 - 1) < 1e-9 && Math.abs(s2 + 1) < 1e-9, d: `rho=${r.rho} s1=${s1} s2=${s2}` };
+  }));
+  prueba('Fase 5: plan — aplazar tras < 48 h o en pausa; mantener sin señales; cada recomendación con motivos', () => {
+    const m = [];
+    conHist([sesF('q1', 'pecho', Date.now() - 5 * 36e5, [fil('pecho', 0, 10, 1, 30)])], () => { const p = anPlanGrupo('pecho'); if (p.acc !== 'aplazar' || !p.mot.length) m.push(`pecho hace 5 h: ${p.acc}`); });
+    conHist([sesF('q2', 'pecho', Date.now() - 4 * 864e5, [fil('pecho', 0, 10, 1, 30)])], () => { const p = anPlanGrupo('pecho'); if (p.acc !== 'mantener') m.push(`pecho hace 4 días: ${p.acc} (${p.mot})`); });
+    conLes({ z: 'hombro', p: 'del_lat', n: 'extremo', ...dentro() }, () => conHist([], () => { const p = anPlanGrupo('hombros'); if (p.acc !== 'aplazar') m.push(`hombros en pausa: ${p.acc}`); }));
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Fase 5: las vistas de análisis y la tarjeta del plan se pintan sin textos rotos', () => {
+    const m = [], t0 = tab;
+    for (const t of ['prep', 'est', 'vol']) { anTab = t; renderAnalisis(); if (/undefined|NaN|\[object/.test(document.getElementById('pAnal').textContent)) m.push(t); }
+    anTab = 'prep'; anSelZ = 'pecho_med'; renderAnalisis(); if (/undefined|NaN/.test(document.getElementById('pAnal').textContent)) m.push('detalle'); anSelZ = '';
+    tab = 'reloj'; renderPlanHoy(); if (!document.getElementById('planHoy').textContent.includes('Plan para')) m.push('plan'); tab = t0;
+    return { ok: !m.length, d: m.join(', ') };
+  });
+
   // ---------- 7. Los datos originales no se tocan ----------
   prueba('Pintar todas las vistas no modifica las sesiones guardadas', () => localStorage.getItem(KEY) === crudoAntes);
 

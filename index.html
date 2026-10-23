@@ -259,6 +259,15 @@ html[data-recto] *{border-radius:3px!important}
 .lesmapa{margin:6px 0 2px} .lesmapa .fig{max-width:340px}
 /* Fase 4: aprendizaje de recuperación (Ajustes) */
 #cCalib tr.on td{background:var(--soft)} .recdet{margin-top:8px} .recdet p{margin:4px 0;font-size:13px}
+/* Fase 5: análisis (Progreso) y plan de hoy (Reloj) */
+.antabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px} .antabs button,.chipb{border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--surface);color:var(--fg);font-size:13px}
+.antabs button[aria-pressed="true"],.chipb[aria-pressed="true"]{background:var(--art);border-color:var(--art);color:var(--bg)} .chipb{padding:3px 9px;font-size:12px;margin:2px 2px}
+.fig .lpl{fill:var(--mok)} .fig .lpe{fill:var(--mlo)} .fig .lpc{fill:var(--mal)} .fig .lpn{fill:var(--m0)} .fig [data-anz]{stroke:var(--mborde);stroke-width:.75;cursor:pointer} .fig .sel{stroke:var(--fg);stroke-width:1.6}
+.mpt.lpl{background:var(--mok)} .mpt.lpe{background:var(--mlo)} .mpt.lpc{background:var(--mal)} .mpt.lpn{background:var(--m0)}
+.andet{margin-top:8px} .ant{width:100%;border-collapse:collapse;font-size:13px} .ant{table-layout:fixed} .ant td{padding:5px 4px;border-top:1px solid var(--line);vertical-align:top;white-space:normal;text-align:left;overflow-wrap:anywhere;font-family:var(--body)} .ant td:first-child{color:var(--muted);width:34%}
+.anest{border-top:1px solid var(--line);padding:6px 0} .anest summary{cursor:pointer;font-size:14px} .anest.caida summary b{color:var(--mal)} .anest.mejora summary b{color:var(--mok)}
+.anplan .top{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px} .anplan.reducir,.anplan.modificar{border-color:var(--mlo)} .anplan.aplazar{border-color:var(--mal)}
+.anmot{margin:6px 0 0;padding-left:18px;font-size:13px}
 .recg{width:100%;max-width:280px;display:block;margin:6px auto} .recg .rect{font-family:var(--mono);font-size:8px;fill:var(--muted)}
 .mpt{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px var(--mborde)}
 .mpt.z0{background:var(--m0)} .mpt.zlo{background:var(--mlo)} .mpt.zok{background:var(--mok)} .mpt.zhi{background:var(--mhi)} .mpt.zal{background:var(--mal)}
@@ -364,6 +373,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <div id="retomarAv" class="aviso-d" hidden></div>
     <div id="cuotaAv" class="aviso-d" hidden></div>
     <button id="hoyCard" type="button" class="hoy" hidden></button>
+    <div id="planHoy" class="card anplan" hidden></div>
     <div id="rutinas" role="group" aria-label="Rutina"></div>
     <div id="ssPar" class="sspar" hidden></div>
     <div id="grupos"></div>
@@ -511,6 +521,8 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 
   <section id="vProg" hidden style="display:flex;flex-direction:column;gap:10px">
     <div id="pDesc"></div>
+    <h2>Análisis</h2>
+    <div id="pAnal" class="card"></div>
     <h2>Plan por bloques</h2>
     <div id="pBloque" class="card blq"></div>
     <h2>Esta semana</h2>
@@ -633,5 +645,6 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 
 <script src="anim.js"></script>
 <script src="reloj.js"></script>
+<script src="analisis.js"></script>
 </body>
 </html>

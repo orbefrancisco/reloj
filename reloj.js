@@ -897,7 +897,7 @@ $('pad').onclick=async()=>{
     if(sinGrupo()||(ssSel.on&&!ssLados())||pausaInicio()){render();return}   // «La mía» sin grupos o superserie propia sin sus dos grupos: no empieza
     // antes de la primera sesión del día: cómo llegas (un segundo toque empieza igual). Si Comida ya anotó el sueño, solo pregunta la energía.
     if(!bienHoy()&&!omitHoy()&&!pideBien){pideBien=true;bienEd=bienEd||bienDe(bienDia())||{};render();$('bien').scrollIntoView?.({block:'nearest',behavior:'smooth'});return}
-    if(retomar)descartarRetomar();
+    if(retomar)descartarRetomar();if(!ssSel.on&&typeof anRegistraDecision==='function')anRegistraDecision(grupo);   // Fase 5: entrenar contra la recomendación queda anotado
     pideBien=false;$('editor').hidden=true;if(rutPos===0)rutEf=0;pila=[];rirPrev=null;
     if(ssSel.on)ssIniciar();else{SS=null;iniciarSesion(fzaActiva()?{fza:planFuerza(grupo)}:undefined)}empezar()}
   else if(S.st==='cal'){const E=est(),c=S.cal[S.calI];
@@ -1414,7 +1414,7 @@ let lastG=null,lastEn=null,lastPlan='',lastRows='';
 function subInicio(E){const s=sugerir(grupo,E);
   return s?`${E.n} · última vez ${kgTxt(s.prev.kg)} × ${s.prev.reps} (reserva ${s.prev.rir}) → ${s.txt}`:`${E.n} · peso con el que ${E.r} reps te dejen a 1 del fallo`}
 function render(){
-  lesRefresca();
+  lesRefresca();if(typeof renderPlanHoy==='function')renderPlanHoy();   // Fase 5: plan de hoy (solo en reposo; memorizado)
   const G=CAT[grupo],E=est(),e=Math.max(0,now()-S.t0),pad=$('pad');
   [['vReloj','tReloj','reloj'],['vProg','tProg','progreso'],['vHist','tHist','historial'],['vEstilo','tEstilo','estilo']].forEach(([v,t,k])=>{
     $(v).hidden=tab!==k;$(v).style.display=tab===k?'flex':'none';$(t).setAttribute('aria-current',tab===k?'page':'false')});
@@ -1670,7 +1670,7 @@ function renderProg(){
     :'<p class="hint">La gráfica aparece cuando tengas el peso anotado en al menos una sesión.</p>';
   if(ks.length){$('gSel').onchange=e=>{grafSel=e.target.value;renderProg()};dibujarGraf(grafSel,rel?PC:null)}
   $('pBloque').innerHTML=bloqueHTML(true);renderCmp();
-  renderMapa();renderMedallas();renderMedidas();renderFotos()}
+  renderMapa();renderMedallas();renderMedidas();renderFotos();if(typeof renderAnalisis==='function')renderAnalisis()}   // Fase 5 (analisis.js)
 document.addEventListener('click',e=>{if(!e.target.closest('[data-rel]'))return;CFG.rel=!CFG.rel;guardarCfg();renderProg()});
 const num2f=x=>x.toFixed(2).replace('.',',');
 /* ---------- comparar periodos: A (anterior) contra B (actual) ---------- */
