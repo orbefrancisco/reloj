@@ -248,16 +248,17 @@
   });
 
   // ---------- 10. v24: cuidar una zona por parte y nivel (en memoria; se deja todo como estaba) ----------
-  const conLes = (les, fn) => { const L0 = lesion; try { lesion = les; aplicarEjercicios(); return fn(); } finally { lesion = L0; aplicarEjercicios(); } };
+  // (v25: lesion = {zs: [...]}; conLes acepta una zona o una lista)
+  const conLes = (les, fn) => { const L0 = lesion; try { lesion = { zs: Array.isArray(les) ? les : [les] }; aplicarEjercicios(); return fn(); } finally { lesion = L0; aplicarEjercicios(); } };
   const dentro = (d = 7) => ({ ini: new Date(Date.now() - 864e5).toISOString(), hasta: new Date(Date.now() + d * 864e5).toISOString() });
   prueba('Lo guardado antes de v24 (sin parte ni nivel) sigue igual: zona entera y dolor fuerte', () => {
-    const r = normLesion({ z: 'hombro', ...dentro() }), r2 = normLesion({ z: 'hombro', p: 'xx', n: 'yy', ...dentro() }), r3 = normLesion({ z: 'brazo', ...dentro() });
+    const r = normLesion({ z: 'hombro', ...dentro() }).zs[0], r2 = normLesion({ z: 'hombro', p: 'xx', n: 'yy', ...dentro() }).zs[0], r3 = normLesion({ z: 'brazo', ...dentro() }).zs[0];
     const ok = r.p === 'entero' && r.n === 'fuerte' && r2.p === 'entero' && r2.n === 'fuerte' && r3.p === 'biceps_prox';
     return { ok, d: JSON.stringify([r.p, r.n, r2.p, r2.n, r3.p]) };
   });
   prueba('Niveles: molestia no cambia ejercicios; fuerte los cambia; extremo quita o pausa', () => conLes({ z: 'hombro', p: 'del_lat', n: 'leve', ...dentro() }, () => {
     const m = [], base = CAT.hombros.base.map(x => x.n).join('|');
-    const nivel = n => { lesion = { ...lesion, n }; aplicarEjercicios(); return CAT.hombros.e; };
+    const nivel = n => { lesion = { zs: [{ ...lesion.zs[0], n }] }; aplicarEjercicios(); return CAT.hombros.e; };
     const L = nivel('leve'); if (L.some(x => x.lesDe) || L.filter(x => !x.levy).map(x => x.n).join('|') !== base.split('|').filter(Boolean).join('|')) m.push('molestia cambió ejercicios');
     if (!L.some(x => x.lesM && x.lesAng)) m.push('molestia sin serie recta en el de carga alta');
     const F = nivel('fuerte'); if (!F.some(x => x.lesDe)) m.push('fuerte no cambió nada');
@@ -285,6 +286,43 @@
   prueba('Molestia con parte: se guarda en la serie y se valida al leer', () => {
     const a = normSet({ ex: 'x', k: 'act.', reps: '8', rir: '1', mol: 'hombro', molP: 'manguito' }), b = normSet({ ex: 'x', k: 'act.', reps: '8', rir: '1', mol: 'hombro', molP: 'rodilla' });
     return { ok: a.molP === 'manguito' && !b.molP, d: `${a.molP} / ${b.molP}` };
+  });
+
+  // ---------- 11. v25: varias zonas a la vez y mapa de lo que duele / se adapta ----------
+  prueba('Varias zonas a la vez: manda la acción más prudente de cada una y se suman sus efectos', () => {
+    const del = { z: 'hombro', p: 'del_lat', n: 'extremo', ...dentro() }, cod = { z: 'codo', p: 'posterior', n: 'fuerte', ...dentro() };
+    const solo1 = conLes(del, () => ({ ph: enPausa('hombros'), tri: CAT.triceps.e.some(x => x.lesDe || x.lesM) }));
+    const solo2 = conLes(cod, () => ({ ph: enPausa('hombros'), tri: CAT.triceps.e.some(x => x.lesDe || x.lesM) }));
+    const ambos = conLes([del, cod], () => ({ ph: enPausa('hombros'), tri: CAT.triceps.e.some(x => x.lesDe || x.lesM), n: lesAct().length }));
+    const ok = solo1.ph && !solo1.tri && !solo2.ph && solo2.tri && ambos.ph && ambos.tri && ambos.n === 2;
+    return { ok, d: JSON.stringify({ solo1, solo2, ambos }) };
+  });
+  prueba('Añadir una zona no quita la otra; renovar la misma zona y parte no la duplica; terminar una deja la otra', () => {
+    const L0 = lesion, m = [], crudo = localStorage.getItem(LESKEY);   // se restaura al final: el perfil de pruebas queda como estaba
+    try {
+      lesion = { zs: [] };
+      try {
+        lesEmpezar('hombro', 7, 'manguito', 'fuerte'); lesEmpezar('codo', 14, 'interna', 'leve');
+        if (lesAct().length !== 2) m.push(`tras añadir: ${lesAct().length}`);
+        lesEmpezar('hombro', 28, 'manguito', 'extremo');
+        if (lesAct().length !== 2 || lesAct().find(x => x.z === 'hombro').n !== 'extremo') m.push('renovar duplicó o no cambió el nivel');
+        lesNivel('codo|interna', 'fuerte'); if (lesAct().find(x => x.z === 'codo').n !== 'fuerte') m.push('lesNivel por zona');
+        lesTerminar('hombro|manguito'); if (lesAct().length !== 1 || lesAct()[0].z !== 'codo') m.push(`terminar una: ${lesAct().map(lesK)}`);
+      } finally { if (crudo == null) localStorage.removeItem(LESKEY); else localStorage.setItem(LESKEY, crudo); }
+    } finally { lesion = L0; aplicarEjercicios(); }
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Mapa de cuidar: la parte que duele en coral; lo que se deja de entrenar y lo que se adapta, cada uno con su color', () => {
+    const e = lesEfecto([{ z: 'hombro', p: 'del_ant', n: 'extremo' }]), m = [];
+    if (e.cls('del_ant') !== 'ldu') m.push(`del_ant=${e.cls('del_ant')}`);
+    // pecho en pausa: sus zonas o se dejan de entrenar o, si otro grupo aún las trabaja (press cerrado de tríceps), se adaptan; nunca «sin cambios»
+    if (!['lqu', 'lad'].includes(e.cls('pecho_med')) || !['lqu', 'lad'].includes(e.cls('pecho_sup'))) m.push(`pecho: ${e.cls('pecho_sup')}/${e.cls('pecho_med')}`);
+    if (!Object.keys(MUS).some(k => e.cls(k) === 'lqu')) m.push('ninguna zona «se deja de entrenar»');
+    if (e.cls('pantorrillas') !== 'l0') m.push(`pantorrillas=${e.cls('pantorrillas')}`);
+    const e2 = lesEfecto([{ z: 'brazo', p: 'biceps_prox', n: 'fuerte' }]); if (e2.cls('dorsal') !== 'lad') m.push(`bíceps proximal → dorsal=${e2.cls('dorsal')}`);
+    const svg = lesMapaSVG([{ z: 'hombro', p: 'del_ant', n: 'extremo' }]);
+    if (!/class="ldu"/.test(svg) || !/class="lqu"/.test(svg) || !/se deja de entrenar/.test(svg)) m.push('svg o leyenda incompletos');
+    return { ok: !m.length, d: m.join('; ') };
   });
 
   // ---------- 7. Los datos originales no se tocan ----------

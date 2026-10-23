@@ -246,13 +246,17 @@ html[data-recto] *{border-radius:3px!important}
 #grupos button.pausa{opacity:.55;text-decoration:line-through} #grupos button.pausa small{text-decoration:none;font-size:11px} .lest tr.pausa td{color:var(--muted)} .aviso-d small{display:block;margin-top:4px;color:var(--muted);font-size:12px}
 .lest td.lc{text-align:left;white-space:normal} .lest th:nth-child(n+2){text-align:left}
 /* Mapa muscular, medallas, medidas, fotos */
-#mapa{width:100%;max-width:420px;height:auto;display:block;margin:0 auto}
-#mapa .cb{fill:var(--cuerpo);stroke:var(--cborde);stroke-width:1.8;stroke-linejoin:round} #mapa .cf{fill:var(--cuerpo)}
-#mapa .zn,#mapa [data-m]{stroke:var(--mborde);stroke-width:.75;stroke-linejoin:round} #mapa .zn{fill:var(--cuerpo)} #mapa [data-m]{cursor:pointer}
-#mapa .z0{fill:var(--m0)} #mapa .zlo{fill:var(--mlo)} #mapa .zok{fill:var(--mok)} #mapa .zhi{fill:var(--mhi)} #mapa .zal{fill:var(--mal)}#mapa .selb{fill:none;stroke:var(--fg);stroke-width:1.4;stroke-linejoin:round;pointer-events:none}
-#mapa .mvol{fill:url(#mvol);pointer-events:none} #mapa .mfib{fill:none;stroke:var(--mborde);stroke-opacity:.5;stroke-width:.32;stroke-linecap:round;pointer-events:none}
-#mapa .mluz{fill:url(#mluz);pointer-events:none}
-#mapa text{font-family:var(--mono);font-size:8px;letter-spacing:.14em;fill:var(--muted)}
+.fig{width:100%;max-width:420px;height:auto;display:block;margin:0 auto}
+.fig .cb{fill:var(--cuerpo);stroke:var(--cborde);stroke-width:1.8;stroke-linejoin:round} .fig .cf{fill:var(--cuerpo)}
+.fig .zn,.fig [data-m]{stroke:var(--mborde);stroke-width:.75;stroke-linejoin:round} .fig .zn{fill:var(--cuerpo)} .fig [data-m]{cursor:pointer}
+.fig .z0{fill:var(--m0)} .fig .zlo{fill:var(--mlo)} .fig .zok{fill:var(--mok)} .fig .zhi{fill:var(--mhi)} .fig .zal{fill:var(--mal)}.fig .selb{fill:none;stroke:var(--fg);stroke-width:1.4;stroke-linejoin:round;pointer-events:none}
+.fig .mvol{fill:url(#mvol);pointer-events:none} .fig .mfib{fill:none;stroke:var(--mborde);stroke-opacity:.5;stroke-width:.32;stroke-linecap:round;pointer-events:none}
+.fig .mluz{fill:url(#mluz);pointer-events:none}
+.fig text{font-family:var(--mono);font-size:8px;letter-spacing:.14em;fill:var(--muted)}
+/* mapa de «cuidar» (v25): duele / se deja de entrenar / se adapta / sin cambios (colores de la paleta, leyenda propia) */
+.fig [data-lm]{stroke:var(--mborde);stroke-width:.75;stroke-linejoin:round} .fig .ldu{fill:var(--mal)} .fig .lqu{fill:var(--mlo)} .fig .lad{fill:var(--mhi)} .fig .l0{fill:var(--cuerpo)}
+.mpt.ldu{background:var(--mal)} .mpt.lqu{background:var(--mlo)} .mpt.lad{background:var(--mhi)} .mpt.l0{background:var(--cuerpo)}
+.lesmapa{margin:6px 0 2px} .lesmapa .fig{max-width:340px}
 .mpt{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px var(--mborde)}
 .mpt.z0{background:var(--m0)} .mpt.zlo{background:var(--mlo)} .mpt.zok{background:var(--mok)} .mpt.zhi{background:var(--mhi)} .mpt.zal{background:var(--mal)}
 .mnav .msel{position:relative;flex:1;min-width:0;display:flex;justify-content:center;height:36px}

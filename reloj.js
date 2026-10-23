@@ -90,7 +90,8 @@ function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha
   // v18: día de fuerza, superserie ('biceps+triceps', mismo superId en sus dos sesiones, lado A o B) y zona cuidada
   if(s.fza===true)o.fza=true;
   if(typeof s.super==='string'&&s.super.length<=40){const p=s.super.split('+');if(p.length===2&&p.every(esG)){o.super=s.super;const si=vTxt(s.superId,80);if(si)o.superId=si;if(s.lado==='A'||s.lado==='B')o.lado=s.lado}}
-  if(LES_Z.includes(s.cuida)){o.cuida=s.cuida;if(LES_P[s.cuida].includes(s.cuidaP))o.cuidaP=s.cuidaP;if(LES_N.includes(s.cuidaN))o.cuidaN=s.cuidaN}
+  if(LES_Z.includes(s.cuida)){o.cuida=s.cuida;if(LES_P[s.cuida].includes(s.cuidaP))o.cuidaP=s.cuidaP;if(LES_N.includes(s.cuidaN))o.cuidaN=s.cuidaN;
+    const cl=normLesL(s.cuidaL);if(cl.length>1)o.cuidaL=cl}   // v25: varias zonas a la vez
   return o}
 function normHist(a,cnt){const out=[],ids=new Set();(Array.isArray(a)?a:[]).slice(0,SES_MAX).forEach(s=>{const v=normSes(s);
   if(v&&!ids.has(v.id)){out.push(v);ids.add(v.id)}else if(cnt)cnt.mal++});return out}
@@ -173,14 +174,25 @@ const lesTxt=(z,p)=>p&&p!=='entero'&&LES_PART[p]?LES_PART[p]:LES_ART[z];        
 // nivel: molestia = mismos ejercicios sin el ángulo que molesta; fuerte = se cambian los que cargan la parte; extremo = también los de carga media
 // y los grupos que la cargan de rebote (pecho y tríceps con el hombro, espalda con el bíceps…); un grupo sin ejercicios seguros queda en pausa
 const LES_N=['leve','fuerte','extremo'],LES_NN={leve:'molestia',fuerte:'dolor fuerte',extremo:'dolor extremo'};
-// {z, p, n, ini, hasta}: zona, parte y nivel que se cuidan (7, 14 o 28 días; terminar antes = hasta ahora) y {nz, nf}: la sugerencia que dijiste «ahora no».
-// Lo guardado antes de v24 no trae parte ni nivel: zona entera y dolor fuerte, que es lo que hacía.
-function normLesion(o){const r={};if(!esObj(o))return r;const z=LES_Z.includes(o.z)?o.z:null,i=vFecha(o.ini),h=vFecha(o.hasta);
-  if(z&&i&&h&&Date.parse(h)>Date.parse(i)&&Date.parse(h)-Date.parse(i)<=29*864e5)
-    Object.assign(r,{z,p:LES_P[z].includes(o.p)?o.p:LES_P[z][0],n:LES_N.includes(o.n)?o.n:'fuerte',ini:i,hasta:h});
+// v25: varias zonas a la vez. {zs: [{z, p, n, ini, hasta}], nz, nf}: cada zona con su parte y nivel (7, 14 o 28 días; terminar antes = hasta ahora;
+// una por zona y parte) y la sugerencia a la que dijiste «ahora no». Lo de v18–v24 ({z, p?, n?, ini, hasta}) pasa a ser una lista de una;
+// sin parte ni nivel (antes de v24): zona entera y dolor fuerte, que es lo que hacía.
+const LES_MAX=6;
+// lista {z, p, n} guardada en sesiones (cuidaL) y en la sesión en curso (lesL): solo entradas válidas, sin repetir
+function normLesL(a){if(!Array.isArray(a))return [];const out=[],v=new Set();
+  for(const x of a.slice(0,LES_MAX)){if(!esObj(x)||!LES_Z.includes(x.z))continue;const p=LES_P[x.z].includes(x.p)?x.p:LES_P[x.z][0],n=LES_N.includes(x.n)?x.n:'fuerte';
+    if(v.has(x.z+'|'+p))continue;v.add(x.z+'|'+p);out.push({z:x.z,p,n})}
+  return out}
+function normLesZ(o){if(!esObj(o))return null;const z=LES_Z.includes(o.z)?o.z:null,i=vFecha(o.ini),h=vFecha(o.hasta);
+  if(!z||!i||!h||Date.parse(h)<=Date.parse(i)||Date.parse(h)-Date.parse(i)>29*864e5)return null;
+  return {z,p:LES_P[z].includes(o.p)?o.p:LES_P[z][0],n:LES_N.includes(o.n)?o.n:'fuerte',ini:i,hasta:h}}
+function normLesion(o){const r={zs:[]};if(!esObj(o))return r;const vistos=new Set();
+  for(const x of (Array.isArray(o.zs)?o.zs:o.z?[o]:[])){const e=normLesZ(x);if(!e||vistos.has(e.z+'|'+e.p))continue;vistos.add(e.z+'|'+e.p);r.zs.push(e);if(r.zs.length>=LES_MAX)break}
   const nz=LES_Z.includes(o.nz)?o.nz:null,nf=vFecha(o.nf);if(nz&&nf)Object.assign(r,{nz,nf});return r}
 let lesion=normLesion(leerJSON(LESKEY,{})),v18listo=false,lesAplicada='';
-const lesOn=()=>!!lesion.z&&Date.now()<Date.parse(lesion.hasta);
+const lesAct=()=>lesion.zs.filter(x=>Date.now()<Date.parse(x.hasta));   // las zonas que se cuidan ahora
+const lesOn=()=>lesAct().length>0;
+const lesK=x=>x.z+'|'+x.p;
 // Superserie: pares fijos o propio (dos grupos). En piernas se alternan sus estaciones entre sí (1.ª, 3.ª… con 2.ª, 4.ª…).
 const SS_PARES=[{id:'bt',n:'Bíceps + Tríceps',g:['biceps','triceps']},{id:'pe',n:'Pecho + Espalda',g:['pecho','espalda']},
  {id:'pi',n:'Piernas: cuádriceps ⇄ isquios',g:['piernas','piernas']},{id:'ha',n:'Hombros + Abdomen',g:['hombros','abdominales']},{id:'mia',n:'Superserie propia'}];
@@ -198,11 +210,11 @@ function aplicarEjercicios(){for(const g in BASE){const M=misEj[g]||{},q=new Set
   let ok=base.filter(x=>!q.has(x.b));
   if(ok.length+ex.length<EST_MIN||!ok.concat(ex).some(x=>!x.levy))ok=base;   // nunca menos de 2 ni sin ejercicio con series
   CAT[g].e=[...ok.filter(x=>!x.levy),...ex,...ok.filter(x=>x.levy)];CAT[g].pausa=false;CAT[g].base=CAT[g].e;   // base: el plan sin cuidar (tabla de Ajustes)
-  if(v18listo&&lesOn()){const L=lesLista(g,CAT[g].e,lesion),q=L.filter(x=>!x.lesFuera);
+  if(v18listo&&lesOn()){const L=lesLista(g,CAT[g].e,lesAct()),q=L.filter(x=>!x.lesFuera);
     // dolor extremo: fuera lo que no tiene alternativa segura; sin ningún ejercicio con series, el grupo queda en pausa (se conserva la lista)
     if(q.some(x=>!x.levy))CAT[g].e=q;else{CAT[g].e=L;CAT[g].pausa=true}}}
   lesAplicada=v18listo&&lesOn()?lesKey():''}
-function lesKey(){return [lesion.z,lesion.p,lesion.n,lesion.hasta].join('|')}
+function lesKey(){return lesAct().map(x=>[x.z,x.p,x.n,x.hasta].join('|')).join(';')}
 function enPausa(g){return !!(CAT[g]&&CAT[g].pausa)}
 aplicarEjercicios();
 const DISCOS_STD=[25,20,15,10,5,2.5,1.25],BARRAS=[20,15,10,7],DISCOS_LB=[45,35,25,10,5,2.5],BARRAS_LB=[45,35,25,15];
@@ -343,7 +355,7 @@ const descargaActiva=()=>descargaManual()||!!(bloqueSem()||{}).desc;
 // Regla de doble progresión sobre la primera serie del ejercicio.
 function regla(E,r){const [lo,hi]=rango(E.r),R=parseInt(r.reps,10)||0,n=rirN(r.rir),kg=+r.kg||0;
   if(descargaActiva())return {kg,txt:`semana de descarga: ${kgTxt(kg)} y para lejos del fallo`,cambio:false};
-  if(E.lesM)return {kg,txt:`cuidando ${lesQue()}: mantén ${kgTxt(kg)} y deja 2–3 en reserva`,cambio:false};
+  if(E.lesM)return {kg,txt:`cuidando ${lesQueDe(E)}: mantén ${kgTxt(kg)} y deja 2–3 en reserva`,cambio:false};
   if(kg>0&&(n>=4||(R>=hi&&n>=1))){const k=cambiaKg(E,kg,1);return {kg:k,txt:`sube a ${kgTxt(k)}`,cambio:true}}
   if(kg>0&&R<lo&&n===0){const k=cambiaKg(E,kg,-1);
     if(k>=kg)return {kg,txt:`${kgTxt(kg)} es la barra sola: repite y busca ${lo} reps, o pasa a una variante más fácil`,cambio:true};
@@ -410,7 +422,7 @@ function iniciarSesion(x){x=x||{};if(x.fza)S.fza=x.fza;if(x.ests)S.ests=x.ests;
     meta:metaHoy(grupo),metaE:repartir(grupo),bien:bienDe(b),kRec:kDe(grupo),desc:descargaActiva()});
   if(x.ests){S.sec=s0;S.meta=x.ests.reduce((a,i)=>a+(S.metaE[i]||0),0)}   // la meta del grupo se reparte entre los dos lados
   if(x.fza){S.desc=false;S.meta=x.fza.nP+x.fza.nA;S.metaE=x.fza.e.map(e=>e.fz==='p'?x.fza.nP:x.fza.nA)}   // en fuerza la meta son series pesadas
-  if(lesOn()){S.les=lesion.z;S.lesP=lesion.p;S.lesN=lesion.n;S.lesAv=lesAvisoSesion(grupo,x.ests)}
+  if(lesOn()){const A=lesAct();S.les=A[0].z;S.lesP=A[0].p;S.lesN=A[0].n;S.lesL=A.map(({z,p,n})=>({z,p,n}));S.lesAv=lesAvisoSesion(grupo,x.ests)}
   prepEstacion()}
 // En rutina: al cerrar un grupo, guarda y pasa al siguiente tras 2 min.
 function sigueRutina(pre=''){const L=rutLista();if(!enRutina()||rutPos>=L.length-1)return false;
@@ -563,7 +575,7 @@ const fzaReps=p=>Math.min(6,Math.max(3,Math.round(30*(1/p-1)-1.5)));   // reps a
 const fzaHechas=()=>S.sets.filter(r=>r.k==='act.').length;
 // ¿ya hubo fuerza de este grupo esta semana? (se aconseja una como mucho)
 const fzaSemana=g=>hist.some(h=>h.fza&&gDe(h)===g&&Date.parse(h.start)>=lunes(Date.now()));
-function planFuerza(g){if(!fzaDisponible(g))return null;const L=FZA_PRIN[g].filter(n=>{if(!lesOn())return true;const c=lesCarga(n,g,lesion.z,lesion.p);return !(c==='a'||(lesion.n==='extremo'&&c==='m'))});if(!L.length)return null;
+function planFuerza(g){if(!fzaDisponible(g))return null;const L=FZA_PRIN[g].filter(n=>!lesAct().some(x=>{const c=lesCarga(n,g,x.z,x.p);return c==='a'||(x.n==='extremo'&&c==='m')}));if(!L.length)return null;   // pesado: nada que cargue mucho una zona cuidada
   const plan=CAT[g].e.map(x=>x.n),c=L.map(n=>({n,p:previas(g,n).filter(x=>x.kg>0)}));
   const el=c.filter(x=>x.p.length).sort((a,b)=>Date.parse(b.p[0].fecha)-Date.parse(a.p[0].fecha))[0]||c.find(x=>plan.includes(x.n))||c[0];
   const n=el.n,rm=el.p.length?Math.max(...el.p.slice(0,3).map(x=>x.mejor)):null,pct=fzaCfg.pct[n]||FZA_PCT,reps=fzaReps(pct);
@@ -665,6 +677,27 @@ const LES_TAB=Object.fromEntries(Object.entries({
 }).map(([k,o])=>[k,{a:new Set((o.a||'').split(' ').filter(Boolean)),m:new Set((o.m||'').split(' ').filter(Boolean)),ang:o.ang||''}]));
 const lesTab=(z,p)=>!p||p==='entero'?CARGA_ART[z]:LES_TAB[z+'|'+p];
 const lesAng=(z,p)=>(LES_TAB[z+'|'+(p||'entero')]||{}).ang||'';
+// v25 · dónde cae cada parte en la figura del mapa (zonas de MUS). La ingle no tiene zona propia: se marca el cuádriceps, su vecino.
+const LES_MUS={'hombro|entero':['del_ant','del_lat','del_post'],'hombro|manguito':['del_lat','del_post'],'hombro|del_ant':['del_ant'],'hombro|del_lat':['del_lat'],'hombro|del_post':['del_post'],
+  'brazo|biceps_prox':['biceps'],'brazo|biceps_dist':['biceps','antebrazo'],'brazo|triceps':['triceps'],'brazo|antebrazo':['antebrazo'],
+  'codo|entero':['antebrazo'],'codo|interna':['antebrazo'],'codo|externa':['antebrazo'],'codo|posterior':['triceps'],
+  'muñeca|entero':['antebrazo'],'muñeca|empujar':['antebrazo'],'muñeca|agarrar':['antebrazo'],'espalda baja|entero':['lumbar'],
+  'rodilla|entero':['cuads','isquios'],'rodilla|delante':['cuads'],'rodilla|detras':['isquios'],'cadera|entero':['gluteos'],'cadera|ingle':['cuads'],'cadera|lateral':['gluteos']};
+/* qué pasa con cada músculo del mapa cuidando zs: duele (la parte) · se deja de entrenar (todos sus ejercicios quitados o el grupo en pausa)
+   · se adapta (algún ejercicio que lo trabaja se cambia, va en serie recta o con aviso de ángulo) · sin cambios. Cuenta lo que trabaja ≥ ½. */
+function lesEfecto(zs){const du=new Set(),est={};
+  zs.forEach(x=>(LES_MUS[lesK(x)]||[]).forEach(m=>du.add(m)));
+  for(const g in CAT){const L=lesLista(g,CAT[g].base||CAT[g].e,zs),pausa=!L.some(x=>!x.levy&&!x.lesFuera);
+    L.forEach(x=>{if(x.levy)return;const fuera=pausa||!!x.lesFuera,adapta=!!(x.lesDe||x.lesM||x.lesAng);
+      for(const [m,f] of Object.entries(musculos((x.orig||x).n,g))){if(f<.5||!MUS[m])continue;const o=est[m]=est[m]||{fuera:0,sigue:0,adapta:0};
+        if(fuera)o.fuera++;else{o.sigue++;if(adapta)o.adapta++}}})}
+  const cls=m=>du.has(m)?'ldu':!est[m]?'l0':est[m].fuera&&!est[m].sigue?'lqu':est[m].fuera||est[m].adapta?'lad':'l0';
+  return {du,cls}}
+const LES_LEY=[['ldu','duele'],['lqu','se deja de entrenar'],['lad','se adapta (cambio, serie más suave o cuidado del ángulo)'],['l0','sin cambios']];
+function lesMapaSVG(zs){const {cls}=lesEfecto(zs);
+  const zona=(m,d)=>`<path d="${d}" data-lm="${m}" class="${cls(m)}"><title>${esc(MUS[m][0])}: ${LES_LEY.find(([k])=>k===cls(m))[1]}</title></path>`;
+  return `<div class="lesmapa">${figuraSVG({aria:'Mapa de lo que duele y lo que se adapta al cuidar',zona})}`
+    +`<div class="mleg">${LES_LEY.map(([k,t])=>`<span><i class="mpt ${k}"></i>${t}</span>`).join('')}</div></div>`}
 // sustitutos preferidos por zona (desempatan entre los de carga baja)
 const LES_PREF={hombro:new Set(['press_maquina','remo_maquina','elev_lateral_maquina','pushdown_barra']),codo:new Set(['curl_martillo','remo_maquina']),
  'muñeca':new Set(['curl_martillo','press_maquina','pushdown_cuerda']),'espalda baja':new Set(['prensa','remo_maquina','remo_polea','hip_thrust']),
@@ -673,52 +706,68 @@ const LES_PRUD='No es consejo médico: si el dolor es agudo, sigue o empeora, co
 // carga de un ejercicio sobre la zona (y la parte, v24): a / m / b. Un nombre que el catálogo no reconoce cuenta como «media».
 function lesCarga(n,g,z,p){const T=lesTab(z,p);if(!T)return 'b';const b=ANIM.buscar(n,g);if(b.d&&b.d.id==='vacio')return 'b';if(b.aprox)return 'm';
   return T.a.has(b.d.id)?'a':T.m.has(b.d.id)?'m':'b'}
-// mejor alternativa del mismo grupo: de carga baja (si no hay, media, salvo con soloB), que trabaje los mismos músculos y que no esté ya en el plan
-function lesAlt(g,E,z,p,ya,soloB){const mE=musculos(E.n,g),P=LES_PREF[z]||new Set();let best=null;
-  for(const d of ANIM.lista){if(d.g!==g||d.id==='vacio'||d.id==='generico'||ya.has(d.n))continue;const c=lesCarga(d.n,g,z,p);if(c==='a'||(soloB&&c==='m'))continue;
-    const m=musculos(d.n,g);let s=0;for(const k in mE)if(m[k])s+=Math.min(mE[k],m[k]);if(P.has(d.id))s+=.6;if(c==='m')s-=10;
-    if(!best||s>best.s)best={n:d.n,c,s}}
+/* v25 · varias zonas a la vez: cada zona pide una acción sobre el ejercicio según su nivel y la carga; manda la más prudente.
+   0 nada · 1 avisar del ángulo · 2 serie recta con 2–3 en reserva · 3 cambiarlo · 4 cambiarlo por uno de carga baja o quitarlo */
+const LES_ACC={leve:{m:1,a:2},fuerte:{m:2,a:3},extremo:{m:4,a:4}};
+function lesAcc(n,g,zs){let v=0,ang=false;const ks=[];
+  for(const x of zs){const c=lesCarga(n,g,x.z,x.p);if(c==='b')continue;const a=LES_ACC[x.n][c];ks.push(lesK(x));if(x.n==='leve')ang=true;if(a>v)v=a}
+  return {v,ks,ang}}
+// mejor alternativa del mismo grupo que ninguna zona obligue a cambiar (acción < 3): que trabaje los mismos músculos y que no esté ya en el plan
+function lesAlt(g,E,zs,ya){const mE=musculos(E.n,g),P=new Set(zs.flatMap(x=>[...(LES_PREF[x.z]||[])]));let best=null;
+  for(const d of ANIM.lista){if(d.g!==g||d.id==='vacio'||d.id==='generico'||ya.has(d.n))continue;const r=lesAcc(d.n,g,zs);if(r.v>=3)continue;
+    const m=musculos(d.n,g);let s=0;for(const k in mE)if(m[k])s+=Math.min(mE[k],m[k]);if(P.has(d.id))s+=.6;if(r.v===2)s-=10;else if(r.v===1)s-=1;
+    if(!best||s>best.s)best={n:d.n,r,s}}
   return best}
 const nCorto=n=>{if(SUGEJ[n])return SUGEJ[n].s;const w=n.split(' ');const s=w.length>1?w[0]+' '+w[w.length-1]:w[0];return s.length>14?(w[0].slice(0,4)+'. '+w[w.length-1]).slice(0,14):s};
-/* plan de un grupo cuidando les = {z, p, n}. Por nivel, según la carga del ejercicio sobre la parte:
+/* plan de un grupo cuidando zs = [{z, p, n}…]. Por nivel, según la carga del ejercicio sobre cada parte (manda la acción más prudente):
      molestia: a → el mismo ejercicio, serie recta con 2–3 en reserva y sin el ángulo que molesta (lesAng); m → el mismo, con el aviso del ángulo
      fuerte:   a → la mejor alternativa (o serie recta si no hay); m → serie recta con 2–3 en reserva
-     extremo:  a y m → alternativa de carga baja; si no hay, el ejercicio se quita (lesFuera). Sin ninguno seguro, el grupo queda en pausa. */
-function lesLista(g,L,les){const z=les.z,p=les.p,nv=les.n||'fuerte',ya=new Set(L.map(x=>x.n));
-  return L.map(E=>{if(E.levy)return E;const c=lesCarga(E.n,g,z,p);if(c==='b')return E;
-    if(nv==='leve')return c==='a'?{...E,lesM:z,lesAng:1,orig:E}:{...E,lesAng:1,orig:E};
-    if(nv==='fuerte'&&c==='m')return {...E,lesM:z,orig:E};
-    const a=lesAlt(g,E,z,p,ya,nv==='extremo');if(!a)return nv==='extremo'?{...E,lesFuera:1,orig:E}:{...E,lesM:z,lesSin:true,orig:E};ya.add(a.n);
-    const sg=SUGEJ[a.n]||{},ext=sg.ext||'part',o={...E,n:a.n,s:sg.s||nCorto(a.n),tempo:sg.tempo||'controlado · sin dolor',ext,
-      extN:sg.extN||'Parciales',extH:sg.extH||'recorrido corto y sin dolor',k:KEXT[ext]||1.5,lesDe:E.n,lesZ:z,orig:E};
-    if(a.c==='m')o.lesM=z;return o})}
-const lesQue=()=>lesTxt(lesion.z,lesion.p);   // lo que se cuida ahora, con artículo
-function lesAvisoSesion(g,ests){const L=CAT[g].e.filter((x,i)=>!ests||ests.includes(i)),q=lesQue();
-  const c=L.filter(x=>x.lesDe).map(x=>`${x.n} en lugar de ${x.lesDe}`),m=L.filter(x=>x.lesM&&!x.lesDe).map(x=>x.s.toLowerCase()),an=L.some(x=>x.lesAng);
-  return `Cuidando ${q} · ${LES_NN[lesion.n]}`+(c.length?`: cambié ${c.join(' y ')}`:'')+(m.length?`. En ${m.join(' y ')}, series rectas con 2 o 3 en reserva`:'')
-    +(an?`. ${lesAng(lesion.z,lesion.p)}`:'')+(!c.length&&!m.length&&!an?': hoy ningún ejercicio lo carga mucho':'')+'. Si duele, para'}
-function avisoEst(g,E){const a=avisoMolestia(g,E);if(!E||(!E.lesDe&&!E.lesM&&!E.lesAng))return a;const q=lesQue();
+     extremo:  a y m → alternativa de carga baja; si no hay, el ejercicio se quita (lesFuera). Sin ninguno seguro, el grupo queda en pausa.
+   lesZs: las zonas («z|p») que afectan a ese ejercicio, para los avisos. */
+function lesLista(g,L,zs){if(!Array.isArray(zs))zs=[zs];const ya=new Set(L.map(x=>x.n));
+  return L.map(E=>{if(E.levy)return E;const r=lesAcc(E.n,g,zs);if(!r.v)return E;const base={...E,lesZs:r.ks,orig:E};
+    if(r.v===1)return {...base,lesAng:1};
+    if(r.v===2)return {...base,lesM:zs[0].z,...(r.ang?{lesAng:1}:{})};
+    const a=lesAlt(g,E,zs,ya);if(!a)return r.v===4?{...base,lesFuera:1}:{...base,lesM:zs[0].z,lesSin:true};ya.add(a.n);
+    const sg=SUGEJ[a.n]||{},ext=sg.ext||'part',o={...base,n:a.n,s:sg.s||nCorto(a.n),tempo:sg.tempo||'controlado · sin dolor',ext,
+      extN:sg.extN||'Parciales',extH:sg.extH||'recorrido corto y sin dolor',k:KEXT[ext]||1.5,lesDe:E.n,lesZ:zs[0].z};
+    if(a.r.v===2)o.lesM=zs[0].z;else if(a.r.v===1)o.lesAng=1;if(a.r.ks.length)o.lesZs=[...new Set(r.ks.concat(a.r.ks))];return o})}
+// lo que se cuida, con artículo: «el manguito rotador y el codo» (sin lista: lo activo ahora)
+const yJunta=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' y '+a[a.length-1];
+const lesQue=(zs=lesAct())=>yJunta(zs.map(x=>lesTxt(x.z,x.p)));
+const lesQueN=(zs=lesAct())=>yJunta(zs.map(x=>`${lesTxt(x.z,x.p)} (${LES_NN[x.n]})`));
+const lesQueDe=E=>{const ks=new Set(E.lesZs||[]),zs=lesAct().filter(x=>ks.has(lesK(x)));return lesQue(zs.length?zs:lesAct())};
+// qué evitar en un ejercicio: el ángulo de cada zona que lo afecta (sin repetir)
+const angDe=E=>{const ks=E.lesZs&&E.lesZs.length?E.lesZs:lesAct().map(lesK);return [...new Set(ks.map(k=>{const [z,p]=k.split('|');return lesAng(z,p)}).filter(Boolean))].join(' ')};
+function lesAvisoSesion(g,ests){const L=CAT[g].e.filter((x,i)=>!ests||ests.includes(i)),q=lesQueN();
+  const c=L.filter(x=>x.lesDe).map(x=>`${x.n} en lugar de ${x.lesDe}`),m=L.filter(x=>x.lesM&&!x.lesDe).map(x=>x.s.toLowerCase()),an=L.filter(x=>x.lesAng);
+  return `Cuidando ${q}`+(c.length?`: cambié ${c.join(' y ')}`:'')+(m.length?`. En ${m.join(' y ')}, series rectas con 2 o 3 en reserva`:'')
+    +(an.length?`. ${[...new Set(an.map(angDe))].join(' ')}`:'')+(!c.length&&!m.length&&!an.length?': hoy ningún ejercicio lo carga mucho':'')+'. Si duele, para'}
+function avisoEst(g,E){const a=avisoMolestia(g,E);if(!E||(!E.lesDe&&!E.lesM&&!E.lesAng))return a;const q=lesQueDe(E);
   const l=E.lesDe?`Cambiado por cuidar ${q}: ${E.n} en lugar de ${E.lesDe}`+(E.lesM?' · 2–3 en reserva':'')
-    :E.lesM?`Cuidando ${q}: series rectas con 2–3 en reserva, sin llegar al fallo`+(E.lesAng?`. ${lesAng(lesion.z,lesion.p)}`:'')
-    :`Cuidando ${q}: ${lesAng(lesion.z,lesion.p)}`;
+    :E.lesM?`Cuidando ${q}: series rectas con 2–3 en reserva, sin llegar al fallo`+(E.lesAng?`. ${angDe(E)}`:'')
+    :`Cuidando ${q}: ${angDe(E)}`;
   return a?l+'. '+a:l}
 // progreso de la meta cuidando: las series rectas valen 1 si llegan a 5 reps (como en descarga); las demás, sus efectivas
 const progLes=sets=>(sets||[]).reduce((a,r)=>a+(r.recta?(r.k==='act.'&&(parseInt(r.reps,10)||0)>=5?1:0):efectiva(r)),0);
 // sugerencia: la misma zona con molestia en 2 de las 3 últimas sesiones (salvo que dijeras «ahora no» hace menos de 7 días)
 // (v24) con la parte más marcada de esa zona, si la anotaste; si no, la zona entera
-function lesSugerida(){if(lesOn())return null;const H=hist.slice(0,3),n={};if(H.length<2)return null;
+function lesSugerida(){const H=hist.slice(0,3),n={},ya=new Set(lesAct().map(x=>x.z));if(H.length<2)return null;   // (v25) una zona que aún no cuidas
   H.forEach(h=>new Set((h.sets||[]).map(r=>r.mol).filter(z=>LES_Z.includes(z))).forEach(z=>n[z]=(n[z]||0)+1));
-  const z=LES_Z.find(z=>n[z]>=2);if(!z||(lesion.nz===z&&Date.now()-Date.parse(lesion.nf)<7*864e5))return null;
+  const z=LES_Z.find(z=>n[z]>=2&&!ya.has(z));if(!z||(lesion.nz===z&&Date.now()-Date.parse(lesion.nf)<7*864e5))return null;
   const np={};H.forEach(h=>(h.sets||[]).forEach(r=>{if(r.mol===z&&LES_P[z].includes(r.molP))np[r.molP]=(np[r.molP]||0)+1}));
   const p=Object.keys(np).sort((a,b)=>np[b]-np[a])[0]||LES_P[z][0];return {z,p}}
 // al volver a reposo: si la zona cuidada empezó, cambió o venció, se rehace el plan
 function lesRefresca(){if(!v18listo||S.st!=='idle')return;const k=lesOn()?lesKey():'';if(k!==lesAplicada){aplicarEjercicios();lastPlan=''}}
+const lesGuarda=()=>{guardarObj(LESKEY,lesion);aplicarEjercicios();lastPlan='';if(S.st==='idle')S=fresh()};
+// añade una zona (o la renueva si esa zona y parte ya se cuidaban); las vencidas se van quitando de la lista
 function lesEmpezar(z,d,p,n){const t=Date.now();p=LES_P[z].includes(p)?p:LES_P[z][0];n=LES_N.includes(n)?n:'fuerte';
-  lesion={...(lesion.nz?{nz:lesion.nz,nf:lesion.nf}:{}),z,p,n,ini:new Date(t).toISOString(),hasta:new Date(t+d*864e5).toISOString()};
-  guardarObj(LESKEY,lesion);aplicarEjercicios();lastPlan='';if(S.st==='idle')S=fresh()}
-// subir o bajar el nivel mientras dura (mismo periodo): el plan se rehace al volver a reposo
-function lesNivel(n){if(!lesOn()||!LES_N.includes(n))return;lesion={...lesion,n};guardarObj(LESKEY,lesion);aplicarEjercicios();lastPlan='';if(S.st==='idle')S=fresh()}
-function lesTerminar(){if(!lesion.z)return;lesion={...lesion,hasta:new Date().toISOString()};guardarObj(LESKEY,lesion);aplicarEjercicios();lastPlan='';if(S.st==='idle')S=fresh()}
+  const e={z,p,n,ini:new Date(t).toISOString(),hasta:new Date(t+d*864e5).toISOString()};
+  lesion={...lesion,zs:[...lesAct().filter(x=>lesK(x)!==lesK(e)),e].slice(-LES_MAX)};lesGuarda()}
+// subir o bajar el nivel de una zona mientras dura (mismo periodo): el plan se rehace al volver a reposo
+function lesNivel(k,n){if(!LES_N.includes(n))return;lesion={...lesion,zs:lesion.zs.map(x=>lesK(x)===k&&Date.now()<Date.parse(x.hasta)?{...x,n}:x)};lesGuarda()}
+// terminar antes una zona (k) o todas (sin k)
+function lesTerminar(k){if(!lesOn())return;const ya=new Date().toISOString();lesion={...lesion,zs:lesion.zs.map(x=>!k||lesK(x)===k?{...x,hasta:x.hasta<ya?x.hasta:ya}:x)};lesGuarda()}
 const fLarga=x=>new Date(x).toLocaleDateString('es-DO',{weekday:'long',day:'numeric',month:'short'});
 /* ---------- deshacer: antes de cada serie se guarda una copia profunda del motor (y de lo que una rutina cambia al pasar de grupo) ---------- */
 const PILA_MAX=5;let pila=[],rirPrev=null;   // rirPrev: la reserva que habías marcado en la serie deshecha
@@ -759,7 +808,7 @@ function guardar(completa){
     efectivas:Math.round(efDe(S.sets)*100)/100,meta:S.meta,bien:S.bien||undefined,nota:S.nota||undefined,
     antes:!completa&&S.antes||undefined,desc:S.desc||undefined,serC:S.desc?serDe(S.sets):S.fza?fzaHechas():undefined,
     rut:enRutina()?{n:RUTINAS[rutI].mia?'La mía':RUTINAS[rutI].n,pos:rutPos,de:rutLista().length}:undefined,
-    fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined,cuidaP:S.les&&S.lesP||undefined,cuidaN:S.les&&S.lesN||undefined};
+    fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined,cuidaP:S.les&&S.lesP||undefined,cuidaN:S.les&&S.lesN||undefined,cuidaL:S.les&&S.lesL&&S.lesL.length>1?S.lesL:undefined};
   hist=[ent].concat(hist.filter(h=>h.id!==S.id));   // sin tope: nunca se borran sesiones viejas
   $('save').textContent=escribirHist()?'Guardado ✓':'Sin espacio: no se guardó (mira el aviso)';
   if(persistE==null)pedirPersist();pintarHist()}
@@ -1122,44 +1171,50 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-tipo]');if
 const LES_ND={leve:'Mantiene tus ejercicios. En los que llevan la parte al ángulo que molesta: serie recta con 2–3 en reserva y recorrido cómodo; en el resto, el aviso de qué evitar.',
   fuerte:'Cambia los ejercicios que cargan mucho la parte por la mejor alternativa del mismo grupo; en los de carga media, serie recta con 2–3 en reserva.',
   extremo:'Solo deja ejercicios que casi no la cargan, también en los grupos que la cargan de rebote. Lo que no tenga alternativa se quita, y el grupo que se quede sin ejercicios queda en pausa. Con dolor así, lo primero es que te vea un profesional.'};
+const lesExtremo=()=>lesAct().some(x=>x.n==='extremo');
 function lesBanner(){
-  if(lesOn()){const L=CAT[grupo].e,c=L.filter(x=>x.lesDe),m=L.filter(x=>x.lesM&&!x.lesDe),q=lesQue(),an=L.some(x=>x.lesAng);
-    return `<div class="aviso-d les${lesion.n==='extremo'?' fuerte':''}"><span><b>Cuidando ${esc(q)} · ${LES_NN[lesion.n]}</b> hasta el ${esc(fLarga(lesion.hasta))}. `
-      +(enPausa(grupo)?`<b>${esc(CAT[grupo].n)} está en pausa</b>: no queda ningún ejercicio que no la cargue. Elige otro grupo. `:'')
-      +(c.length&&!enPausa(grupo)?`Cambiado: `+c.map(x=>`${esc(x.lesDe)} → <b>${esc(x.n)}</b>`).join(' · ')+'. ':'')
-      +(m.length&&!enPausa(grupo)?`Series rectas con 2–3 en reserva en ${m.map(x=>esc(x.s.toLowerCase())).join(', ')}. `:'')
-      +(an&&!enPausa(grupo)?`${esc(lesAng(lesion.z,lesion.p))} `:'')
-      +(!c.length&&!m.length&&!an&&!enPausa(grupo)?`Hoy ${esc(CAT[grupo].n.toLowerCase())} casi no la carga: entrena normal y para si duele. `:'')
-      +`<small>${LES_PRUD}</small></span><button type="button" data-les="fin">Terminar antes</button></div>`}
+  if(lesOn()){const L=CAT[grupo].e,c=L.filter(x=>x.lesDe),m=L.filter(x=>x.lesM&&!x.lesDe),an=L.filter(x=>x.lesAng),pa=enPausa(grupo);
+    const hasta=lesAct().map(x=>Date.parse(x.hasta)),mismo=hasta.every(t=>t===hasta[0]);
+    return `<div class="aviso-d les${lesExtremo()?' fuerte':''}"><span><b>Cuidando ${esc(lesQueN())}</b>${mismo?` hasta el ${esc(fLarga(lesAct()[0].hasta))}`:''}. `
+      +(pa?`<b>${esc(CAT[grupo].n)} está en pausa</b>: no queda ningún ejercicio que no las cargue. Elige otro grupo. `:'')
+      +(c.length&&!pa?`Cambiado: `+c.map(x=>`${esc(x.lesDe)} → <b>${esc(x.n)}</b>`).join(' · ')+'. ':'')
+      +(m.length&&!pa?`Series rectas con 2–3 en reserva en ${m.map(x=>esc(x.s.toLowerCase())).join(', ')}. `:'')
+      +(an.length&&!pa?`${esc([...new Set(an.map(angDe))].join(' '))} `:'')
+      +(!c.length&&!m.length&&!an.length&&!pa?`Hoy ${esc(CAT[grupo].n.toLowerCase())} casi no las carga: entrena normal y para si duele. `:'')
+      +`<small>${LES_PRUD}</small></span><button type="button" data-les="fin">Terminar ${lesAct().length>1?'todas':'antes'}</button></div>`}
   const sg=lesSugerida();if(!sg)return '';const {z,p}=sg;
   return `<div class="aviso-d"><span>Marcaste molestia en <b>${esc(lesTxt(z,p))}</b> en 2 de tus últimas 3 sesiones. ¿Lo cuidamos unos días? Empiezo en nivel «molestia»: mismos ejercicios, sin los ángulos que suelen molestar (lo puedes subir en Ajustes). <small>${LES_PRUD}</small></span>`
     +`<div class="tog">${LES_D.map(d=>`<button type="button" data-ld="${d}" data-lz="${esc(z)}" data-lp="${esc(p)}" data-ln="leve">Cuidar ${d} días</button>`).join('')}<button type="button" data-les="no" data-lz="${esc(z)}">Ahora no</button></div></div>`}
 let lesZsel='hombro',lesPsel='entero',lesNsel='fuerte';
-function renderLesCfg(){const el=$('cLes');if(!el)return;const on=lesOn(),z=on?lesion.z:lesZsel,p=on?lesion.p:(LES_P[z].includes(lesPsel)?lesPsel:LES_P[z][0]),n=on?lesion.n:lesNsel;
-  const filas=Object.keys(CAT).map(g=>{const L=lesLista(g,CAT[g].base||CAT[g].e,{z,p,n}),pausa=!L.some(x=>!x.levy&&!x.lesFuera);
+/* Ajustes · cuidar (v25): arriba, las zonas que ya cuidas (cada una con su nivel y su «terminar»); debajo, añadir otra zona.
+   El mapa y la tabla muestran el efecto de TODO junto: lo activo más la zona que estás eligiendo (si aún no está). */
+function renderLesCfg(){const el=$('cLes');if(!el)return;const A=lesAct(),z=lesZsel,p=LES_P[z].includes(lesPsel)?lesPsel:LES_P[z][0],n=lesNsel;
+  const cand={z,p,n},ya=A.find(x=>lesK(x)===lesK(cand)),zs=ya?A:[...A,cand];
+  const filas=Object.keys(CAT).map(g=>{const L=lesLista(g,CAT[g].base||CAT[g].e,zs),pausa=!L.some(x=>!x.levy&&!x.lesFuera);
     const c=L.filter(x=>x.lesDe),m=L.filter(x=>x.lesM&&!x.lesDe),an=L.filter(x=>x.lesAng&&!x.lesM),f=L.filter(x=>x.lesFuera);
     return `<tr${pausa?' class="pausa"':''}><td>${CAT[g].n}${pausa?'<br><b>en pausa</b>':''}</td><td class="lc">${pausa?'—':c.map(x=>`${esc(x.lesDe)} → <b>${esc(x.n)}</b>`).join('<br>')||'—'}</td>`
       +`<td class="lc">${pausa?'—':m.map(x=>esc(x.s)).concat(an.map(x=>esc(x.s)+' (ojo al ángulo)')).join(', ')||'—'}</td><td class="lc">${pausa?'todo el grupo':f.map(x=>esc(x.s)).join(', ')||'—'}</td></tr>`}).join('');
-  const chips=(lista,sel,attr,nom)=>`<div class="chips">${lista.map(x=>`<button type="button" ${attr}="${esc(x)}" aria-pressed="${x===sel}">${esc(nom(x))}</button>`).join('')}</div>`;
-  const h=(on?`<div class="aviso-d les${n==='extremo'?' fuerte':''}"><span><b>Cuidando ${esc(lesTxt(z,p))} · ${LES_NN[n]}</b> desde el ${esc(fLarga(lesion.ini))} hasta el ${esc(fLarga(lesion.hasta))} · quedan ${Math.max(1,Math.ceil((Date.parse(lesion.hasta)-Date.now())/864e5))} días.</span><button type="button" data-les="fin">Terminar antes</button></div>
-      <span class="lbl">Cómo va (cámbialo cuando mejore o empeore)</span>${chips(LES_N,n,'data-lniv',x=>LES_NN[x])}`
-      :`<span class="lbl">Zona</span>${chips(LES_Z,z,'data-lsel',x=>x)}
+  const chips=(lista,sel,attr,nom,extra='')=>`<div class="chips">${lista.map(x=>`<button type="button" ${attr}="${esc(x)}" ${extra} aria-pressed="${x===sel}">${esc(nom(x))}</button>`).join('')}</div>`;
+  const quedan=x=>Math.max(1,Math.ceil((Date.parse(x.hasta)-Date.now())/864e5));
+  const activas=A.length?`<span class="lbl">Ya cuidas</span>`+A.map(x=>`<div class="aviso-d les${x.n==='extremo'?' fuerte':''}"><span><b>${esc(lesTxt(x.z,x.p))}</b> · ${LES_NN[x.n]} · hasta el ${esc(fLarga(x.hasta))} (quedan ${quedan(x)} días)</span>`
+      +chips(LES_N,x.n,'data-lniv',v=>LES_NN[v],`data-lk="${esc(lesK(x))}"`)+`<button type="button" data-les="fin" data-lk="${esc(lesK(x))}">Terminar esta</button></div>`).join(''):'';
+  const h=activas+`<span class="lbl">${A.length?'Añadir otra zona':'Zona'}</span>${chips(LES_Z,z,'data-lsel',x=>x)}
       ${LES_P[z].length>1?`<span class="lbl">Qué parte</span>${chips(LES_P[z],p,'data-lpsel',x=>lesPN(z,x))}`:''}
       <span class="lbl">Cuánto molesta</span>${chips(LES_N,n,'data-lnsel',x=>LES_NN[x])}
-      <span class="lbl">Cuánto tiempo</span><div class="tog">${LES_D.map(d=>`<button type="button" data-ld="${d}" data-lz="${esc(z)}" data-lp="${esc(p)}" data-ln="${n}">Cuidar ${d} días</button>`).join('')}</div>`)
+      <span class="lbl">Cuánto tiempo</span><div class="tog">${LES_D.map(d=>`<button type="button" data-ld="${d}" data-lz="${esc(z)}" data-lp="${esc(p)}" data-ln="${n}">${ya?'Renovar':'Cuidar'} ${d} días</button>`).join('')}</div>`
     +`<p class="hint"><b>${esc(LES_NN[n])[0].toUpperCase()+esc(LES_NN[n]).slice(1)}:</b> ${LES_ND[n]}${lesAng(z,p)?` <b>Qué evitar:</b> ${esc(lesAng(z,p))}`:''}</p>
-    <p class="hint">${on?'Así queda tu plan':'Qué cambiaría'}, grupo por grupo:</p>
+    <p class="hint">${ya||!A.length?'Qué cambiaría':'Qué cambiaría junto con lo que ya cuidas'}${zs.length>1?` (${esc(lesQueN(zs))})`:''}:</p>${lesMapaSVG(zs)}
     <div class="tbl"><table class="lest"><thead><tr><th>Grupo</th><th>Se cambia</th><th>Más suave</th><th>Se quita</th></tr></thead><tbody>${filas}</tbody></table></div>
-    <p class="hint"><b>${LES_PRUD}</b> Este modo solo adapta el entrenamiento mientras dura; no trata la lesión ni sustituye una valoración. Las cargas por parte son orientativas.</p>`;
+    <p class="hint"><b>${LES_PRUD}</b> Este modo solo adapta el entrenamiento mientras dura; no trata la lesión ni sustituye una valoración. Las cargas por parte y el mapa son orientativos.</p>`;
   if(el.innerHTML!==h)el.innerHTML=h}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-ld],[data-les],[data-lsel],[data-lpsel],[data-lnsel],[data-lniv]');if(!b)return;const d=b.dataset,z=d.lz;
   if(d.lsel){if(LES_Z.includes(d.lsel)){lesZsel=d.lsel;lesPsel=LES_P[d.lsel][0]}renderLesCfg();return}
   if(d.lpsel){if(LES_P[lesZsel].includes(d.lpsel))lesPsel=d.lpsel;renderLesCfg();return}
   if(d.lnsel){if(LES_N.includes(d.lnsel))lesNsel=d.lnsel;renderLesCfg();return}
   if(enCurso())return;   // a media sesión el plan no cambia
-  if(d.lniv){lesNivel(d.lniv);decir(`Cuidando ${lesQue()}: ${LES_NN[lesion.n]}. ${lesion.n==='extremo'?LES_PRUD:''}`)}
-  else if(d.ld&&LES_Z.includes(z)&&LES_D.includes(+d.ld)){lesEmpezar(z,+d.ld,d.lp,d.ln);decir(`Cuidando ${lesQue()} ${d.ld} días, ${LES_NN[lesion.n]}. ${LES_PRUD}`)}
-  else if(d.les==='fin'){lesTerminar();decir('Terminado el modo cuidar')}
+  if(d.lniv){lesNivel(d.lk,d.lniv);const x=lesAct().find(x=>lesK(x)===d.lk);if(x)decir(`Cuidando ${lesTxt(x.z,x.p)}: ${LES_NN[x.n]}. ${x.n==='extremo'?LES_PRUD:''}`)}
+  else if(d.ld&&LES_Z.includes(z)&&LES_D.includes(+d.ld)){lesEmpezar(z,+d.ld,d.lp,d.ln);decir(`Cuidando ${lesTxt(z,LES_P[z].includes(d.lp)?d.lp:LES_P[z][0])} ${d.ld} días, ${LES_NN[d.ln]||'dolor fuerte'}. ${LES_PRUD}`)}
+  else if(d.les==='fin'){lesTerminar(d.lk);decir(d.lk?'Terminado el cuidado de esa zona':'Terminado el modo cuidar')}
   else if(d.les==='no'&&LES_Z.includes(z)){lesion={...lesion,nz:z,nf:new Date().toISOString()};guardarObj(LESKEY,lesion)}
   renderGrupos();renderLesCfg();render()});
 /* ---------- v18 · el pad en superserie, fuerza y reposo con modo (sin modo, render no pasa por aquí) ---------- */
@@ -1236,7 +1291,7 @@ $('hist').addEventListener('click',e=>{const b=e.target.closest('[data-hed]');if
 function histExtra(h){const mols=[...new Map((h.sets||[]).filter(r=>r.mol).map(r=>[r.ej+r.mol+(r.molP||''),`${r.mol==='sin zona'?'sí':esc(r.mol)+(r.molP&&LES_PN[r.molP]?' · '+esc(LES_PN[r.molP]):'')} (${esc(r.ex)})`])).values()];
   const x=[h.bien&&bienTxt(h.bien)?`Cómo llegaste: ${esc(bienTxt(h.bien))}`:'',mols.length?`<b>Molestia:</b> ${mols.join(', ')}`:'',
     h.nota?`<b>Nota:</b> ${esc(h.nota)}`:'',(h.sets||[]).some(r=>r.k==='cal.')?'Con calentamiento':'',
-    h.super?`<b>Superserie</b> ${h.super.split('+').map(g=>esc(CAT[g].n)).join(' + ')}${h.lado?` · lado ${esc(h.lado)}`:''}`:'',h.fza?'<b>Día de fuerza</b>':'',h.cuida?`Cuidando ${esc(lesTxt(h.cuida,h.cuidaP))}${h.cuidaN?` · ${LES_NN[h.cuidaN]}`:''}`:''].filter(Boolean);
+    h.super?`<b>Superserie</b> ${h.super.split('+').map(g=>esc(CAT[g].n)).join(' + ')}${h.lado?` · lado ${esc(h.lado)}`:''}`:'',h.fza?'<b>Día de fuerza</b>':'',h.cuida?`Cuidando ${esc(h.cuidaL?lesQueN(h.cuidaL):lesTxt(h.cuida,h.cuidaP)+(h.cuidaN?` · ${LES_NN[h.cuidaN]}`:''))}`:''].filter(Boolean);
   return x.length?`<div class="hist-x">${x.join('<br>')}</div>`:''}
 let lastG=null,lastEn=null,lastPlan='',lastRows='';
 function subInicio(E){const s=sugerir(grupo,E);
@@ -1681,15 +1736,19 @@ const fibra=s=>{const [a,c,b]=s.split(' ').map(p=>p.split(',').map(Number)),q=(A
 const figTr=()=>figD||(figD={b:FIG_B.split('|').map(trazo).join(''),d:FIG_D.split('|').map(trazo).join(''),F:FIG.F.map(([m,s])=>[m,trazo(s)]),E:FIG.E.map(([m,s])=>[m,trazo(s)]),
   fF:FIG_FIB.F.split('|').map(fibra).join(''),fE:FIG_FIB.E.split('|').map(fibra).join('')});
 const semNom=o=>o===0?'Esta semana':o===1?'Semana pasada':'Semana del '+new Date(lunes(Date.now())-o*7*864e5).toLocaleDateString('es-DO',{day:'numeric',month:'short'});
-function mapaSVG(){
-  const {v,de,V}=volMus(mapaOff),T=figTr();
-  const zona=(m,d)=>`<path d="${d}" data-m="${m}" class="${estMus(m,v)}${m===mapaSel?' sel':''}"><title>${esc(MUS[m][0])}: ${ef1(v[m]||0)} (objetivo orientativo ${rangoZona(m).join('–')})</title></path>`;
-  // capas: cuerpo (contorno + relleno + luz), músculos (clicables), volumen por músculo, fibras y, encima, el borde de la zona elegida; lo decorativo no captura toques
+/* figura anatómica frente/espalda, compartida por el mapa de volumen (Progreso) y el de «cuidar» (Ajustes, v25).
+   o.zona(m, d) pinta cada músculo; o.sel = músculo con borde marcado. Capas: cuerpo (contorno + relleno + luz), músculos, volumen
+   por músculo, fibras y, encima, el borde de la zona elegida; lo decorativo no captura toques. */
+function figuraSVG(o){const T=figTr();
   const fig=(V,dx,lab)=>`<g transform="translate(${dx} 0)"><path class="cb" d="${T.b}"/><path class="cf" d="${T.b}"/><path class="mluz" d="${T.b}"/><path class="zn" d="${T.d}"/>`
-    +T[V].map(([m,d])=>m&&MUS[m]?zona(m,d):`<path class="zn" d="${d}"/>`).join('')
+    +T[V].map(([m,d])=>m&&MUS[m]?o.zona(m,d):`<path class="zn" d="${d}"/>`).join('')
     +T[V].map(([,d])=>`<path class="mvol" d="${d}"/>`).join('')+`<path class="mfib" d="${T['f'+V]}"/>`
-    +T[V].filter(([m])=>m&&m===mapaSel).map(([,d])=>`<path class="selb" d="${d}"/>`).join('')
+    +(o.sel?T[V].filter(([m])=>m&&m===o.sel).map(([,d])=>`<path class="selb" d="${d}"/>`).join(''):'')
     +`<text x="60" y="247" text-anchor="middle">${lab}</text></g>`;
+  return `<svg ${o.id?`id="${o.id}" `:''}class="fig" viewBox="0 0 244 252" role="img" aria-label="${esc(o.aria)}"><defs><linearGradient id="mluz" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient><radialGradient id="mvol" cx=".42" cy=".36" r=".72"><stop offset="0" stop-color="#fff" stop-opacity=".26"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".38"/></radialGradient></defs>${fig('F',0,'FRENTE')}${fig('E',124,'ESPALDA')}</svg>`}
+function mapaSVG(){
+  const {v,de,V}=volMus(mapaOff);
+  const zona=(m,d)=>`<path d="${d}" data-m="${m}" class="${estMus(m,v)}${m===mapaSel?' sel':''}"><title>${esc(MUS[m][0])}: ${ef1(v[m]||0)} (objetivo orientativo ${rangoZona(m).join('–')})</title></path>`;
   let det='<p class="hint" style="text-align:center">Toca una zona para ver de qué ejercicios vienen sus series.</p>';
   if(mapaSel&&MUS[mapaSel]){const [n,G]=MUS[mapaSel],r=rangoZona(mapaSel),x=v[mapaSel]||0,zo=V.zonas[mapaSel]||{dir:0,ind:0,deDir:{},deInd:{}},una=zonasDe(G).length===1;
     const lista=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([e,c])=>`${esc(e)} ${ef1(c)}`).join(' · ');
@@ -1702,7 +1761,7 @@ function mapaSVG(){
   return `<div class="calnav mnav"><button type="button" data-moff="1" aria-label="Semana anterior" ${mapaOff>=8?'disabled':''}>‹</button>
     <span class="msel"><span class="mlab" aria-hidden="true">${esc(semNom(mapaOff))}<i>▾</i></span><select id="mSem" aria-label="Semana del mapa">${Array.from({length:9},(_,o)=>`<option value="${o}"${o===mapaOff?' selected':''}>${esc(semNom(o))}</option>`).join('')}</select></span>
     <button type="button" data-moff="-1" aria-label="Semana siguiente" ${mapaOff<=0?'disabled':''}>›</button></div>
-    <svg id="mapa" viewBox="0 0 244 252" role="img" aria-label="Mapa muscular por zonas, frente y espalda"><defs><linearGradient id="mluz" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient><radialGradient id="mvol" cx=".42" cy=".36" r=".72"><stop offset="0" stop-color="#fff" stop-opacity=".26"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".38"/></radialGradient></defs>${fig('F',0,'FRENTE')}${fig('E',124,'ESPALDA')}</svg>
+    ${figuraSVG({id:'mapa',aria:'Mapa muscular por zonas, frente y espalda',zona,sel:mapaSel})}
     <div class="mleg">${Object.entries(EST_MUS).map(([k,t])=>`<span><i class="mpt ${k}"></i>${t}</span>`).join('')}</div>
     ${det}<p class="lbl" style="margin:6px 0 0">Volumen semanal por grupo muscular</p>
     <div class="musl"><div>${ks.slice(0,8).map(fila).join('')}</div><div>${ks.slice(8).map(fila).join('')}</div></div>
@@ -2023,7 +2082,7 @@ function normS(x){if(!esObj(x))return null;const f=fresh(),o={};
   o.sug=p?{kg:vNum(x.sug.kg,0,1000)??0,txt:vTxt(x.sug.txt)??'',cambio:x.sug.cambio===true,prev:{...p,mejor:vNum(x.sug.prev.mejor,0,1e5)??0,fecha:vFecha(x.sug.prev.fecha)}}:null;
   o.molR=x.molR==null?null:vTxt(x.molR,40);o.molP=o.molR&&LES_P[o.molR]&&LES_P[o.molR].includes(x.molP)?x.molP:null;o.bien=x.bien==null?null:normBien1(x.bien);o.Cpre=x.Cpre==null?null:vNum(x.Cpre,0,10);
   // v18: zona cuidada, estaciones de un lado de superserie y plan de fuerza
-  if(LES_Z.includes(x.les)){o.les=x.les;if(LES_P[x.les].includes(x.lesP))o.lesP=x.lesP;if(LES_N.includes(x.lesN))o.lesN=x.lesN}{const t=vTxt(x.lesAv,400);if(t)o.lesAv=t}if(x.lesDicho===true)o.lesDicho=true;if(x.ssW===true)o.ssW=true;
+  if(LES_Z.includes(x.les)){o.les=x.les;if(LES_P[x.les].includes(x.lesP))o.lesP=x.lesP;if(LES_N.includes(x.lesN))o.lesN=x.lesN;const cl=normLesL(x.lesL);if(cl.length)o.lesL=cl}{const t=vTxt(x.lesAv,400);if(t)o.lesAv=t}if(x.lesDicho===true)o.lesDicho=true;if(x.ssW===true)o.ssW=true;
   if(Array.isArray(x.ests)){const e=vLista(x.ests,EST_MAX,v=>vEnt(v,0,EST_MAX-1));if(e.length)o.ests=e}
   if(x.fza!=null){const f=normFzaS(x.fza);if(!f)return null;o.fza=f}
   return o}
