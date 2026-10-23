@@ -502,6 +502,53 @@
     return { ok: !m.length, d: m.join('; ') };
   });
 
+  // ---------- 16. v30 · Fase 3: navegación y pantallas ----------
+  prueba('Fase 3: barra con 5 destinos; cada uno muestra solo su pantalla; Ajustes, Aprendizaje y Auditoría cuelgan de «Más» con vuelta', () => {
+    const m = [], t0 = tab, nav = [...document.querySelectorAll('nav button')].map(b => b.id);
+    if (nav.join() !== 'tReloj,tHoy,tProg,tHist,tMas') m.push('barra: ' + nav.join());
+    const vis = () => ['vReloj', 'vHoy', 'vProg', 'vHist', 'vMas', 'vEstilo', 'vApr', 'vAud'].filter(v => !document.getElementById(v).hidden);
+    for (const [b, v] of [['tReloj', 'vReloj'], ['tHoy', 'vHoy'], ['tProg', 'vProg'], ['tHist', 'vHist'], ['tMas', 'vMas'], ['tEstilo', 'vEstilo'], ['tApr', 'vApr'], ['tAud', 'vAud']]) {
+      document.getElementById(b).click(); const w = vis(); if (w.join() !== v) m.push(`${b} → ${w.join()}`);
+      if (['vEstilo', 'vApr', 'vAud'].includes(v) && document.getElementById('tMas').getAttribute('aria-current') !== 'page') m.push(`${v}: «Más» no resaltado`); }
+    document.querySelector('#vApr [data-volver]').click(); if (vis().join() !== 'vMas') m.push('volver de Aprendizaje');
+    tab = t0; render();
+    return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Fase 3: Progreso con pestañas internas (Resumen, Análisis, Volumen, Por ejercicio)', () => {
+    const m = [], t0 = tab; document.getElementById('tProg').click();
+    for (const [k, id] of [['anal', 'pgAnal'], ['vol', 'pgVol'], ['ej', 'pgEj'], ['res', 'pgRes']]) {
+      document.querySelector(`[data-psub="${k}"]`).click();
+      const vis = ['pgRes', 'pgAnal', 'pgVol', 'pgEj'].filter(x => !document.getElementById(x).hidden);
+      if (vis.join() !== id) m.push(`${k} → ${vis.join()}`); }
+    tab = t0; render(); return { ok: !m.length, d: m.join('; ') };
+  });
+  prueba('Fase 3: Hoy — plan con «¿por qué?», todos los grupos y preparación; «Entrenar» lleva al reloj con ese grupo', () => conHist([sesF('h1', 'pecho', Date.now() - 4 * 864e5, [fil('pecho', 0, 10, 1, 30)])], () => {
+    const m = [], g0 = grupo, t0 = tab; document.getElementById('tHoy').click();
+    if (document.querySelectorAll('#hoyGrupos tbody tr').length !== Object.keys(CAT).length) m.push('tabla de grupos');
+    if (!document.querySelector('#hoyPrep .fig')) m.push('mapa de preparación');
+    const b = document.querySelector('#hoyGrupos [data-entrenar="g:triceps"]'); b.click();
+    if (tab !== 'reloj' || grupo !== 'triceps') m.push(`entrenar → tab ${tab}, grupo ${grupo}`);
+    grupo = g0; tab = t0; renderGrupos(); render(); return { ok: !m.length, d: m.join('; ') };
+  }));
+  prueba('Fase 3: Volumen detallado — únicas ≤ suma de atribuciones y el desglose de una fila suma su total', () => conHist([sesF('vd', 'pecho', Date.now() - 864e5, [fil('pecho', 0, 10, 1, 30), fil('pecho', 1, 10, 1, 20)])], () => {
+    const { U, unicas } = psVolumen(7, 'g'), suma = Object.values(U).reduce((s, o) => s + o.dir + o.ind, 0);
+    const o = U.pecho, desg = o.filas.reduce((s, x) => s + x.c * x.f, 0);
+    const ok = unicas <= suma + 1e-9 && Math.abs(desg - (o.dir + o.ind)) < 1e-9 && Math.abs(unicas - efDe(sesF('x', 'pecho', 0, [fil('pecho', 0, 10, 1, 30), fil('pecho', 1, 10, 1, 20)]).sets)) < 1e-9;
+    return { ok, d: `únicas ${unicas} · suma ${suma} · pecho ${o.dir + o.ind} = desglose ${desg}` };
+  }));
+  prueba('Fase 3: Historial — los filtros y el día del calendario acotan la lista; quitar filtros la recupera', () => conHist([
+    sesF('f1', 'pecho', Date.now() - 864e5, [fil('pecho', 0, 10, 1, 30)]), sesF('f2', 'biceps', Date.now() - 3 * 864e5, [fil('biceps', 0, 10, 1, 12)]), sesF('f3', 'biceps', Date.now() - 40 * 864e5, [fil('biceps', 0, 10, 1, 12)])], () => {
+    const m = [], F0 = { ...histF };
+    try {
+      histF = { g: 'biceps', ej: '', k: '', dias: 0, dia: '' }; if (histVisibles().length !== 2) m.push('grupo');
+      histF = { g: 'biceps', ej: '', k: '', dias: 28, dia: '' }; if (histVisibles().length !== 1) m.push('periodo');
+      histF = { g: '', ej: '', k: '', dias: 0, dia: diaK(Date.now() - 864e5) }; if (histVisibles().length !== 1) m.push('día');
+      histF = { g: '', ej: '', k: 'myo', dias: 0, dia: '' }; if (histVisibles().length !== 0) m.push('tipo');
+      histF = { g: '', ej: '', k: '', dias: 0, dia: '' }; if (histVisibles().length !== 3) m.push('sin filtros');
+    } finally { histF = F0; }
+    return { ok: !m.length, d: m.join(', ') };
+  }));
+
   // ---------- 7. Los datos originales no se tocan ----------
   prueba('Pintar todas las vistas no modifica las sesiones guardadas', () => localStorage.getItem(KEY) === crudoAntes);
 

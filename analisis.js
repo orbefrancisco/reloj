@@ -115,7 +115,7 @@ function anRegistraDecision(g){try{const p=anPlanGrupo(g);if(p.acc==='mantener'|
 
 /* ---------- vistas ---------- */
 const AN_PREP={listo:['lpl','sin señales en contra'],espera:['lpe','esperar (regla de horas)'],cuidar:['lpc','cuidar o molestias'],nada:['lpn','sin registros']};
-let anTab='prep',anSelZ='',anDias=7,anRegla=AN_REGLA_H,anSelG='biceps',anPlanVer=false;
+let anTab='est',anSelZ='',anDias=7,anRegla=AN_REGLA_H,anSelG='biceps',anPlanVer=false;
 function anPrepHTML(){const Z={},D=864e5,t=Date.now(),VW={};[7,14,28,90].forEach(d=>VW[d]=volumen(t-d*D,t+D));   // 4 pasadas para las 18 zonas
   Object.keys(MUS).forEach(m=>Z[m]=anZona(m,{dias:anDias,reglaH:anRegla,VW}));
   const zona=(m,d)=>`<path d="${d}" data-anz="${m}" class="${AN_PREP[Z[m].prep.e][0]}${m===anSelZ?' sel':''}"><title>${esc(MUS[m][0])}: ${esc(Z[m].prep.txt)}</title></path>`;
@@ -153,9 +153,12 @@ function anVolHTML(){const R=anVolumen(anSelG);
     :`Correlación de rangos entre el volumen de una semana y el cambio de rendimiento de la siguiente: ${num2(R.rho)} con ${R.pares} pares. Es una asociación, no una causa, y con tan pocos datos puede ser casualidad.`}</p>`;
   return h}
 function renderAnalisis(){const el=document.getElementById('pAnal');if(!el)return;
-  const T=[['prep','Preparación'],['est','Estancamiento'],['vol','Respuesta al volumen']];
+  // (v30) la preparación por zona vive en la pantalla Hoy; aquí, estancamiento y respuesta al volumen
+  if(anTab==='prep')anTab='est';
+  const T=[['est','Estancamiento'],['vol','Respuesta al volumen']];
   el.innerHTML=`<div class="antabs">${T.map(([k,n])=>`<button type="button" data-antab="${k}" aria-pressed="${k===anTab}">${n}</button>`).join('')}</div>`
-    +(anTab==='prep'?anPrepHTML():anTab==='est'?anEstHTML():anVolHTML())}
+    +(anTab==='est'?anEstHTML():anVolHTML())}
+function renderPrep(){const el=document.getElementById('hoyPrep');if(el)el.innerHTML=anPrepHTML()}
 // tarjeta del reloj en reposo: plan de hoy con «¿por qué?»
 const AN_ACC={mantener:'mantener',reducir:'reducir volumen',modificar:'modificar ejercicios',aplazar:'aplazar'};
 // render() se llama a menudo: el plan se recalcula solo si cambia algo de lo que depende
@@ -169,4 +172,4 @@ function renderPlanHoy(){const el=document.getElementById('planHoy');if(!el)retu
 document.addEventListener('click',e=>{const b=e.target.closest('[data-antab],[data-anz],[data-andias],[data-anregla],[data-ang],[data-anpor]');if(!b)return;const d=b.dataset;
   if(d.anpor){anPlanVer=!anPlanVer;renderPlanHoy();return}
   if(d.antab)anTab=d.antab;else if(d.anz)anSelZ=anSelZ===d.anz?'':d.anz;else if(d.andias)anDias=+d.andias;else if(d.anregla)anRegla=+d.anregla;else if(d.ang)anSelG=d.ang;
-  renderAnalisis()});
+  if(d.anz||d.andias||d.anregla)renderPrep();else renderAnalisis()});

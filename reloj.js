@@ -1376,9 +1376,16 @@ const efMeta=h=>h.cuida?progLes(h.sets):efH(h);   // cuidar una zona: el progres
 // avance de una sesión guardada hacia su meta en su propia unidad: series completas (descarga), pesadas (fuerza), progLes (cuidar una zona) o efectivas
 const avanceH=h=>h.desc||h.fza?(h.serC||0):h.cuida?progLes(h.sets):efH(h),metaHechaH=h=>h.meta>0&&avanceH(h)>=h.meta-.05;
 const estadoSes=h=>h.completa?'Completa':h.antes?`Terminada antes (${h.desc||h.fza?esc(h.serC||0)+' de '+esc(h.meta)+' series':ef1(efMeta(h))+' de '+esc(h.meta)})`:'Parcial';
-function renderHist(){histSucio=false;renderAlmacen();
-  $('hist').innerHTML=hist.length?hist.map(h=>`<div class="card" data-hid="${esc(h.id)}"><div class="top"><span class="g">${esc(h.grupo)}</span><span class="muted" style="font-family:var(--mono);font-size:12px">${new Date(h.start).toLocaleString('es-DO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
-    <div class="meta"><span>${esc(h.series)} series</span>${h.desc||h.fza?`<span>${esc(h.serC||0)}${h.meta?' / '+esc(h.meta):''} series ${h.fza?'de fuerza':'de descarga'}</span><span>${ef1(efH(h))} efectivas</span>`:`<span>${ef1(efMeta(h))}${h.meta?' / '+esc(h.meta):''} efectivas</span>`}<span>${esc(h.reps)} reps</span><span>${fmt(h.tuc)} bajo congestión</span><span class="muted">${estadoSes(h)}</span></div>${histExtra(h)}
+// (v30) fechas: entrenamiento (start), registro (creada) y última edición (editada); solo se muestran las que difieren
+const fechasSes=h=>{const f=t=>new Date(t).toLocaleString('es-DO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),x=[];
+  if(h.creada&&Math.abs(Date.parse(h.creada)-Date.parse(h.start))>36e5)x.push('registrada '+f(h.creada));if(h.editada)x.push('editada '+f(h.editada));
+  return x.length?`<p class="hint" style="margin:0">${x.join(' · ')}</p>`:''};
+function renderHist(){histSucio=false;renderAlmacen();if(typeof renderFiltrosHist==='function')renderFiltrosHist();
+  const L=typeof histVisibles==='function'?histVisibles():hist;   // Fase 3: filtros y día del calendario (pantallas.js)
+  $('hist').innerHTML=!hist.length?'':!L.length?'<p class="muted" style="font-size:14px;margin:0">Ninguna sesión con estos filtros.</p>':'';
+  if(hist.length&&!L.length)return;
+  $('hist').innerHTML=hist.length?L.map(h=>`<div class="card" data-hid="${esc(h.id)}"><div class="top"><span class="g">${esc(h.grupo)}</span><span class="muted" style="font-family:var(--mono);font-size:12px">${new Date(h.start).toLocaleString('es-DO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
+    <div class="meta"><span>${esc(h.series)} series</span>${h.desc||h.fza?`<span>${esc(h.serC||0)}${h.meta?' / '+esc(h.meta):''} series ${h.fza?'de fuerza':'de descarga'}</span><span>${ef1(efH(h))} efectivas</span>`:`<span>${ef1(efMeta(h))}${h.meta?' / '+esc(h.meta):''} efectivas</span>`}<span>${esc(h.reps)} reps</span><span>${fmt(h.tuc)} bajo congestión</span><span class="muted">${estadoSes(h)}</span></div>${histExtra(h)}${fechasSes(h)}
     ${histEd===h.id?editorSesion(h):`<button type="button" class="lnk" data-hed="abrir" style="align-self:flex-start">${enUso(h.id)?'En curso':'Abrir y editar'}</button>`}</div>`).join('')
     :'<p class="muted" style="font-size:14px;margin:0">Aún no hay sesiones. Cada sesión se guarda sola al reportar la primera serie.</p>'}
 const RIRS=['0','1','2','3','4+'];
@@ -1430,8 +1437,12 @@ function subInicio(E){const s=sugerir(grupo,E);
 function render(){
   lesRefresca();if(typeof renderPlanHoy==='function')renderPlanHoy();   // Fase 5: plan de hoy (solo en reposo; memorizado)
   const G=CAT[grupo],E=est(),e=Math.max(0,now()-S.t0),pad=$('pad');
-  [['vReloj','tReloj','reloj'],['vProg','tProg','progreso'],['vHist','tHist','historial'],['vEstilo','tEstilo','estilo']].forEach(([v,t,k])=>{
-    $(v).hidden=tab!==k;$(v).style.display=tab===k?'flex':'none';$(t).setAttribute('aria-current',tab===k?'page':'false')});
+  // Fase 3: 5 destinos en la barra (Reloj, Hoy, Progreso, Historial, Más); Ajustes, Aprendizaje y Auditoría cuelgan de «Más»
+  [['vReloj','tReloj','reloj'],['vHoy','tHoy','hoy'],['vProg','tProg','progreso'],['vHist','tHist','historial'],['vMas','tMas','mas'],
+   ['vEstilo','tMas','estilo'],['vApr','tMas','aprendizaje'],['vAud','tMas','auditoria']].forEach(([v,t,k])=>{const el=$(v);if(!el)return;
+    el.hidden=tab!==k;el.style.display=tab===k?'flex':'none'});
+  const enMas=['mas','estilo','aprendizaje','auditoria'].includes(tab);
+  [['tReloj','reloj'],['tHoy','hoy'],['tProg','progreso'],['tHist','historial'],['tMas','mas']].forEach(([t,k])=>{const b=$(t);if(b)b.setAttribute('aria-current',tab===k||(k==='mas'&&enMas)?'page':'false')});
   $('gnom').textContent=SS?`${ladoNom(SS.t)} ⇄ ${ladoNom(1-SS.t)}`:S.st==='idle'&&ssSel.on?ssNom():G.n+(enRutina()?` ${rutPos+1}/${rutLista().length}`:'');
   const FP=S.st==='idle'&&!ssSel.on&&fzaActiva()?planFuerza(grupo):null,PE=S.fza?S.fza.e:FP?FP.e:G.e,NE=PE.length;   // v18: en fuerza, sus estaciones
   $('blk').textContent=S.st==='idle'?`${NE} estaciones`:S.st==='done'?(S.antes?'Terminada antes':'Completa'):`Estación ${S.sec+1}/${NE} · ${E.s}`

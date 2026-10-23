@@ -85,7 +85,7 @@ th:first-child,td:first-child{text-align:left} th{color:var(--muted);font-weight
 .card .g{font-family:var(--disp);font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.03em}
 .card .meta{display:flex;flex-wrap:wrap;gap:14px;font-family:var(--mono);font-size:12px}
 .muted{color:var(--muted)}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 12px 14px;border-top:1px solid var(--line);background:var(--surface)}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 12px 14px;border-top:1px solid var(--line);background:var(--surface)}
 nav button{height:54px;border:0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:500;color:var(--muted)}
 nav button[aria-current="page"]{background:var(--soft);color:var(--art)}
 /* Muñeco: una pose por estado del reloj. Trabajo = curl alterno (isometría: brazos a 90° temblando; vacío: respira),
@@ -268,6 +268,22 @@ html[data-recto] *{border-radius:3px!important}
 .anest{border-top:1px solid var(--line);padding:6px 0} .anest summary{cursor:pointer;font-size:14px} .anest.caida summary b{color:var(--mal)} .anest.mejora summary b{color:var(--mok)}
 .anplan .top{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px} .anplan.reducir,.anplan.modificar{border-color:var(--mlo)} .anplan.aplazar{border-color:var(--mal)}
 .anmot{margin:6px 0 0;padding-left:18px;font-size:13px}
+/* Fase 3: navegación y pantallas (Hoy, Más, subpestañas de Progreso, filtros y calendario del historial) */
+.psub{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px} .psub button{flex:none;border:1px solid var(--line);border-radius:999px;padding:7px 13px;background:var(--surface);color:var(--fg);font-size:13px}
+.psub button[aria-pressed="true"]{background:var(--art);border-color:var(--art);color:var(--bg)} .pgsub{display:flex;flex-direction:column;gap:10px}
+.masl{display:flex;flex-direction:column;gap:8px} .masl button{text-align:left;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:14px;display:flex;flex-direction:column;gap:3px;color:var(--fg)}
+.masl button span{font-size:13px;color:var(--muted)} .volver{align-self:flex-start;font-size:14px}
+.hoyg{border-top:1px solid var(--line);padding:8px 0;display:flex;flex-direction:column;gap:4px} .hoyg:first-of-type{border-top:0}
+.hoyg .top{display:flex;justify-content:space-between;align-items:center} .hoyacc{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.hoyg.aplazar .hoyacc{border-color:var(--mal)} .hoyg.reducir .hoyacc,.hoyg.modificar .hoyacc{border-color:var(--mlo)} .hoyg.mantener .hoyacc{border-color:var(--mok)}
+.hoyej{margin:2px 0;padding-left:18px;font-size:13px} .hoyt td,.hoyt th{white-space:normal} .hoyt .mpt{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+#pVolDet tr.on td{background:var(--soft)} #pVolDet .mpt{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+.psg{width:100%;max-width:360px;display:block;margin:4px 0} .psg .rect{font-family:var(--mono);font-size:8px;fill:var(--muted)} #ejSel,.hfl select{max-width:100%;font-size:14px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.hcal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin:6px 0} .hcal .hd{font-size:11px;color:var(--muted);text-align:center}
+.hcal button{height:34px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--muted);font-size:13px;position:relative} .hcal button.con{color:var(--fg);border-color:var(--art);font-weight:600}
+.hcal button.on{background:var(--art);color:var(--bg)} .hcal button:disabled{opacity:.45} .hcal sup{font-size:9px}
+.hfil{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px} .hfl{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:2px;min-width:0} .hfl select{width:100%;min-width:0}
+.psdet td{white-space:normal;vertical-align:top} .psdet th{white-space:normal}
 /* Fase 6: auditoría de datos (Historial) */
 .audl{margin:4px 0;padding-left:18px;font-size:13px} .audl.err li{color:var(--mal)} .audl.av li{color:var(--fg)} .audl.inf li{color:var(--muted)}
 .recg{width:100%;max-width:280px;display:block;margin:6px auto} .recg .rect{font-family:var(--mono);font-size:8px;fill:var(--muted)}
@@ -522,9 +538,14 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
   </section>
 
   <section id="vProg" hidden style="display:flex;flex-direction:column;gap:10px">
+    <div class="psub" role="tablist" aria-label="Progreso">
+      <button type="button" data-psub="res" aria-pressed="true">Resumen</button><button type="button" data-psub="anal" aria-pressed="false">Análisis</button><button type="button" data-psub="vol" aria-pressed="false">Volumen</button><button type="button" data-psub="ej" aria-pressed="false">Por ejercicio</button>
+    </div>
+    <div id="pgAnal" class="pgsub" hidden><div id="pAnal" class="card"></div></div>
+    <div id="pgVol" class="pgsub" hidden><div id="pVolDet" class="card"></div></div>
+    <div id="pgEj" class="pgsub" hidden><div id="pEjDet" class="card"></div></div>
+    <div id="pgRes" class="pgsub">
     <div id="pDesc"></div>
-    <h2>Análisis</h2>
-    <div id="pAnal" class="card"></div>
     <h2>Plan por bloques</h2>
     <div id="pBloque" class="card blq"></div>
     <h2>Esta semana</h2>
@@ -552,6 +573,37 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <div id="pMedidas" class="card"></div>
     <h2>Fotos de progreso</h2>
     <div id="pFotos" class="card"></div>
+    </div>
+  </section>
+
+  <!-- Fase 3: Hoy (mi entrenamiento) -->
+  <section id="vHoy" hidden style="display:flex;flex-direction:column;gap:10px">
+    <h2>Mi entrenamiento</h2>
+    <div id="hoyPlan" class="card"></div>
+    <h2>Todos los grupos</h2>
+    <div id="hoyGrupos" class="card"></div>
+    <h2>Preparación por zona</h2>
+    <div id="hoyPrep" class="card"></div>
+  </section>
+
+  <!-- Fase 3: Más (secundarias) -->
+  <section id="vMas" hidden style="display:flex;flex-direction:column;gap:10px">
+    <h2>Más</h2>
+    <div class="masl">
+      <button id="tEstilo" type="button"><b>Ajustes</b><span>Entrenamiento, cuidar una zona, voz, tempo, unidades y estilo visual</span></button>
+      <button id="tApr" type="button"><b>Aprendizaje</b><span>Qué ha aprendido el reloj de tu recuperación, con qué datos y cuánto acierta</span></button>
+      <button id="tAud" type="button"><b>Auditoría de datos</b><span>Integridad de tus registros, solo lectura, exportable</span></button>
+    </div>
+  </section>
+  <section id="vApr" hidden style="display:flex;flex-direction:column;gap:10px">
+    <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
+    <h2>Aprendizaje</h2>
+    <div id="cCalib" class="card"></div>
+  </section>
+  <section id="vAud" hidden style="display:flex;flex-direction:column;gap:10px">
+    <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
+    <h2>Auditoría de datos</h2>
+    <div id="hAudit" class="card"></div>
   </section>
 
   <section id="vHist" hidden style="display:flex;flex-direction:column;gap:10px">
@@ -571,7 +623,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
       <span id="copiaMsg" class="hint" aria-live="polite"></span>
       <p class="hint" id="almacen"></p>
     </div>
-    <details class="card" style="gap:8px"><summary style="cursor:pointer;font-weight:600">Auditoría de datos</summary><div id="hAudit"></div></details>
+    <div id="hFiltros" class="card"></div>
     <div id="hist"></div>
   </section>
 
@@ -602,8 +654,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <div class="tog" id="cTempos"></div>
     <div style="display:flex;gap:8px"><input id="cTempoN" class="in" placeholder="Otro: 3-1-2-0" maxlength="9" autocomplete="off" style="flex:1"><button id="cTempoAdd" type="button" class="btn2">Usar</button></div>
     <p class="muted" style="font-size:13px;margin:0" id="cTempoTxt">Un metrónomo durante la serie: pitido grave al empezar a bajar y agudo al empezar a subir. Los números son segundos de bajada, pausa abajo, subida y pausa arriba. Suena en la activación, las mini-series y los parciales; nunca en isometrías, vacíos ni descansos. Empieza 2 s después del pitido de inicio.</p>
-    <h2 style="margin-top:8px">Recuperación aprendida</h2>
-    <div id="cCalib"></div>
+    <p class="hint">La recuperación aprendida está ahora en <b>Más → Aprendizaje</b>.</p>
     <h2 style="margin-top:8px">Estilo visual</h2>
     <p class="muted" style="font-size:13px;margin:0">Solo cambia el aspecto; el reloj funciona igual. Cada estilo tiene sus propios colores para trabajo, descanso y cambio de fase (las tres bolitas de cada tarjeta, en ese orden): en Arterial son rojo, azul y verde; en Hierro, amarillo, azul acero y verde; en Terminal, verde, celeste y amarillo. El naranja o ámbar marca avisos y lo que va por debajo.</p>
     <div id="estilos"></div>
@@ -635,14 +686,17 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
   <button id="tReloj" type="button" aria-current="page">
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><span>Reloj</span>
   </button>
+  <button id="tHoy" type="button">
+    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg><span>Hoy</span>
+  </button>
   <button id="tProg" type="button">
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M4 20h16M8 16l4-5 3 3 5-7"/></svg><span>Progreso</span>
   </button>
   <button id="tHist" type="button">
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span>Historial</span>
   </button>
-  <button id="tEstilo" type="button">
-    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2l-.3-.8c-.4-1.1.4-2.2 1.6-2.2H17a4 4 0 0 0 4-4c0-5-4-9-9-9z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="8" r="1.2"/></svg><span>Ajustes</span>
+  <button id="tMas" type="button">
+    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>Más</span>
   </button>
 </nav>
 
@@ -650,5 +704,6 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 <script src="reloj.js"></script>
 <script src="analisis.js"></script>
 <script src="auditoria.js"></script>
+<script src="pantallas.js"></script>
 </body>
 </html>
