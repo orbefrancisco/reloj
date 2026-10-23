@@ -405,6 +405,10 @@ function otraRonda(row){
   const r=Math.min(180,Math.max(60,S.tauC/(S.kRec||1)*Math.log(Math.max(1.01,(1-S.C)/.15))));row.rest=Math.round(r);
   return {row,mode:'trans',rest:r}}
 const cerrarEstacion=row=>faltaE()&&S.ronda<MAXRONDA?otraRonda(row):siguienteEstacion(row);
+// meta del grupo ya cumplida: no más series aunque a este ejercicio le falte su parte (los anteriores pudieron pasarse); solo quedan los vacíos
+const metaTotal=()=>S.ef>=S.meta-.05;
+function finPorMeta(row){const L=S.ests||estsDe().map((_,i)=>i),j=L.slice(L.indexOf(S.sec)+1).find(k=>estsDe()[k]&&estsDe()[k].levy);
+  if(j==null)return {row,mode:'done',rest:0};S.sec=L[L.indexOf(j)-1];return siguienteEstacion(row)}
 function siguienteEstacion(row){
   if(S.ests){const i=S.ests.indexOf(S.sec);if(i<0||i>=S.ests.length-1)return {row,mode:'done',rest:0};S.sec=S.ests[i+1]}   // lado de una superserie de piernas
   else{if(S.sec>=estsDe().length-1)return {row,mode:'done',rest:0};S.sec++}
@@ -420,6 +424,7 @@ function avanzar(ev){
     const c=efectiva(row);S.efE+=c;S.ef+=c;
     if(ph==='vac'){S.levyN++;if(S.levyN<3){S.levyT=levy();const r=30+15*Math.random();row.rest=Math.round(r);return {row,mode:'rest',rest:r}}
       return siguienteEstacion(row)}
+    if(!S.desc&&!S.fza&&!E.lesM&&metaTotal())return finPorMeta(row);
     return cerrarEstacion(row)}
   const R=ev.R,rir=ev.rir,p=R/(R+rir+1e-9);
   if(ph==='act'){S.R1=R;S.RTF=R+rir}
@@ -433,6 +438,7 @@ function avanzar(ev){
   if(S.fza)return avanzarFuerza(R,row);
   if(E.lesM&&!S.desc)row.recta=true;   // cuidar una zona: serie recta, sin fallo
   if(S.desc||E.lesM)return avanzarDescarga(R,row);
+  if(metaTotal())return finPorMeta(row);
   if(ph==='ext')return cerrarEstacion(row);
   if(!faltaE())return siguienteEstacion(row);
   if(ph==='act'&&S.ronda>1&&c<1/3)return siguienteEstacion(row);
