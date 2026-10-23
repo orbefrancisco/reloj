@@ -267,11 +267,12 @@ function cgRenderPeso(){cgRenderAvisos();const el=$('cgPeso');if(!el)return;cons
   else if(tab==='reloj'&&enCurso()&&E&&!E.levy&&!(S.st==='work'&&(S.phase==='hold'||S.phase==='vac'))&&!(S.phase==='ext'&&E.ext==='flat')&&S.phase!=='vac'){
     const U=cgUnidadS(),P=cgUI.peso,legacy=S.st==='report'&&!S.cgK,mod=S.fza&&E.fz==='p'?'Fuerza':'Hipertrofia';
     const src={cal:'de tu configuración semanal',mod:`cambiada hoy${S.kgPlan!=null&&U.R?' (configurada: '+cgTxtW(cgDeKg(S.kgPlan,U.u),U.u,U.R.tc)+')':''}`,man:'anotada a mano',hist:'sugerida por tu historial'}[S.kgSrc]||'sin anotar';
-    h=`<div class="cgpeso"><div class="top"><span><b>${esc(E.n)}</b> — ${mod}</span></div>
-      <p class="cgc">${S.cgK?'Carga sugerida':'Carga'}: <b>${esc(cgCargaS())}</b> <span class="muted">· ${esc(src)}</span></p>`;
-    if(S.cgK&&S.kg>0&&esBarra(E)){const d=discTxt(S.cgOne?S.cgOne.kg:S.kg,E);if(d)h+=`<p class="hint">${esc(d)}</p>`}
+    // v32: la carga va en grande dentro del reloj; aquí, una línea con su origen y el botón
+    const enReloj=!$('padCarga').hidden;   // si la carga ya está en grande en el reloj, aquí solo su origen
+    h=`<div class="cgpeso"><div class="cgfila1"><span class="cgc"><b>${esc(E.s)}</b> · ${mod.toLowerCase()}${enReloj?'':` · <span class="cgsr">${esc(cgCargaS())}</span>`} <span class="muted">· ${esc(src)}</span></span>${!legacy&&!P.abierto?'<button type="button" class="btn2" data-cgp="abrir">Cambiar peso</button>':''}</div>`;
+    if(S.cgK&&S.kg>0&&esBarra(E)&&S.st==='report'){const k=S.cgOne?S.cgOne.kg:S.kg,d=discTxt(k,E);if(d)h+=`<p class="hint">${esc(d)}</p>${discSVG(k,E)}`}
     if(legacy)h+=`<p class="hint">Este ejercicio no tiene carga configurada esta semana: anótala abajo (se guarda como referencia) o <button type="button" class="lnk" data-cgir="1">configúrala en Mis cargas</button>.</p>`;
-    else if(!P.abierto)h+=`<button type="button" class="btn2" data-cgp="abrir">Cambiar peso</button>`;
+    else if(!P.abierto){}
     else{const L=cgOpc(U.u,U.tc,U.eq,U.paso),v=P.v;if(v!=null&&!L.some(x=>Math.abs(x-v)<1e-9)){L.push(v);L.sort((a,b)=>a-b)}
       const rep=S.st==='report';
       h+=`<div class="cgf"><button type="button" class="cgpm" data-cgp="menos" aria-label="Un salto menos">−</button>
@@ -314,6 +315,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-cgir],[dat
   if(d.cgw){const a=d.cgw;if(a==='m'){const p=cgUI.sel.split('|');cgUI.sel=cgKey(p[0],p[1],b.dataset.m);renderCargas();return}
     if(a==='rir'||a==='cn'){cgSet(cgUI.sel,a,b.dataset.v);renderCargas();return}
     if(a==='menos'||a==='mas'){const R=cgBase(cgKeyObj(cgUI.sel)),L=cgOpcR(R);const x=R.w==null?L[0]:a==='mas'?cgPaso(R,1):cgPaso(R,-1);if(x!=null)cgSet(cgUI.sel,'w',x);renderCargas();return}
+    if(a==='pend'){const x=cgSigPend(cgUI.sel);if(x){cgUI.sel=x.key;if(cgUI.fg&&x.g!==cgUI.fg)cgUI.fg=''}else cgUI.msg='No queda ningún ejercicio pendiente.';renderCargas();window.scrollTo(0,0);return}
     if(a==='ant'||a==='sig'){const L=cgLista(),i=L.findIndex(x=>x.key===cgUI.sel),j=Math.max(0,Math.min(L.length-1,(i<0?0:i)+(a==='sig'?1:-1)));if(L[j])cgUI.sel=L[j].key;renderCargas();window.scrollTo(0,0);return}
     if(a==='usar'){cgUsaPrevio(cgUI.sel);renderCargas();return}
     if(a==='confirmar'){cgConfirma(cgUI.sel);renderCargas();return}
@@ -325,7 +327,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-cgir],[dat
   if(d.cg){const row=b.closest('[data-k]');if(!row)return;const k=row.dataset.k,a=d.cg;
     if(a==='menos'||a==='mas'){const R=cgBase(cgKeyObj(k)),L=cgOpcR(R);const x=R.w==null?L[0]:a==='mas'?cgPaso(R,1):cgPaso(R,-1);if(x!=null)cgSet(k,'w',x)}
     else if(a==='abrir')cgUI.abiertas[k]=true;else if(a==='cerrar')delete cgUI.abiertas[k];
-    else if(a==='usar')cgUsaPrevio(k);else if(a==='confirmar')cgConfirma(k);else if(a==='editar'){cgUI.vista='uno';cgUI.sel=k;renderCargas();window.scrollTo(0,0);return}
+    else if(a==='usar')cgUsaPrevio(k);else if(a==='confirmar'){cgConfirma(k);cgPintaFila(k,true);return}else if(a==='editar'){cgUI.vista='uno';cgUI.sel=k;renderCargas();window.scrollTo(0,0);return}
     cgPintaFila(k);return}});
 const cgKeyObj=k=>{const p=k.split('|');return {key:k,g:p[0],n:p[1],m:p[2]}};
 document.addEventListener('change',e=>{const s=e.target;
@@ -386,8 +388,16 @@ function cgFilaHTML(x){const W=cgSem(),R0=W.refs[x.key],R=cgBase(x),e=cgEstado(R
     ${cgUI.otro[x.key+'|r']?`<input class="in" data-cgf="rotro" inputmode="numeric" placeholder="Repeticiones (más de 30)" autocomplete="off">`:''}
     ${R0?cgAvisos(x.key,R0):cgPrevHTML(x,R,'cg')}${cgPropHTML(x.key)}
     <div class="cgf cgpie">${R0&&!R0.ok&&cgTieneCarga(R0)?'<button type="button" class="btn2 cgok" data-cg="confirmar">Confirmar</button>':''}<button type="button" class="lnk" data-cg="editar">Más opciones</button>${cgTieneCarga(R0)?'<button type="button" class="lnk" data-cg="cerrar">Listo</button>':''}${R0?`<span class="hint">${esc(CG_SRCN[R0.src])}${R0.obs==='sesion'?' · reps y RIR medidos en una sesión':''}</span>`:''}</div></div>`}
-function cgPintaFila(k){const el=document.querySelector(`#vCargasC .cgrow[data-k="${CSS.escape(k)}"]`),x=cgActivos().find(y=>y.key===k);if(!el||!x){renderCargas();return}
-  el.outerHTML=cgFilaHTML(x);cgPintaCab();render()}
+function cgPintaFila(k,salta){const el=document.querySelector(`#vCargasC .cgrow[data-k="${CSS.escape(k)}"]`),x=cgActivos().find(y=>y.key===k);if(!el||!x){renderCargas();return}
+  const antes=cgEstado(cgSem().refs[k]);el.outerHTML=cgFilaHTML(x);cgPintaCab();render();
+  // v32: al quedar configurado, un destello de confirmación y (si se pide) se lleva la vista al siguiente pendiente
+  const nuevo=document.querySelector(`#vCargasC .cgrow[data-k="${CSS.escape(k)}"]`),e=cgEstado(cgSem().refs[k]);
+  if(nuevo&&(e==='carga'||e==='completa')){nuevo.classList.add('cgflash');if(salta){const p=[...document.querySelectorAll('#vCargasC .cgrow')].find(r=>!r.hidden&&/\b(pend|calibrar|heredada)\b/.test(r.className)&&r!==nuevo);
+    if(p)try{p.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}catch(_){}}}
+  void antes}
+// siguiente ejercicio pendiente (sin configurar, por calibrar o por confirmar) en el orden de la encuesta
+const cgSigPend=desde=>{const L=cgLista(),i=L.findIndex(x=>x.key===desde),orden=[...L.slice(i+1),...L.slice(0,Math.max(0,i))];
+  return orden.find(x=>x.act&&!['carga','completa'].includes(cgEstado(cgSem().refs[x.key])))}
 function cgCabHTML(){const s=cgEstadoSem(),pc=s.tot?Math.round(100*s.conf/s.tot):0,est=!s.tot?'sin ejercicios':s.conf===s.tot?'completo':s.conf||s.her?'en curso':'sin empezar';
   return `<p class="hint">Semana del ${esc(cgFSem())} · test semanal: <b>${est}</b></p>
     <div class="cgbar" role="progressbar" aria-valuemin="0" aria-valuemax="${s.tot}" aria-valuenow="${s.conf}" aria-label="Ejercicios configurados"><i style="width:${pc}%"></i></div>
@@ -421,6 +431,7 @@ function cgUnoHTML(){const L=cgLista();if(!L.length)return '<p class="hint">Ning
       ${cgSel('paso',[['','Automático (según el equipo)'],...CG_PASOS.map(p=>[p,`${cgN(p)} ${R.u==='nivel'?'nivel':R.u}`])],R.paso,'Salto entre pesos')}
       ${R0?`<button type="button" class="btn2 peligro" data-cgw="quitar">${cgUI.conf===2?'¿Seguro? Toca otra vez':'Quitar esta referencia'}</button>`:''}</details>
     <div class="cgnav"><button type="button" data-cgw="ant"${i<=0?' disabled':''}>‹ Anterior</button><button type="button" data-cgw="sig"${i>=L.length-1?' disabled':''}>Siguiente ›</button></div>
+    ${cgSigPend(x.key)?'<button type="button" class="btn2 cgpend" data-cgw="pend">Siguiente pendiente ›</button>':''}
     ${R0&&!R0.ok&&cgTieneCarga(R0)?'<button type="button" class="btn2" data-cgw="confirmar">Confirmar sin cambios</button>':''}</div>`}
 function cgListaHTML(){const L=cgLista(),secs=[];
   if(cgUI.agr==='mod'){for(const m of ['h','f']){const l=L.filter(x=>x.m===m&&x.act);if(l.length)secs.push([m==='f'?'Fuerza':'Hipertrofia',l])}}
@@ -446,8 +457,8 @@ function cgResumenHTML(){const W=cgSem(),Wp=cgSemPrev(),L=cgActivos(),fila=x=>{c
       :'<p class="hint">Aún no hay revisión: las propuestas aparecen al empezar la semana siguiente, con lo que entrenes esta semana con tus cargas de referencia.</p>'}
     <p class="hint"><b>Cómo se decide.</b> Hipertrofia: si llegas al tope de tu rango con tu RIR objetivo en 2 sesiones (o te sobran reps), sube el salto real siguiente de tu equipo; si no llegas al mínimo al fallo, baja uno; si no, mantén y busca más reps. Fuerza: con su rango y su RIR objetivo, todas las series. Con molestias o en descarga, mantener; sin series comparables, recalibrar. No sube solo porque pasó una semana. La técnica no se registra, así que no se valora.</p>`}
 function renderCargas(){const el=$('vCargasC');if(!el)return;const W=cgSem();
-  let h=`<div id="cgCab">${cgCabHTML()}</div>
-    <div class="psub" role="tablist" aria-label="Mis cargas"><button type="button" data-cgs="enc" aria-pressed="${cgUI.sub==='enc'}">Encuesta semanal</button><button type="button" data-cgs="res" aria-pressed="${cgUI.sub==='res'}">Resumen y progresión</button></div>`;
+  let h=`<div class="cgtop"><div id="cgCab">${cgCabHTML()}</div>
+    <div class="psub" role="tablist" aria-label="Mis cargas"><button type="button" data-cgs="enc" aria-pressed="${cgUI.sub==='enc'}">Encuesta semanal</button><button type="button" data-cgs="res" aria-pressed="${cgUI.sub==='res'}">Resumen y progresión</button></div></div>`;   // v32: cabecera fija al desplazarse
   if(cgUI.msg)h+=`<p class="cgmsg" role="status">${esc(cgUI.msg)}</p>`;
   if(cgUI.sub==='res')h+=cgResumenHTML();
   else{h+=`<p class="hint"><b>RIR</b> = repeticiones en reserva: cuántas más podrías haber hecho antes del fallo técnico. Si no lo sabes, elige «No sé»: no se inventa. Cada selección se guarda al momento.</p>

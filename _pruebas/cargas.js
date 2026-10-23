@@ -70,9 +70,9 @@
   // 4
   prueba('4. Peso sugerido asumido por defecto: sin preguntarlo, se registra como «de la configuración»', () => limpio(() => {
     refPI(40); nueva('pecho'); tab = 'reloj'; S.st = 'report'; render();
-    const pregunta = !$('kgFila').hidden, panel = $('cgPeso').textContent;
+    const pregunta = !$('kgFila').hidden, enReloj = $('padCarga').textContent, panel = 'reloj: ' + enReloj + ' | ' + $('cgPeso').textContent;   // v32: la carga va dentro del reloj
     const r = reporta(10, 1);
-    const ok = !pregunta && /Carga sugerida/.test(panel) && /40 lb por mancuerna/.test(panel) && /Cambiar peso/.test(panel) && r.kgSrc === 'cal' && casi(r.kg, LBK(40)) && r.tc === 'mancuerna' && r.u === 'lb' && r.kgPlan == null;
+    const ok = !pregunta && /carga sugerida/i.test(enReloj) && /40 lb por mancuerna/.test(enReloj) && /Cambiar peso/.test(panel) && r.kgSrc === 'cal' && casi(r.kg, LBK(40)) && r.tc === 'mancuerna' && r.u === 'lb' && r.kgPlan == null;
     return { ok, d: `pide peso: ${pregunta} · panel «${panel.trim().slice(0, 90)}» · serie ${JSON.stringify({ kg: r.kg, kgSrc: r.kgSrc, tc: r.tc })}` }; }));
   // 5
   prueba('5. Cambio de peso en una sola serie: solo esa serie cambia y queda la carga planificada', () => limpio(() => {

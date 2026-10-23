@@ -75,6 +75,7 @@ function renderVolDet(){const el=$('pVolDet');if(!el)return;const {U,unicas}=psV
       <div class="tbl"><table class="psdet"><thead><tr><th style="text-align:left">Fecha · ejercicio · tipo</th><th>Reps · reserva</th><th>Aporte</th></tr></thead><tbody>${o.filas.slice().sort((a,b)=>b.t-a.t).slice(0,80).map(x=>
         `<tr><td style="text-align:left;white-space:normal">${psF(x.t)} · ${esc(x.ej)}<br><span class="muted">${psTipo(x.k)}</span></td><td>${esc(x.reps)}${x.kg>0?' × '+num(aU(x.kg)):''} · ${esc(x.rir)}</td><td title="efectiva ${num2(x.c)} × fracción ${num2(x.f)}">${num2(x.c)} × ${num2(x.f)}<br><b>${num2(x.c*x.f)}</b></td></tr>`).join('')}</tbody></table></div>
       <p class="hint">Aporte = efectiva × fracción. Efectiva: cuánto cuenta esa serie según su tipo y su reserva (principal y parciales hasta 1, mini-serie hasta ½, isometría hasta ½; reserva 4+ no cuenta). Fracción: cuánto trabaja ${volNivel==='g'?'este grupo':'esta zona'} (1 = músculo principal). Más recientes primero.</p></div>`}
+  h+=psCalor();   // v32
   el.innerHTML=h}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-vold],[data-voln],[data-vols]');if(!b)return;const d=b.dataset;
   if(d.vold)volDias=+d.vold;else if(d.voln){volNivel=d.voln;volSel=''}else if(d.vols)volSel=volSel===d.vols?'':d.vols;renderVolDet()});
@@ -97,9 +98,35 @@ function renderEjDet(){const el=$('pEjDet');if(!el)return;const L=psEjercicios()
       `<tr><td style="text-align:left">${psF(x.t)}${x.pr?' ★':''}</td><td>${x.r.niv!=null?'nivel '+num(x.r.niv):x.r.kg>0?num(aU(x.r.kg))+' '+uTxt():cargaDe(x.r,x.g)==='c'?'corporal':'sin carga'} × ${esc(x.r.reps)} · ${esc(x.r.rir)}</td>`
       +`<td>${x.e1!=null?`1RM ${num(aU(x.e1))}${x.e1===mejor?' ↑':''}`:x.rtf!=null?`${x.rtf} al fallo`:'—'}${x.trab?`<br><span class="muted">trabajo ${num(aU(x.trab))}</span>`:''}</td><td>${x.n}${x.desc?` · ${x.desc} s`:''}</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">Primera serie principal de cada sesión. Medida: 1RM estimado si hay peso; si no, reps al fallo (reps + reserva; con «3+»/«4+» no se calcula). Trabajo = reps × carga de todas sus series con peso. Series del ejercicio en la sesión · descanso antes de la primera. ★ récord · ↑ mejor 1RM estimado.</p>`;
-  h+=cl.length?cl.map(({s,c})=>`<p><b>${s.carga==='peso'?'Fuerza (1RM estimado)':s.carga==='pc'?'Resistencia con peso corporal (reps al fallo)':s.carga==='na'?'Carga sin anotar (no comparable)':'Reps al fallo con el nivel '+esc(s.carga.slice(2))}:</b> ${esc(AN_EST[c.estado])} — ${esc(c.txt)}${c.cv!=null?` · variabilidad ±${Math.round(c.cv*100)} %`:''}.</p>`+psGraf(s.pts)).join('')
+  h+=psSemanas(ejSel);   // v32
+  h+=cl.length?cl.map(({s,c})=>`<p><b>${s.carga==='peso'?'Fuerza (1RM estimado)':s.carga==='pc'?'Resistencia con peso corporal (reps al fallo)':s.carga==='na'?'Carga sin anotar (no comparable)':'Reps al fallo con el nivel '+esc(s.carga.slice(2))}:</b> ${esc(AN_EST[c.estado])} — ${esc(c.txt)}${c.cv!=null?` · variabilidad ±${Math.round(c.cv*100)} %`:''}.</p>`+(s.pts.nc?'':psGraf(s.pts))).join('')   // v32: sin carga conocida no se dibuja una tendencia que no existe
     :'<p class="hint">Sin medidas comparables todavía.</p>';
   el.innerHTML=h;const s=$('ejSel');if(s)s.onchange=()=>{ejSel=s.value;renderEjDet()}}
+/* v32 · semana a semana (últimas 12): la carga más alta de sus series principales (barras) y el mejor 1RM estimado (línea), solo con
+   carga CONOCIDA (cargaDe: ni sin anotar ni ceros dudosos). En la unidad de la pantalla. */
+function psSemanas(ej){const W=7*864e5,L0=lunes(Date.now()),sem={};
+  hist.forEach(h=>{const g=gDe(h);if(!g||!CAT[g])return;const t=Date.parse(h.start),i=Math.round((L0-lunes(t))/W);if(i<0||i>11)return;
+    (h.sets||[]).forEach(r=>{if(r.k!=='act.'||nomFila(r,g)!==ej)return;const c=cargaDe(r,g);if(!c||!c.startsWith('k:'))return;
+      const o=sem[i]=sem[i]||{c:0,e:0};o.c=Math.max(o.c,aU(r.kg));if(!/\+/.test(r.rir||'')&&r.rir!=='—')o.e=Math.max(o.e,aU(e1(r)))})});
+  const ks=Object.keys(sem).map(Number);
+  if(!ks.length)return `<p class="hint">Evolución semanal: aún no hay series de ${esc(ej)} con carga conocida. Aparecerá en cuanto entrenes con la carga de «Mis cargas» (o anotada).</p>`;
+  const n=Math.max(...ks)+1,N=Math.max(n,4),Wd=300,H=130,P=26,mx=Math.max(...ks.map(i=>Math.max(sem[i].c,sem[i].e)))*1.12||1,bw=(Wd-P-8)/N,x=i=>P+(N-1-i)*bw,y=v=>H-18-v/mx*(H-30);
+  const barras=ks.map(i=>`<rect x="${(x(i)+bw*.18).toFixed(1)}" y="${y(sem[i].c).toFixed(1)}" width="${(bw*.64).toFixed(1)}" height="${(H-18-y(sem[i].c)).toFixed(1)}" rx="2" fill="var(--muted)" fill-opacity=".45"><title>${num(sem[i].c)} ${uTxt()}</title></rect>`).join('');
+  const pe=ks.filter(i=>sem[i].e>0).sort((a,b)=>b-a),lin=pe.map(i=>`${(x(i)+bw/2).toFixed(1)},${y(sem[i].e).toFixed(1)}`).join(' ');
+  const fecha=i=>psF(L0-i*W);
+  return `<p class="lbl" style="margin:10px 0 0">Semana a semana · ${esc(uTxt())}</p><svg viewBox="0 0 ${Wd} ${H}" class="psg" role="img" aria-label="Carga máxima y 1RM estimado por semana">
+    <line x1="${P}" y1="${H-18}" x2="${Wd-6}" y2="${H-18}" stroke="var(--line)"/>${barras}
+    ${pe.length>1?`<polyline fill="none" stroke="var(--art)" stroke-width="1.8" points="${lin}"/>`:''}${pe.map(i=>`<circle cx="${(x(i)+bw/2).toFixed(1)}" cy="${y(sem[i].e).toFixed(1)}" r="3" fill="var(--art)"><title>1RM ${num(sem[i].e)}</title></circle>`).join('')}
+    <text x="${P}" y="${H-4}" class="rect">${fecha(N-1)}</text><text x="${Wd-6}" y="${H-4}" text-anchor="end" class="rect">esta semana</text>
+    <text x="${P-4}" y="${y(mx/1.12)+3}" text-anchor="end" class="rect">${num(mx/1.12)}</text></svg>
+    <p class="hint" style="margin-top:0">Barras: carga más alta de la semana · línea: mejor 1RM estimado (con reserva conocida). Solo series con carga conocida.</p>`}
+/* v32 · mapa de calor: series efectivas por zona en las últimas 8 semanas, con los cinco colores del volumen semanal */
+function psCalor(){const Ws=[...Array(8).keys()].reverse(),V=Ws.map(o=>volMus(o).v),zs=Object.keys(MUS);
+  const L0=lunes(Date.now());
+  return `<h3 style="margin:10px 0 4px">Mapa de calor · 8 semanas</h3><div class="hm" role="table" aria-label="Volumen por zona y semana">
+    <span></span>${Ws.map(o=>`<span class="hmw">${o===0?'hoy':psF(L0-o*7*864e5).replace(/\s.*/,'')}</span>`).join('')}
+    ${zs.map(m=>`<span class="hmz">${esc(MUS[m][3]||MUS[m][0])}</span>${V.map((v,j)=>{const x=v[m]||0;return `<i class="${estMus(m,v)}" title="${esc(MUS[m][0])}, ${esc(semNom(Ws[j]))}: ${ef1(x)} series"></i>`}).join('')}`).join('')}</div>
+    <p class="hint">Cada columna es una semana (lunes a domingo); el color compara con el rango semanal de cada zona: ${VOL_ESTADOS.map(s=>`<span class="mpt ${s.k}"></span> ${esc(s.n)}`).join(' · ')}.</p>`}
 // gráfico de una serie comparable: puntos observados y línea de tendencia (Theil–Sen) en otro estilo: lo estimado no se confunde con lo medido
 function psGraf(pts){if(pts.length<2)return '';const W=300,H=110,P=24,ys=pts.map(p=>p.v),mn=Math.min(...ys)*.95,mx=Math.max(...ys)*1.05||1,
   x=i=>P+i*(W-P-8)/(pts.length-1),y=v=>H-16-(v-mn)/(mx-mn||1)*(H-26),sl=anTheilSen(ys),med=anMed(ys.map((v,i)=>v-sl*i));

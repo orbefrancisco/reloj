@@ -430,12 +430,61 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 .cgsum{display:flex;flex-direction:column;gap:2px} .cgsum ul{list-style:none;margin:0;padding:0}
 .cgsum li{display:flex;flex-direction:column;gap:1px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px} .cgsn{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 @media (max-width:360px){.cg4,.cg2{grid-template-columns:minmax(0,1fr)}}
+/* v32 · mejoras visuales */
+#hpre[hidden]{display:none} #desc:empty,#lesR:empty,#planX:empty{display:none}
+#selRes{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:10px 12px;text-align:left;width:100%;color:var(--fg)}
+#selRes b{font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
+#selRes .sr{display:flex;flex-direction:column;gap:2px;min-width:0} #selRes .sr span{font-size:12.5px;color:var(--muted)}
+#selRes .sc{flex:none;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)}
+#vReloj.plegado :is(#rutinas,#ssPar,#grupos,#rutHint,#meta,#plan,#planHint,#planX,#bloqueR){display:none!important}
+#vReloj.plegado .hoy{padding:8px 12px;gap:2px} #vReloj.plegado .hoy b{font-size:19px}
+#vReloj.plegado .hoy .r{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vReloj .cgav{flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 12px;border-width:1.5px}
+#vReloj .cgav .cgbar{flex-basis:100%;height:5px;order:3} #vReloj .cgav .btn2{margin-left:auto;height:36px}
+.bien.compacta{padding:8px 12px} .bienl{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13.5px;line-height:1.35}
+.bigw{position:relative;display:grid;place-items:center}
+#aro{display:none;position:absolute;left:50%;top:50%;width:186px;height:186px;transform:translate(-50%,-50%);overflow:visible;pointer-events:none}
+#pad.aro .bigw{width:186px;height:186px;margin:4px 0} #pad.aro #aro{display:block}
+#aro circle,#aro path{fill:none;stroke-linecap:round} .aro-t{stroke:var(--line);stroke-width:5}
+.aro-r{stroke:var(--ven);stroke-width:5;transform:rotate(-90deg);transform-origin:50px 50px;transition:stroke-dashoffset .2s linear}
+#pad.trans .aro-r,#pad.shift .aro-r{stroke:var(--cap)} #pad.work .aro-r{stroke:var(--art)}
+.aro-p{stroke:var(--art);stroke-width:2.6;opacity:.9} .aro-c{stroke:var(--cap);stroke-width:2.6;opacity:.9}
+.aro-b{stroke:var(--line);stroke-width:2.6;opacity:.6}
+#aro text{font-family:var(--mono);font-size:6px;fill:var(--muted)}
+#padCarga{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:.02em;line-height:1.1;text-align:center;color:var(--fg)}
+#padCarga small{display:block;font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.discg{display:block;width:100%;max-width:280px;height:auto;margin:2px auto 0}
+.discg .barra{fill:var(--muted)} .discg .tope{fill:var(--fg)} .discg rect.dc{stroke:rgba(0,0,0,.35);stroke-width:.6}
+.discg text{font-family:var(--mono);font-size:7px;fill:var(--muted)}
+.pc2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.pc2 .m{grid-template-columns:auto minmax(0,1fr) auto;gap:6px} .pc2 .lbl{font-size:10px}
+details.notas{border-top:1px solid var(--line);padding-top:8px} details.notas summary{cursor:pointer;font-size:14px;font-weight:600;padding:6px 0}
+details.notas .nota{margin-top:8px}
+.rirh{text-align:center}
+#doneW{touch-action:pan-y;cursor:ew-resize;user-select:none;padding:0 6px} #doneW .lbl i{font-style:normal;opacity:.7}
+.masl button{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:12px;row-gap:3px;align-items:center}
+.masl button svg{grid-row:1/3;width:26px;height:26px;color:var(--art)} .masl button b,.masl button span{grid-column:2}
+.cgst{font-size:12px;font-weight:500}
+.cgtop{position:sticky;top:0;z-index:3;background:var(--bg);display:flex;flex-direction:column;gap:6px;padding:6px 0 8px;margin-top:-6px;border-bottom:1px solid var(--line)}
+.cgfin{position:sticky;bottom:84px;z-index:3;background:var(--bg);padding:8px 0;box-shadow:0 -6px 10px -8px rgba(0,0,0,.35)}
+.cgrow{border-left-width:4px} .cgrow.pend,.cgrow.calibrar{border-left-color:var(--amb)} .cgrow.heredada{border-left-color:var(--muted)} .cgrow.carga,.cgrow.completa{border-left-color:var(--cap)}
+@keyframes cgflash{0%{background:color-mix(in srgb,var(--cap) 30%,var(--surface))}100%{background:var(--surface)}}
+.cgflash{animation:cgflash 1.1s ease-out}
+.cgflash .cgst::before{content:'✓ '}
+.cgfila1{display:flex;justify-content:space-between;align-items:center;gap:10px} .cgfila1 .cgc{min-width:0;font-size:13.5px;line-height:1.35} .cgfila1 .btn2{flex:none}
+.cgsr{font-weight:600}
+.hm{display:grid;grid-template-columns:minmax(0,1fr) repeat(8,22px);gap:3px 3px;align-items:center;font-size:11.5px}
+.hm .hmw{font-family:var(--mono);font-size:9px;color:var(--muted);text-align:center} .hm .hmz{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm i{display:block;width:22px;height:15px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--mborde)}
+.hm i.z0{background:var(--m0);opacity:.55} .hm i.zlo{background:var(--mlo)} .hm i.zok{background:var(--mok)} .hm i.zhi{background:var(--mhi)} .hm i.zal{background:var(--mal)}
+.cgpend{align-self:stretch;border:2px solid var(--amb)!important}
+@media (prefers-reduced-motion: reduce){.aro-r{transition:none} .cgflash{animation:none!important}}
 </style>
 <script src="estilo.js"></script>
 </head>
 <body>
 <main>
-  <header><h1>Congestión · <span id="gnom">Bíceps</span></h1><div id="blk">3 estaciones</div></header>
+  <header><h1><span id="hpre">Congestión · </span><span id="gnom">Bíceps</span></h1><div id="blk">3 estaciones</div></header>
 
   <section id="vReloj" style="display:flex;flex-direction:column;gap:14px">
     <div id="retomarAv" class="aviso-d" hidden></div>
@@ -443,6 +492,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <div id="cgAviso" class="cgav" hidden></div>
     <button id="hoyCard" type="button" class="hoy" hidden></button>
     <div id="planHoy" class="card anplan" hidden></div>
+    <button id="selRes" type="button" hidden aria-expanded="false"></button>
     <div id="rutinas" role="group" aria-label="Rutina"></div>
     <div id="ssPar" class="sspar" hidden></div>
     <div id="grupos"></div>
@@ -535,9 +585,11 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
       </svg>
       <span id="animPad" hidden></span>
       <span id="kind">Toca para empezar</span>
-      <span id="big">—</span>
+      <span class="bigw"><svg id="aro" viewBox="0 0 100 100" aria-hidden="true"><circle class="aro-t" cx="50" cy="50" r="46"/><circle id="aroR" class="aro-r" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/><path class="aro-b" d="M50 92 A42 42 0 0 1 50 8" pathLength="100"/><path class="aro-b" d="M50 92 A42 42 0 0 0 50 8" pathLength="100"/><path id="aroP" class="aro-p" d="M50 92 A42 42 0 0 1 50 8" pathLength="100" stroke-dasharray="0 100"/><path id="aroC" class="aro-c" d="M50 92 A42 42 0 0 0 50 8" pathLength="100" stroke-dasharray="0 100"/><text x="2" y="99">P</text><text x="94" y="99">C</text></svg><span id="big">—</span></span>
+      <span id="padCarga" hidden></span>
       <span id="sub"></span>
       <span id="disc" hidden></span>
+      <span id="discG" hidden></span>
       <span id="pav" hidden></span>
       <span id="ssB" hidden></span>
       <span id="bar"></span>
@@ -552,10 +604,10 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
         <div style="text-align:center"><label class="lbl" for="kgv">Peso</label><br><input id="kgv" class="kgv" inputmode="decimal" autocomplete="off" placeholder="—" aria-describedby="kgU"><div class="lbl" id="kgU">kg</div></div>
         <button id="kgMas" type="button" aria-label="Más peso">+</button>
       </div>
-      <div class="discos" id="discos" hidden><span id="discosT"></span><button id="barraT" type="button"></button></div>
+      <div class="discos" id="discos" hidden><span id="discosT"></span><button id="barraT" type="button"></button><span id="discosG" style="flex-basis:100%"></span></div>
       <div class="step">
         <button id="minus" type="button" aria-label="Una rep menos">−</button>
-        <div style="text-align:center"><div class="lbl">Reps hechas</div><div id="done">0</div></div>
+        <div id="doneW" style="text-align:center"><div class="lbl">Reps hechas <i>· desliza ← →</i></div><div id="done">0</div></div>
         <button id="plus" type="button" aria-label="Una rep más">+</button>
       </div>
       <div class="chips" id="molB"></div>
@@ -564,8 +616,9 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
         <button type="button" data-r="0">0</button><button type="button" data-r="1">1</button>
         <button type="button" data-r="2">2</button><button type="button" data-r="3">3</button><button type="button" data-r="4">4+</button>
       </div>
+      <p class="hint rirh">0 = no podías ni una más · 1 = te quedaba una · 2 = dos · 3 = tres · 4+ = cuatro o más</p>
     </section>
-    <div style="display:grid;gap:10px">
+    <div class="pc2">
       <div class="m"><span class="lbl">Congestión P</span><div class="track"><div class="fill" id="fP"></div></div><span class="val" id="vP">0.00</span></div>
       <div class="m"><span class="lbl">Capacidad C</span><div class="track"><div class="fill" id="fC"></div></div><span class="val" id="vC">1.00</span></div>
     </div>
@@ -580,6 +633,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
       <input id="notaIn" class="in" maxlength="140" autocomplete="off" placeholder="Ej.: buen bombeo, el hombro algo cargado">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button id="notaOk" type="button" class="btn2">Guardar nota</button><span id="notaMsg" class="hint" aria-live="polite"></span></div>
     </section>
+    <details class="notas"><summary>Cómo funciona el reloj</summary>
     <p class="nota"><b>Cómo decide.</b> La congestión decae como e^(−t/110 s) y la capacidad se recupera como 1 − A·e^(−t/τ_C). El descanso es el que maximiza C·P: t* = τ_C·ln[A(τ_C+τ_P)/τ_C], con un ruido log-normal pequeño. Las mini-series tienen objetivo aleatorio entre 65 y 90 % de RTF·C. Cuando ya no da, el reloj no te deja parar: cambia a una variante más fácil en 10 s. El core cierra con 3 vacíos de duración sorteada por una ley de potencias entre 15 y 50 s. Con 8 mini-series o más de un grupo, el reloj aprende cómo te recuperas: si sueles hacer menos reps de las previstas alarga el descanso (×1/k) y baja el objetivo (×k); si haces más, al revés (Ajustes → Recuperación aprendida).</p>
     <p class="nota"><b>Mis cargas (v31).</b> Una vez por semana configuras o confirmas en «Más → Mis cargas» la carga de cada ejercicio (hipertrofia y fuerza por separado). Al entrenar, el reloj ya la sabe: no te pregunta el peso y registra cada serie con esa carga («de tu configuración»). «Cambiar peso» la cambia solo para una serie, para el resto del ejercicio o también en tu referencia; las series ya hechas no se tocan. Una mini-serie con otra carga recalcula su objetivo y no se confunde con fatiga. Al empezar la semana, el reloj revisa la anterior y propone subir, mantener, bajar o recalibrar con su porqué; decides tú.</p>
     <p class="nota"><b>Peso y progresión.</b> Si un ejercicio no tiene carga configurada, al reportar la primera serie anota el peso: toca el número y escríbelo, o usa − y +. Con mancuernas, el peso de una. La próxima vez el reloj te dice con cuánto empezar: si hiciste el tope del rango con 1 o más en reserva, o te sobraron 4 o más, sube (1 kg si usas menos de 10 kg, 2 kg hasta 40 kg, 2,5 kg por encima; en libras, 2,5 lb por debajo de 25 lb y 5 lb de ahí en adelante; con barra, un par de los discos más pequeños); si no llegaste al mínimo del rango al fallo, baja. Un récord es superar tu mejor 1RM estimado: peso × (1 + (reps + reserva)/30).</p>
@@ -587,7 +641,8 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
     <p class="nota"><b>Superseries.</b> Eliges un par (bíceps + tríceps, pecho + espalda, las estaciones de piernas entre sí, hombros + abdomen o el tuyo) y el reloj alterna una serie de cada lado con ~20 s para cambiar de máquina. Cada lado tiene su propio modelo de congestión y capacidad, su meta y su descanso, contado desde SU última serie: mientras trabajas B, A se recupera. Las mini-series se alternan igual (su objetivo se ajusta al descanso real que tuvieron); el paso a parciales, isometría o variante va seguido, sin alternar, porque aprovecha la congestión. Se guardan dos sesiones, una por grupo, y al final ves el tiempo que ahorraste frente a hacerlas por separado.</p>
     <p class="nota"><b>Día de fuerza.</b> Un compuesto pesado del grupo (4–5 series de 3–6 reps al 80–88 % de tu 1RM estimado, con 1–2 en reserva y descanso fijo de 3–3,5 min, sin mini-series ni fallo) y, si quieres, un accesorio. Calentamiento más largo: 40, 60, 75 y 85 %. Si completas todas las series con 2 o más en reserva, la próxima vez sube 2 puntos el %. Como mucho uno por grupo a la semana; en descarga no hay.</p>
     <p class="nota"><b>Cuidar una zona.</b> En Ajustes (o cuando marcas la misma molestia en 2 de 3 sesiones) puedes cuidar hombro, codo, muñeca, espalda baja, rodilla o cadera 7, 14 o 28 días: los ejercicios que más la cargan se cambian por otro del mismo grupo y en los que la cargan algo haces series rectas con 2–3 en reserva. No es consejo médico: si el dolor es agudo, sigue o empeora, consulta a un profesional.</p>
-    <p class="nota"><b>Semana de descarga.</b> Mientras dura (la que empiezas tú o la última semana de un bloque), el reloj cambia de modo: cada ejercicio son series rectas, sin mini-series, parciales, variante ni isometría al fallo, con 2 min de descanso y dejando 2–3 en reserva. La meta es la mitad de la normal y se cuenta en <b>series completas</b> (5 reps o más, con cualquier reserva), no en efectivas, así que no te pide rondas extra. Las series se guardan igual y sus efectivas reales cuentan en Progreso.</p>
+    <p class="nota" id="notaDesc"><b>Semana de descarga.</b> Mientras dura (la que empiezas tú o la última semana de un bloque), el reloj cambia de modo: cada ejercicio son series rectas, sin mini-series, parciales, variante ni isometría al fallo, con 2 min de descanso y dejando 2–3 en reserva. La meta es la mitad de la normal y se cuenta en <b>series completas</b> (5 reps o más, con cualquier reserva), no en efectivas, así que no te pide rondas extra. Las series se guardan igual y sus efectivas reales cuentan en Progreso.</p>
+    </details>
   </section>
 
   <section id="vProg" hidden style="display:flex;flex-direction:column;gap:10px">
@@ -642,27 +697,23 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 
   <!-- Fase 3: Más (secundarias) -->
   <section id="vMas" hidden style="display:flex;flex-direction:column;gap:10px">
-    <h2>Más</h2>
     <div class="masl">
-      <button id="tCargas" type="button"><b>Mis cargas</b><span>Carga de referencia de cada ejercicio esta semana (hipertrofia y fuerza), encuesta semanal y propuestas de progresión</span></button>
-      <button id="tEstilo" type="button"><b>Ajustes</b><span>Entrenamiento, cuidar una zona, voz, tempo, unidades y estilo visual</span></button>
-      <button id="tApr" type="button"><b>Aprendizaje</b><span>Qué ha aprendido el reloj de tu recuperación, con qué datos y cuánto acierta</span></button>
-      <button id="tAud" type="button"><b>Auditoría de datos</b><span>Integridad de tus registros, solo lectura, exportable</span></button>
+      <button id="tCargas" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12"/></svg><b>Mis cargas</b><span>Carga de referencia de cada ejercicio esta semana (hipertrofia y fuerza), encuesta semanal y propuestas de progresión</span></button>
+      <button id="tEstilo" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><b>Ajustes</b><span>Entrenamiento, cuidar una zona, voz, tempo, unidades y estilo visual</span></button>
+      <button id="tApr" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M6 16l4-5 3 3 5-7"/><circle cx="18" cy="7" r="1.5"/></svg><b>Aprendizaje</b><span>Qué ha aprendido el reloj de tu recuperación, con qué datos y cuánto acierta</span></button>
+      <button id="tAud" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><b>Auditoría de datos</b><span>Integridad de tus registros, solo lectura, exportable</span></button>
     </div>
   </section>
   <section id="vCargas" hidden style="display:flex;flex-direction:column;gap:10px">
     <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
-    <h2>Mis cargas</h2>
     <div id="vCargasC" style="display:flex;flex-direction:column;gap:10px"></div>
   </section>
   <section id="vApr" hidden style="display:flex;flex-direction:column;gap:10px">
     <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
-    <h2>Aprendizaje</h2>
     <div id="cCalib" class="card"></div>
   </section>
   <section id="vAud" hidden style="display:flex;flex-direction:column;gap:10px">
     <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
-    <h2>Auditoría de datos</h2>
     <div id="hAudit" class="card"></div>
   </section>
 
