@@ -431,6 +431,7 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 .cgsum li{display:flex;flex-direction:column;gap:1px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px} .cgsn{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 @media (max-width:360px){.cg4,.cg2{grid-template-columns:minmax(0,1fr)}}
 /* v32 · mejoras visuales */
+.musv{display:flex;flex-direction:column;gap:4px} .musv input{width:100%;height:36px;accent-color:var(--cap)}
 #hpre[hidden]{display:none} #desc:empty,#lesR:empty,#planX:empty{display:none}
 #selRes{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:10px 12px;text-align:left;width:100%;color:var(--fg)}
 #selRes b{font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
@@ -760,6 +761,9 @@ details.notas .nota{margin-top:8px}
     <h2 style="margin-top:8px">Voz y vibración</h2>
     <div class="tog"><button id="cVoz" type="button" aria-pressed="true">Voz</button><button id="cVib" type="button" aria-pressed="true">Vibración</button><button id="cProbar" type="button">Probar</button></div>
     <p class="muted" style="font-size:13px;margin:0">La voz anuncia cada serie, el descanso, los últimos 10 segundos, las sugerencias de peso y los récords. Usa la voz en español del teléfono; mantén el volumen multimedia alto. La vibración avisa al empezar y al terminar cada descanso.</p>
+    <h2 style="margin-top:8px">Música para entrenar</h2>
+    <p class="muted" style="font-size:13px;margin:0">Música instrumental que el teléfono compone mientras entrenas, sin descargas ni conexión. Sigue al reloj: completa en la serie, suave en el descanso, sube en sus últimos 10 s y «cae» justo cuando empieza la serie siguiente. Baja cuando habla la voz. Si pones tu propia música, mejor desactívala.</p>
+    <div id="cMus" style="display:flex;flex-direction:column;gap:8px"></div>
     <h2 style="margin-top:8px">Tempo guiado</h2>
     <div class="tog"><button id="cTempo" type="button" aria-pressed="false">Tempo: no</button><button id="cTempoVoz" type="button" aria-pressed="false">Contar en voz: no</button></div>
     <div class="tog" id="cTempos"></div>
@@ -817,5 +821,6 @@ details.notas .nota{margin-top:8px}
 <script src="auditoria.js"></script>
 <script src="pantallas.js"></script>
 <script src="cargas.js"></script>
+<script src="musica.js"></script>
 </body>
 </html>

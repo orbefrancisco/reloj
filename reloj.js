@@ -126,6 +126,8 @@ function normCfg(o){const c={};if(!esObj(o))return c;
   if(o.uni==='kg'||o.uni==='lb')c.uni=o.uni;
   const pt=vNum(o.persistT,0,1e14);if(pt!=null)c.persistT=pt;
   if(esObj(o.barraEj)){c.barraEj={};let n=0;for(const k in o.barraEj)if(tiene(o.barraEj,k)&&typeof o.barraEj[k]==='boolean'&&k.length<=TXT_MAX&&++n<=500)c.barraEj[k]=o.barraEj[k]}
+  if(esObj(o.musica)){const m={};if(typeof o.musica.on==='boolean')m.on=o.musica.on;if(['elec','intensa','lofi','misterio'].includes(o.musica.estilo))m.estilo=o.musica.estilo;   // v33
+    const v=vNum(o.musica.vol,0,1);if(v!=null)m.vol=v;c.musica={on:false,estilo:'elec',vol:.6,...m}}
   if(esObj(o.tempo)){const T={};if(typeof o.tempo.on==='boolean')T.on=o.tempo.on;if(typeof o.tempo.voz==='boolean')T.voz=o.tempo.voz;
     const p=typeof o.tempo.t==='string'&&/^\d-\d-\d-\d$/.test(o.tempo.t)?o.tempo.t.split('-').map(Number):null;if(p&&p[0]+p[2]>0)T.t=o.tempo.t;c.tempo=T}
   return c}
@@ -229,7 +231,7 @@ function enPausa(g){return !!(CAT[g]&&CAT[g].pausa)}
 aplicarEjercicios();
 const DISCOS_STD=[25,20,15,10,5,2.5,1.25],BARRAS=[20,15,10,7],DISCOS_LB=[45,35,25,10,5,2.5],BARRAS_LB=[45,35,25,15];
 let CFG={voz:true,vibra:true,cal:true,barra:20,discos:DISCOS_STD.slice(),discosX:[],barraEj:{},tempo:{on:false,t:'3-0-1-0',voz:false},rel:false,
-  uni:'kg',barraLb:45,discosLb:DISCOS_LB.slice(),discosXLb:[],resPeso:false};Object.assign(CFG,normCfg(leerJSON(AKEY,{})));
+  uni:'kg',barraLb:45,discosLb:DISCOS_LB.slice(),discosXLb:[],resPeso:false,musica:{on:false,estilo:'elec',vol:.6}};Object.assign(CFG,normCfg(leerJSON(AKEY,{})));
 let descarga=normDescarga(leerJSON(DKEY,{}));
 // Calibración de la recuperación ({desde}: solo cuenta lo posterior), plan por bloques ({inicio:'AAAA-MM-DD' lunes, sem:4|5|6}) y última copia ({fecha, pos}).
 const CKEY='reloj-anomalo-calib',BQKEY='reloj-anomalo-bloque',COPKEY='reloj-anomalo-copia';
