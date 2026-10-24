@@ -432,6 +432,10 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 @media (max-width:360px){.cg4,.cg2{grid-template-columns:minmax(0,1fr)}}
 /* v32 · mejoras visuales */
 .musv{display:flex;flex-direction:column;gap:4px} .musv input{width:100%;height:36px;accent-color:var(--cap)}
+.hoyej{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13.5px} .hoyej .btn2{height:40px} .hoyej.activo{border:1.5px solid var(--cap);border-radius:12px;padding:8px 10px;background:var(--surface)}
+.hoyej .hoyb{display:flex;gap:6px;flex-wrap:wrap} .hoymeta{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
+.hoymeta button{width:44px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:20px} .hoymeta b{font-family:var(--mono);font-size:18px;min-width:2ch;text-align:center}
+#soloC .acc button:disabled{opacity:.45}
 #hpre[hidden]{display:none} #desc:empty,#lesR:empty,#planX:empty{display:none}
 #selRes{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:10px 12px;text-align:left;width:100%;color:var(--fg)}
 #selRes b{font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
@@ -494,6 +498,7 @@ details.notas .nota{margin-top:8px}
     <button id="hoyCard" type="button" class="hoy" hidden></button>
     <div id="planHoy" class="card anplan" hidden></div>
     <button id="selRes" type="button" hidden aria-expanded="false"></button>
+    <div id="hoyEj" class="hoyej" hidden></div>
     <div id="rutinas" role="group" aria-label="Rutina"></div>
     <div id="ssPar" class="sspar" hidden></div>
     <div id="grupos"></div>
@@ -523,6 +528,7 @@ details.notas .nota{margin-top:8px}
         <label class="lbl" for="edTe">Técnica (opcional)</label><input id="edTe" maxlength="50" autocomplete="off" placeholder="controlado · 2–3 s abajo">
       </div>
       <p class="hint" id="edHint">Se conserva la forma de llegar al fallo de la estación original (parciales, isometría o variante fácil).</p>
+      <p class="hint">Este cambio queda <b>para siempre</b> en tu plan. Si solo es por hoy, <button type="button" class="lnk" data-hoyej="abrir">usa «Otro ejercicio hoy»</button>.</p>
       <div class="acc"><button id="edOk" type="button" style="border:2px solid var(--cap);color:var(--cap);font-weight:600">Guardar</button><button id="edRes" type="button" style="border:1px solid var(--line)">Original</button><button id="edQu" type="button" class="peligro" style="border:1px solid">Quitar</button><button id="edNo" type="button" style="border:1px solid var(--line)">Cancelar</button></div>
     </section>
     <section id="bien" class="card bien" hidden aria-label="Cómo llegas hoy"></section>
@@ -795,6 +801,12 @@ details.notas .nota{margin-top:8px}
     <p class="hint" id="catHint">Toca uno para verlo en movimiento.</p>
     <div id="catL"></div>
   </div>
+</dialog>
+
+<!-- v34: «Otro ejercicio hoy» -->
+<dialog id="soloDlg" class="hoja" aria-labelledby="soloT">
+  <div class="hoja-top"><h2 id="soloT">Otro ejercicio hoy</h2><button id="soloX" type="button" class="cerrar" aria-label="Cerrar">×</button></div>
+  <div class="hoja-c" id="soloC"></div>
 </dialog>
 
 <nav aria-label="Secciones">

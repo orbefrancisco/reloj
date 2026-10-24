@@ -166,3 +166,78 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-hdia],[dat
       entregar(`series-filtradas-${hoy()}.csv`,'﻿'+fil.map(f=>f.map(q).join(',')).join('\n'),'text/csv')}
     return}
   renderHist()});
+
+/* ---------- v34 · «Otro ejercicio hoy»: hacer SOLO un ejercicio, añadir uno o cambiar uno por otro, solo por hoy ----------
+   El plan de siempre (y el editor, que lo cambia para siempre) no se toca. Se guarda {dia, g, modo, e, meta} y se usa en la
+   próxima sesión de ese grupo hoy (se consume al empezar). Las series se guardan en el grupo y cuentan para su volumen y para cada
+   músculo según el ejercicio (musculos), igual que cualquier otra. */
+const HOYKEY='reloj-anomalo-hoy';
+function hoyLee(){const o=leerJSON(HOYKEY,null);if(!esObj(o)||o.dia!==diaK(Date.now())||!esG(o.g))return null;
+  const e=vLista(o.e,EST_MAX+2,normEjHoy),meta=vEnt(o.meta,1,30);if(!e.length||meta==null||!e.some(x=>!x.levy))return null;
+  return {dia:o.dia,g:o.g,modo:['solo','anadir','cambiar'].includes(o.modo)?o.modo:'solo',e,meta}}
+const hoyDe=g=>{const h=hoyLee();return h&&h.g===g?h:null};
+// al empezar la sesión: el plan de hoy, con los ejercicios de siempre tal como están (con sus ajustes de «cuidar una zona»)
+function hoyTomar(g){const h=hoyDe(g);if(!h)return null;try{localStorage.removeItem(HOYKEY)}catch(e){}
+  return {e:h.e.map(x=>(!x.hoy&&CAT[g].e.find(c=>c.n===x.n))||x),meta:h.meta}}
+const hoyBorra=()=>{try{localStorage.removeItem(HOYKEY)}catch(e){}};
+// un ejercicio cualquiera: si es de tu plan, como está; si no, con los datos del catálogo o valores prudentes
+function hoyEj(n,g){const c=(CAT[g].base||CAT[g].e).find(x=>x.n===n);if(c)return normEjHoy({...c,hoy:true});const sg=SUGEJ[n]||{};
+  return normEjHoy({n,s:sg.s||nCorto(n),r:sg.r||'8–12',ext:sg.ext||'part',extN:sg.extN||'Parciales',extH:sg.extH||'mitad del recorrido',tempo:sg.tempo||'controlado · 2–3 s abajo',hoy:true})}
+// ejercicios que se ofrecen para un grupo: los de tu plan, luego los del catálogo de ese grupo (sin repetir)
+function hoyOpciones(g){const plan=(CAT[g].base||CAT[g].e).filter(x=>!x.levy).map(x=>x.n),cat=[...(ALT[g]||[]),...ANIM.lista.filter(d=>d.g===g&&d.id!=='vacio'&&d.id!=='generico').map(d=>d.n)];
+  const vistos=new Set(plan);return {plan,otros:[...new Set(cat)].filter(n=>!vistos.has(n)).sort((a,b)=>a.localeCompare(b,'es'))}}
+const hoyPorEj=g=>Math.max(2,Math.round(metaHoy(g)/Math.max(1,CAT[g].e.filter(x=>!x.levy).length)));
+let hoyF=null;   // formulario abierto: {g, n, otro, modo, cambia, meta, q}
+function hoyAbrir(){const h=hoyDe(grupo),{plan}=hoyOpciones(grupo);if(!$('edL').children.length)$('edL').innerHTML=opts(catGeneral());   // sugerencias al escribir
+  hoyF=h?{g:h.g,n:(h.e.find(x=>x.hoy)||h.e[0]).n,otro:'',modo:h.modo,cambia:0,meta:h.meta,q:''}:{g:grupo,n:plan[0]||'',otro:'',modo:'solo',cambia:0,meta:hoyPorEj(grupo),q:''};
+  hoyPinta();const d=$('soloDlg');if(!d.open)d.showModal()}
+function hoyMetaDef(){const g=hoyF.g;return hoyF.modo==='solo'?hoyPorEj(g):hoyF.modo==='anadir'?Math.min(METAS_MAX_HOY,metaHoy(g)+hoyPorEj(g)):metaHoy(g)}
+const METAS_MAX_HOY=20;
+function hoyPinta(){const F=hoyF,g=F.g,{plan,otros}=hoyOpciones(g),q=sinTilde(F.q).trim(),fil=n=>!q||sinTilde(n).includes(q);
+  const nom=F.n==='__otro'?F.otro.trim():F.n,lista=CAT[g].e.filter(x=>!x.levy),zs=lesAct(),carga=nom&&zs.length?lesAcc(nom,g,zs).v:0;
+  const mus=nom?Object.entries(musculos(nom,g)).filter(([m])=>MUS[m]).sort((a,b)=>b[1]-a[1]).map(([m,f])=>`${MUS[m][3]||MUS[m][0]}${f<1?' (parcial)':''}`):[];
+  const op=(n)=>`<option value="${esc(n)}"${n===F.n?' selected':''}>${esc(n)}</option>`;
+  $('soloC').innerHTML=`<label class="cgl2"><span>Grupo muscular</span><select data-hoyf="g">${Object.keys(CAT).map(k=>`<option value="${k}"${k===g?' selected':''}>${esc(CAT[k].n)}</option>`).join('')}</select></label>
+    <label class="cgl2"><span>Buscar</span><input type="search" class="in" data-hoyf="q" value="${esc(F.q)}" placeholder="p. ej. búlgara" autocomplete="off"></label>
+    <label class="cgl2"><span>Ejercicio</span><select data-hoyf="n"><optgroup label="De tu plan">${plan.filter(fil).map(op).join('')}</optgroup><optgroup label="Otros de ${esc(CAT[g].n.toLowerCase())}">${otros.filter(fil).map(op).join('')}</optgroup>
+      <option value="__otro"${F.n==='__otro'?' selected':''}>Otro (escríbelo)…</option></select></label>
+    ${F.n==='__otro'?`<input class="in" data-hoyf="otro" list="edL" maxlength="60" value="${esc(F.otro)}" placeholder="Nombre del ejercicio" autocomplete="off">`:''}
+    <span class="lbl">¿Qué haces hoy?</span>
+    <div class="tog" role="group" aria-label="Qué haces hoy">${[['solo','Solo este ejercicio'],['anadir','Añadirlo a la sesión'],['cambiar','Cambiar uno por este']].map(([k,t])=>`<button type="button" data-hoym="${k}" aria-pressed="${F.modo===k}">${t}</button>`).join('')}</div>
+    ${F.modo==='cambiar'?`<label class="cgl2"><span>En lugar de</span><select data-hoyf="cambia">${lista.map((x,i)=>`<option value="${i}"${i===F.cambia?' selected':''}>${esc(x.n)}</option>`).join('')}</select></label>`:''}
+    <div class="hoymeta"><span>Meta de hoy</span><button type="button" data-hoymt="-1" aria-label="Una menos">−</button><b>${F.meta}</b><button type="button" data-hoymt="1" aria-label="Una más">+</button><span>series efectivas</span></div>
+    <p class="hint">${F.modo==='solo'?`La sesión será solo ${nom?'«'+esc(nom)+'»':'ese ejercicio'}, con mini-series y variante al final como siempre.`:F.modo==='anadir'?`Tus ${lista.length} ejercicios y, además, ${nom?'«'+esc(nom)+'»':'este'}.`:`${nom?'«'+esc(nom)+'»':'Este'} en lugar de «${esc((lista[F.cambia]||{}).n||'')}».`}
+      <b>Solo por hoy:</b> tu plan de siempre no cambia. Cuenta para el volumen de ${esc(CAT[g].n.toLowerCase())}${mus.length?`: ${esc(mus.join(', '))}`:''}.</p>
+    ${carga>=3?`<p class="cgwarn">⚠ Este ejercicio carga ${esc(lesQue(zs))}, que estás cuidando: el reloj lo dejaría fuera de tu plan. Hazlo con cuidado o elige otro.</p>`:''}
+    <div class="acc"><button type="button" data-hoya="usar" style="border:2px solid var(--cap);color:var(--cap);font-weight:600"${nom?'':' disabled'}>Usar hoy</button><button type="button" data-hoya="ver"${nom?'':' disabled'}>Ver cómo se hace</button><button type="button" data-hoya="cerrar">Cancelar</button></div>`;
+  if(F._foco){const el=$('soloC').querySelector(`[data-hoyf="${F._foco}"]`);if(el){el.focus();try{el.setSelectionRange(99,99)}catch(e){}}F._foco=''}}
+function hoyUsar(){const F=hoyF,g=F.g,nom=(F.n==='__otro'?F.otro:F.n).trim().slice(0,60);if(!nom)return;const E=hoyEj(nom,g);if(!E)return;
+  const base=CAT[g].e,series=base.filter(x=>!x.levy),levyE=base.filter(x=>x.levy);let e;
+  if(F.modo==='solo')e=[E];
+  else if(F.modo==='anadir')e=[...series.filter(x=>x.n!==E.n),E,...levyE];
+  else{const i=Math.min(F.cambia,series.length-1);e=[...series.slice(0,i),E,...series.slice(i+1).filter(x=>x.n!==E.n),...levyE]}
+  // superserie o rutina: «otro ejercicio hoy» es una sesión de un grupo
+  if(ssSel.on){ssSel.on=false;guardarObj(SSKEY,ssSel)}if(rutI!==0){rutI=0;guardarRut()}fzaHoy=false;grupo=g;rutPos=0;
+  guardarObj(HOYKEY,{dia:diaK(Date.now()),g,modo:F.modo,e:e.map(x=>({n:x.n,s:x.s,r:x.r,ext:x.ext,extN:x.extN,extH:x.extH,tempo:x.tempo,...(x.levy?{levy:true}:{}),...(x.hoy||x.n===E.n?{hoy:true}:{})})),meta:F.meta});
+  S=fresh();$('save').textContent='Sin guardar aún';selAbierto=false;$('soloDlg').close();hoyF=null;lastG=null;renderGrupos();render()}
+function renderHoyEj(){const el=$('hoyEj');if(!el)return;const ver=S.st==='idle'&&rutPos===0;el.hidden=!ver;if(!ver)return;const h=hoyDe(grupo);
+  const html=h?`<span>Hoy: <b>${esc(h.modo==='solo'?(h.e.find(x=>!x.levy)||{}).n:h.e.filter(x=>x.hoy).map(x=>x.n).join(', ')||'plan propio')}</b> ${h.modo==='solo'?'· solo este ejercicio':h.modo==='anadir'?'· añadido a tu sesión':'· en lugar de otro'} · meta ${h.meta}</span><span class="hoyb"><button type="button" class="btn2" data-hoyej="abrir">Cambiar</button><button type="button" class="btn2" data-hoyej="quitar">Volver a lo de siempre</button></span>`
+    :`<button type="button" class="btn2" data-hoyej="abrir">＋ Otro ejercicio hoy</button><span class="hint">Haz solo uno, añade uno o cambia uno, sin tocar tu plan.</span>`;
+  if(el.innerHTML!==html)el.innerHTML=html;el.classList.toggle('activo',!!h)}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-hoyej],[data-hoym],[data-hoymt],[data-hoya]');if(!b)return;const d=b.dataset;
+  if(d.hoyej==='abrir'){if(S.st!=='idle')return;$('editor').hidden=true;hoyAbrir();return}   // desde el editor: se cierra y se abre «solo hoy»
+  if(d.hoyej==='quitar'){hoyBorra();render();return}
+  if(!hoyF)return;
+  if(d.hoym){hoyF.modo=d.hoym;hoyF.meta=hoyMetaDef();hoyPinta();return}
+  if(d.hoymt){hoyF.meta=Math.min(METAS_MAX_HOY,Math.max(1,hoyF.meta+(+d.hoymt)));hoyPinta();return}
+  if(d.hoya==='usar'){hoyUsar();return}
+  if(d.hoya==='ver'){const nom=hoyF.n==='__otro'?hoyF.otro:hoyF.n;$('soloDlg').close();verComo(nom,hoyF.g);return}
+  if(d.hoya==='cerrar'){$('soloDlg').close();hoyF=null}});
+document.addEventListener('change',e=>{const s=e.target.closest&&e.target.closest('[data-hoyf]');if(!s||!hoyF)return;const k=s.dataset.hoyf;
+  if(k==='g'){hoyF.g=s.value;const {plan}=hoyOpciones(s.value);hoyF.n=plan[0]||'';hoyF.cambia=0;hoyF.meta=hoyMetaDef()}
+  else if(k==='n')hoyF.n=s.value;else if(k==='cambia')hoyF.cambia=+s.value;else if(k==='otro')hoyF.otro=s.value;else return;hoyPinta()});
+document.addEventListener('input',e=>{const s=e.target.closest&&e.target.closest('[data-hoyf="q"],[data-hoyf="otro"]');if(!s||!hoyF)return;
+  if(s.dataset.hoyf==='q'){hoyF.q=s.value;const {plan,otros}=hoyOpciones(hoyF.g),q=sinTilde(hoyF.q).trim(),L=[...plan,...otros].filter(n=>!q||sinTilde(n).includes(q));
+    if(L.length&&!L.includes(hoyF.n)&&hoyF.n!=='__otro')hoyF.n=L[0];hoyF._foco='q';hoyPinta()}
+  else{hoyF.otro=s.value;const u=$('soloC').querySelector('[data-hoya="usar"]');if(u)u.disabled=!s.value.trim()}});
+$('soloX').onclick=()=>{$('soloDlg').close();hoyF=null};
