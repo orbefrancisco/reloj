@@ -96,7 +96,7 @@ function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha
   if(s.antes===true)o.antes=true;if(s.desc===true)o.desc=true;if(sc!=null)o.serC=sc;
   if(esObj(s.rut)){const n=vTxt(s.rut.n,40),pos=vEnt(s.rut.pos,0,20),de=vEnt(s.rut.de,1,20);if(n!=null&&pos!=null&&de!=null)o.rut={n,pos,de}}
   // v18: día de fuerza, superserie ('biceps+triceps', mismo superId en sus dos sesiones, lado A o B) y zona cuidada
-  if(s.fza===true)o.fza=true;
+  if(s.fza===true)o.fza=true;if(s.cierre===true)o.cierre=true;   // v35: parte de un cierre de déficits
   if(typeof s.super==='string'&&s.super.length<=40){const p=s.super.split('+');if(p.length===2&&p.every(esG)){o.super=s.super;const si=vTxt(s.superId,80);if(si)o.superId=si;if(s.lado==='A'||s.lado==='B')o.lado=s.lado}}
   // v26: versión de esquema y fechas de registro (creada) y de última edición (editada), distintas de la del entrenamiento (start)
   {const e=vEnt(s.esq,1,99);if(e!=null)o.esq=e;const c=vFecha(s.creada),ed=vFecha(s.editada);if(c)o.creada=c;if(ed)o.editada=ed}
@@ -249,7 +249,8 @@ const RUTINAS=[{n:'Un grupo'},{n:'Pecho + Tríceps',g:['pecho','triceps']},{n:'E
  {n:'Piernas + Abdomen',g:['piernas','abdominales']},{n:'Hombros + Abdomen',g:['hombros','abdominales']},{n:'La mía',mia:1}];
 let rutI=0,miaLista=[],rutPos=0,rutEf=0;
 {const r=normRut(leerJSON(RKEY,{}));rutI=r.i;miaLista=r.mia}
-const rutLista=()=>{const R=RUTINAS[rutI];return (R.mia?miaLista:R.g||[]).filter(g=>!enPausa(g))};   // los grupos en pausa (cuidar, dolor extremo) se saltan
+const rutLista=()=>{if(typeof cierreGrupos==='function'){const c=cierreGrupos();if(c)return c}   // v35: el cierre de déficits encadena sus bloques
+  const R=RUTINAS[rutI];return (R.mia?miaLista:R.g||[]).filter(g=>!enPausa(g))};   // los grupos en pausa (cuidar, dolor extremo) se saltan
 const enRutina=()=>!ssSel.on&&rutLista().length>1;   // con superserie elegida no hay rutina
 const guardarRut=()=>guardarObj(RKEY,{i:rutI,mia:miaLista});
 const now=()=>Date.now()/1000;
@@ -460,7 +461,9 @@ const metaHoy=g=>bajaHoy()?Math.max(2,Math.round(metaBase(g)*.75)):metaBase(g);
 function iniciarSesion(x){x=x||{};if(x.fza)S.fza=x.fza;if(x.ests)S.ests=x.ests;
   // v34 · «otro ejercicio hoy»: el plan de hoy de este grupo (solo ese ejercicio, uno añadido o uno cambiado) sustituye al de siempre
   // en esta sesión; se consume al empezar (no en fuerza ni en superserie)
-  let hp=null;if(!x.fza&&!x.ests&&!SS&&typeof hoyTomar==='function'){hp=hoyTomar(grupo);if(hp)S.planE=hp.e}
+  // v35 · cierre de déficits: el bloque de este grupo, con las series efectivas de cada ejercicio (manda sobre «otro ejercicio hoy»)
+  let cb=null;if(!x.fza&&!x.ests&&!SS&&typeof cierreTomar==='function'){cb=cierreTomar(grupo);if(cb)S.planE=cb.e}
+  let hp=null;if(!cb&&!x.fza&&!x.ests&&!SS&&typeof hoyTomar==='function'){hp=hoyTomar(grupo);if(hp)S.planE=hp.e}
   const s0=x.ests?x.ests[0]:0,E0=estsDe()[s0],b=bienDia();
   Object.assign(S,{id:'s'+Date.now()+Math.random().toString(36).slice(2,6),start:new Date().toISOString(),phase:E0.levy?'vac':'act',levyT:E0.levy?levy():0,
     meta:metaHoy(grupo),metaE:repartir(grupo),bien:bienDe(b),kRec:kDe(grupo),modRec:modDe(grupo),desc:descargaActiva()});
@@ -468,6 +471,7 @@ function iniciarSesion(x){x=x||{};if(x.fza)S.fza=x.fza;if(x.ests)S.ests=x.ests;
   if(x.fza){S.desc=false;S.meta=x.fza.nP+x.fza.nA;S.metaE=x.fza.e.map(e=>e.fz==='p'?x.fza.nP:x.fza.nA)}   // en fuerza la meta son series pesadas
   if(hp){const idx=hp.e.map((e,i)=>e.levy?-1:i).filter(i=>i>=0);S.meta=hp.meta;S.metaE=hp.e.map(()=>0);   // la meta elegida, repartida entre sus ejercicios
     idx.forEach((i,j)=>S.metaE[i]=Math.floor(hp.meta/idx.length)+(j<hp.meta%idx.length?1:0))}
+  if(cb){S.meta=cb.meta;S.metaE=cb.e.map(e=>e.levy?0:(e.series||1))}   // v35: lo que el cierre asignó a cada ejercicio
   if(lesOn()){const A=lesAct();S.les=A[0].z;S.lesP=A[0].p;S.lesN=A[0].n;S.lesL=A.map(({z,p,n})=>({z,p,n}));S.lesAv=lesAvisoSesion(grupo,x.ests)}
   prepEstacion()}
 // En rutina: al cerrar un grupo, guarda y pasa al siguiente tras 2 min.
@@ -886,7 +890,8 @@ function guardar(completa){
   const ent={id:S.id,start:S.start,g:grupo,grupo:CAT[grupo].n,series:sinCal(S.sets).length,reps:repsDe(S.sets),tuc:Math.round(S.tuc),iso:Math.round(S.iso),completa:!!completa,sets:S.sets,
     efectivas:Math.round(efDe(S.sets)*100)/100,meta:S.meta,bien:S.bien||undefined,nota:S.nota||undefined,
     antes:!completa&&S.antes||undefined,desc:S.desc||undefined,serC:S.desc?serDe(S.sets):S.fza?fzaHechas():undefined,
-    rut:enRutina()?{n:RUTINAS[rutI].mia?'La mía':RUTINAS[rutI].n,pos:rutPos,de:rutLista().length}:undefined,
+    cierre:typeof cierreOn!=='undefined'&&cierreOn||undefined,   // v35: sesión del cierre de déficits
+    rut:enRutina()?{n:typeof cierreOn!=='undefined'&&cierreOn?'Cierre de déficits':RUTINAS[rutI].mia?'La mía':RUTINAS[rutI].n,pos:rutPos,de:rutLista().length}:undefined,
     fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined,cuidaP:S.les&&S.lesP||undefined,cuidaN:S.les&&S.lesN||undefined,cuidaL:S.les&&S.lesL&&S.lesL.length>1?S.lesL:undefined,
     esq:ESQUEMA,creada:prev&&prev.creada||ahora,editada:prev&&prev.editada||undefined};
   hist=[ent].concat(hist.filter(h=>h.id!==S.id));   // sin tope: nunca se borran sesiones viejas
@@ -1524,7 +1529,7 @@ function subInicio(E){const R=typeof cgRef==='function'?cgRef(grupo,E.n,'h'):nul
 // v32 · encabezado por sección, resumen plegable de la selección en reposo
 const TIT_SEC={hoy:'Hoy',progreso:'Progreso',historial:'Historial',mas:'Más',estilo:'Ajustes',aprendizaje:'Aprendizaje',auditoria:'Auditoría de datos',cargas:'Mis cargas'};
 let selAbierto=false;
-function selResHTML(FP,PE,HP){const t=ssSel.on?`Superserie · ${ssNom()}`:enRutina()?(RUTINAS[rutI].mia?'Tu rutina':RUTINAS[rutI].n):CAT[grupo].n;
+function selResHTML(FP,PE,HP){const t=typeof cierreOn!=='undefined'&&cierreOn?'Cierre de déficits':ssSel.on?`Superserie · ${ssNom()}`:enRutina()?(RUTINAS[rutI].mia?'Tu rutina':RUTINAS[rutI].n):CAT[grupo].n;
   // v34: los ejercicios de hoy a la vista (antes había que desplegar para verlos)
   const ejs=PE.filter(x=>!x.levy).map(x=>x.s+(x.hoy?' (solo hoy)':'')).join(', ');
   const d=ssSel.on?'dos grupos alternados, cada uno con su meta':enRutina()?rutLista().map(g=>CAT[g].n).join(' → ')
@@ -1560,6 +1565,7 @@ function render(){
   // v32 · en reposo, rutina, grupos, meta y ejercicios se pliegan en una línea («Cambiar») para que el reloj quede a la vista
   {const sr=$('selRes'),ver=S.st==='idle'&&rutPos===0,pleg=ver&&!selAbierto&&!sinGrupo()&&$('editor').hidden;
     if(typeof renderHoyEj==='function')renderHoyEj();   // v34: «Otro ejercicio hoy»
+    if(typeof renderCierreReloj==='function'){ciVigila();renderCierreReloj()}   // v35: cierre de déficits (aviso del día y estado real)
     $('vReloj').classList.toggle('plegado',pleg);sr.hidden=!ver;if(ver){const h=selResHTML(FP,PE,HP);if(sr.innerHTML!==h)sr.innerHTML=h;sr.setAttribute('aria-expanded',String(!pleg))}}
   $('terminar').textContent=SS&&enCurso()?'Terminar superserie y guardar':enRutina()&&rutPos<rutLista().length-1&&enCurso()?'Terminar grupo y seguir':'Terminar y guardar';
   const nc=enCurso()&&nuevaConf>Date.now(),nt=nc?'¿Seguro? Toca otra vez':'Nueva sesión';if($('nueva').textContent!==nt){$('nueva').textContent=nt;$('nueva').classList.toggle('peligro',nc)}
@@ -1570,7 +1576,7 @@ function render(){
     $('plan').innerHTML=PE.map((x,i)=>{const pb=`<${tag} ${tag==='button'?`type="button" data-i="${i}"`:''} class="pb${S.st==='done'||(enCurso()&&i<S.sec)?' ok':enCurso()&&i===S.sec?' on':''}${x.lesDe||x.lesM?' les':''}"><b>${esc(x.s)}</b><span>${x.levy?'3 vacíos · 15–50 s':esc(x.n)} · ${esc(x.r)}${x.hoy?' · solo hoy':x.fz?(x.fz==='p'?' · compuesto':' · accesorio'):x.xi!=null?' · agregado':misEj[grupo]&&misEj[grupo][x.b]?' · propio':''}${x.lesDe?` · cambiado por cuidar ${LES_ART[x.lesZ]} (antes: ${esc(x.lesDe)})`:x.lesM?' · cuidado: 2–3 en reserva':''}</span></${tag}>`;
       return S.st==='idle'?`<div class="pbw">${pb}<button type="button" class="ver" data-ver="${i}"${fz?` data-vn="${esc(x.n)}"`:''}>▶ Ver cómo se hace</button></div>`:pb}).join('');
     renderPlanX()}
-  let kind=enRutina()?`Rutina ${RUTINAS[rutI].mia?'propia':RUTINAS[rutI].n} · toca para empezar`:'Toca para empezar',big='—',sub=PE[0].levy?'':subInicio(PE[0]),cls='',bar=0,disc='',pav='';
+  let kind=typeof cierreOn!=='undefined'&&cierreOn?`Cierre de déficits · ${CAT[grupo].n} · toca para empezar`:enRutina()?`Rutina ${RUTINAS[rutI].mia?'propia':RUTINAS[rutI].n} · toca para empezar`:'Toca para empezar',big='—',sub=PE[0].levy?'':subInicio(PE[0]),cls='',bar=0,disc='',pav='';
   if(S.st==='idle'){if(!PE[0].levy){const p=sugerir(grupo,PE[0]);disc=p?discTxt(p.kg,PE[0]):'';pav=avisoEst(grupo,PE[0])}
     if(pideBien){kind='Antes de empezar';sub=bienDia()?'Falta tu energía de hoy (arriba) o toca otra vez para empezar ya':'Cuéntame cómo llegas hoy (arriba) o toca otra vez para empezar ya'}
     if(sinGrupo()){kind='Elige al menos un grupo';sub='Rutina «La mía»: toca arriba los grupos en el orden en que los quieres hacer.';disc='';pav=''}
