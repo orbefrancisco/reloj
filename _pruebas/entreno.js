@@ -109,6 +109,10 @@
     tab = 'historial'; entRenderHist(); const tx = $('entHist').textContent;
     return { ok: !$('entHist').hidden && /Entrenamientos/.test(tx) && /45 min/.test(tx) && /Bíceps/.test(tx), d: tx.replace(/\s+/g, ' ').slice(0, 140) };
   }));
+  prueba('El recuadro está siempre a la vista: sin entrenamiento, en 0:00:00', con(() => {
+    entRender(); const tx = $('entBarra').textContent;
+    return { ok: !$('entBarra').hidden && /Entrenamiento/.test(tx) && /0:00:00/.test(tx), d: tx.replace(/\s+/g, ' ').slice(0, 80) };
+  }));
   prueba('Mirar las pantallas no escribe en el almacenamiento (sin actividad, render no guarda)', con(() => {
     entActividad(T0); hist = [ses(T0)]; entActividad(Date.now() - MIN); const a = localStorage.getItem(ENTKEY);
     for (let i = 0; i < 5; i++) { entRender(); tab = 'historial'; entRender(); tab = 'reloj'; }

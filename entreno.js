@@ -52,10 +52,11 @@ function entRender(){const el=$('entBarra');if(!el)return;const t=Date.now();ent
     return}
   // sin entrenamiento: el resumen del último, si terminó hace menos de 12 h
   const u=ent.lista[ent.lista.length-1];
-  if(u&&t-u.fin<12*36e5&&S.st==='idle'){const r=entResumen(u),firma='u|'+u.id+'|'+r.ss.length+'|'+r.series;
+  if(u&&t-u.fin<12*36e5){const r=entResumen(u),firma='u|'+u.id+'|'+r.ss.length+'|'+r.series;
     if(firma!==entFirma){entFirma=firma;el.hidden=false;el.className='ent ent-fin';
       el.innerHTML=`<div class="ent-l"><span class="ent-t">Último entrenamiento</span><b>${durTxt(r.dur)}</b><span class="ent-d">${entHora(u.inicio)}–${entHora(u.fin)}${u.cierre==='auto'?' (cerrado solo tras la última serie)':''} · ${r.ss.length} ${r.ss.length===1?'sesión':'sesiones'} · ${r.series} series · ${ef1(r.ef)} efectivas</span></div>`}}
-  else if(!el.hidden||entFirma){entFirma='';el.hidden=true;el.innerHTML=''}}
+  else if(entFirma!=='0'){entFirma='0';el.hidden=false;el.className='ent ent-fin';   // siempre a la vista: sin entrenamiento, en cero
+    el.innerHTML=`<div class="ent-l"><span class="ent-t">Entrenamiento</span><b>0:00:00</b><span class="ent-d">Empieza solo con tu primera serie y sigue contando entre sesiones hasta que pulses «Terminar entrenamiento».</span></div>`}}
 function entRenderHist(){const el=$('entHist');if(!el)return;const L=ent.lista.slice(-10).reverse();
   if(!L.length&&!ent.act){el.hidden=true;return}el.hidden=false;
   const semana=lunes(Date.now()),tot=ent.lista.filter(e=>e.inicio>=semana).reduce((n,e)=>n+entDur(e),0)+(ent.act&&ent.act.inicio>=semana?entDur(ent.act):0);
