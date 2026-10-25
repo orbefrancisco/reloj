@@ -340,7 +340,7 @@ function etiqueta(){const E=est();
   if(S.phase==='ext')return `${E.extN}: ${S.target} reps`;
   return `${E.s}: ${S.target} reps · ${E.tempo}`}
 
-function empezar(){const t=now();beep(1320,.25);vibrar(250);
+function empezar(){const t=now();beep(1320,.25);vibrar(250);if(typeof entActividad==='function')entActividad();   // v36: cada serie mantiene vivo el entrenamiento
   if(SS)ssEmpieza(t);   // superserie: la mini-serie se reajusta al descanso real
   const c=!!S.cal&&S.calI<S.cal.length;let f=c?fraseCal():fraseTrabajo();
   if(S.molAv&&!S.molDicho&&(c||S.phase==='act')){f=S.molAv+'. '+f;S.molDicho=true}
@@ -897,6 +897,7 @@ function guardar(completa){
   hist=[ent].concat(hist.filter(h=>h.id!==S.id));   // sin tope: nunca se borran sesiones viejas
   $('save').textContent=escribirHist()?'Guardado ✓':'Sin espacio: no se guardó (mira el aviso)';
   if(S.st==='done')recRegistra();   // Fase 4: al cerrar la sesión se reevalúa el modelo y se registra si cambió
+  if(typeof entActividad==='function')entActividad();   // v36: cada serie guardada mantiene vivo el entrenamiento (cerrar la sesión no lo termina)
   if(persistE==null)pedirPersist();pintarHist()}
 /* ---------- almacenamiento: historial completo en localStorage (compartido con Comida, ~5 millones de caracteres por origen).
    Si no cabe NO se borra nada: queda en memoria, se avisa y se sugiere la copia de seguridad completa (que lo lleva entero). ---------- */
@@ -958,7 +959,9 @@ $('pad').onclick=async()=>{
     if(!bienHoy()&&!omitHoy()&&!pideBien){pideBien=true;bienEd=bienEd||bienDe(bienDia())||{};render();$('bien').scrollIntoView?.({block:'nearest',behavior:'smooth'});return}
     if(retomar)descartarRetomar();if(!ssSel.on&&typeof anRegistraDecision==='function')anRegistraDecision(grupo);   // Fase 5: entrenar contra la recomendación queda anotado
     pideBien=false;selAbierto=false;$('editor').hidden=true;if(rutPos===0)rutEf=0;pila=[];rirPrev=null;
-    if(ssSel.on)ssIniciar();else{SS=null;iniciarSesion(fzaActiva()?{fza:planFuerza(grupo)}:undefined)}empezar()}
+    if(ssSel.on)ssIniciar();else{SS=null;iniciarSesion(fzaActiva()?{fza:planFuerza(grupo)}:undefined)}
+    if(typeof entActividad==='function')entActividad(Date.parse(S.start));   // v36: la primera sesión empieza el entrenamiento; las siguientes lo continúan
+    empezar()}
   else if(S.st==='cal'){const E=est(),c=S.cal[S.calI];
     S.calI++;const fin=S.calI>=S.cal.length,r=fin?75:45;if(fin)S.calHecho=true;if(SS)SS.esp+=r;
     S.sets.push({ex:E.s,ej:E.n,k:'cal.',reps:String(c.reps),rir:'—',kg:c.kg,P:S.P,rest:r});
@@ -2291,7 +2294,7 @@ async function copiaJSON(){let fs=null;try{fs=await fotoTx('readonly',st=>st.get
     if(b)fotos.push({f:x.f,t:x.t,w:x.w,h:x.h,data:await blobAData(b)})}
   return {app:'reloj-anomalo',tipo:'copia-completa',v:2,exportado:new Date().toISOString(),sesiones:hist,metas,ajustes:CFG,ejercicios:misEj,
     rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,modelo:modState,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,
-    ...(typeof cgCopia==='function'?{cargas:cgCopia()}:{}),fotos,...(fs?{}:{sinFotos:true})}}   // v31: «Mis cargas» (todas las semanas)
+    ...(typeof cgCopia==='function'?{cargas:cgCopia()}:{}),...(typeof entCopia==='function'?{entrenos:entCopia()}:{}),fotos,...(fs?{}:{sinFotos:true})}}   // v31: «Mis cargas» (todas las semanas)
 async function hacerCopia(msg=$('copiaMsg')){msg.textContent='Preparando la copia…';
   try{const d=await copiaJSON(),nombre=`reloj-anomalo-copia-${hoy()}.json`;
     const ok=await entregarBlob(nombre,new Blob([JSON.stringify(d)],{type:'application/json'}),msg);
@@ -2318,6 +2321,7 @@ async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw 
   sol(FZKEY,d.fuerza,'fuerza',normFuerza);sol(LESKEY,d.lesion,'zona cuidada',normLesion);sol(SSKEY,d.superserie,'superserie',normSsSel);   // v18
   // v31: «Mis cargas» se FUSIONA: semanas y ejercicios que este teléfono no tiene; lo que ya tiene no se toca
   if(d.cargas!=null&&typeof cgFusiona==='function'){const c=cgFusiona(d.cargas);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} cargas de referencia`);if(c.sinEspacio)r.sinEspacio=true}
+  if(d.entrenos!=null&&typeof entFusiona==='function'){const c=entFusiona(d.entrenos);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} entrenamientos`)}   // v36: se fusionan por id
   if(d.estilo!=null&&!(typeof d.estilo==='string'&&tiene(ESTILOS,d.estilo)))r.mal++;
   else if(d.estilo!=null&&localStorage.getItem(EKEY)==null){try{localStorage.setItem(EKEY,d.estilo)}catch(e){}aplicarEstilo(d.estilo);r.puestos.push('estilo')}
   recargar();
@@ -2420,6 +2424,7 @@ function retomarSesion(){const o=retomar;retomar=null;if(!o)return;
   else if(S.st==='cal'){S.t0=t;S.last=t}
   else if(['rest','shift','trans'].includes(S.st))S.restDur=Math.max(S.restDur,t-S.t0+10);   // si el descanso ya pasó, 10 s para volver (P, C y «bajo congestión» siguen con el tiempo real)
   S.tempoHasta=0;S.lastSec=-1;firmaEC='';activarAudio();$('save').textContent=hist.some(h=>h.id===S.id)?'Guardado ✓':'Sin guardar aún';
+  if(typeof entActividad==='function')entActividad();   // v36: retomar continúa el entrenamiento (o empieza uno si ya se había cerrado)
   lastPlan='';lastG=null;renderGrupos();render();decir('Sesión retomada')}
 $('retomarAv').onclick=e=>{const b=e.target.closest('[data-ret]');if(!b)return;if(b.dataset.ret==='si')retomarSesion();else{descartarRetomar();render()}};
 /* ---------- versión nueva: se recarga sola solo sin sesión, sin el resumen final a la vista y sin estar escribiendo ---------- */
