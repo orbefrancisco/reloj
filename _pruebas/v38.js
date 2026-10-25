@@ -92,6 +92,41 @@
     hist = [ses('v', 6, [act(), myo()], false)]; renderCalib(); const t = $('cCalib').textContent;
     return { ok: /Integridad física \(v38\)/.test(t) && /cuentan la mitad/.test(t), d: t.match(/Integridad física[^.]*\./)?.[0] };
   }));
+  // casos que encontró la campaña del laboratorio sobre v38
+  prueba('Hora atrasada justo antes de tocar (sin tick en medio): duración no negativa y la serie queda «desconocida»', con(() => {
+    nueva(); const real = Date.now; let r;
+    try { S.st = 'work'; S.t0 = now() - 40; S.last = now(); Date.now = () => real() - 36e5; $('pad').onclick(); const dur = S.workDur; S.hechas = 10; aplicar({ R: 10, rir: 1, dur }); r = S.sets[S.sets.length - 1];
+      return { ok: dur >= 39 && dur <= 41 && r.plaus === 'desconocida' && r.dur == null, d: `medido ${dur.toFixed(1)} s, ${r.plaus}` };
+    } finally { Date.now = real; now(); }
+  }));
+  prueba('Hora adelantada con la pantalla encendida en un descanso: no lo da por terminado y queda «interrumpido»', con(() => {
+    nueva(); const r = serie(10, 30), real = Date.now; let e;
+    try { Date.now = () => real() + 3600e3; e = now() - S.t0; Date.now = real; }
+    finally { Date.now = real; }
+    const e2 = now() - S.t0; S.t0 = now() - S.restDur; empezar();
+    return { ok: e < 5 && r.restQ === 'interrumpido', d: `transcurrido tras el salto ${e.toFixed(1)} s · ${r.restQ}` };
+  }));
+  prueba('«+30 s» alarga el descanso: queda «alargado» (la predicción de la mini-serie suponía el planificado) y no enseña', con(() => {
+    nueva(); const r = serie(10, 30), plan = r.rest; $('mas30').onclick(); $('mas30').onclick(); S.t0 = now() - S.restDur; empezar();
+    return { ok: r.restQ === 'alargado' && r.restR >= plan + 55, d: `plan ${plan} s, real ${r.restR} s → ${r.restQ}` };
+  }));
+  prueba('Terminar la sesión en mitad de un descanso también lo mide', con(() => {
+    nueva(); serie(10, 30); const r = serie(10, 30); S.t0 = now() - 12; $('terminar').onclick();
+    return { ok: r.restR === 12 && r.restQ === 'saltado', d: `${r.restR} s · ${r.restQ}` };
+  }));
+  prueba('El descanso real se guarda en el teléfono al acabar el descanso (no espera a la serie siguiente)', con(() => {
+    nueva(); const r = serie(10, 30); S.t0 = now() - S.restDur; empezar();
+    const g = JSON.parse(localStorage.getItem(KEY)).find(h => h.id === S.id);
+    return { ok: g && g.sets[0].restR === r.restR && g.sets[0].restQ === r.restQ, d: g ? `${g.sets[0].restR} s · ${g.sets[0].restQ}` : 'no guardado' };
+  }));
+  prueba('Teléfono lleno: si el entrenamiento no se pudo guardar, el aviso sigue aunque el historial sí se guarde', con(() => {
+    const set = Storage.prototype.setItem;
+    try { Storage.prototype.setItem = function (k, v) { if (k === ENTKEY) throw new DOMException('lleno', 'QuotaExceededError'); return set.call(this, k, v); };
+      guardarObj(ENTKEY, { x: 1 }); escribirHist(); const a = !$('cuotaAv').hidden;
+      Storage.prototype.setItem = set; guardarObj(ENTKEY, { x: 1 }); const b = $('cuotaAv').hidden;
+      return { ok: a && b, d: `con el entrenamiento sin guardar: aviso ${a ? 'visible' : 'oculto'}; al poder guardarlo: ${b ? 'se quita' : 'sigue'}` };
+    } finally { Storage.prototype.setItem = set; sinEn.clear(); sinEspacio = false; renderAlmacen(); }
+  }));
   prueba('Medallas: una sesión hecha solo de series imposibles no cuenta como sesión; una mixta sí', con(() => {
     hist = [ses('solo', 2, [act({ plaus: 'imposible', dur: 1 }), act({ plaus: 'imposible', dur: 1 })], true)]; const a = medallasGanadas();
     hist.push(ses('mixta', 1, [act({ plaus: 'imposible', dur: 1 }), act({ plaus: 'plausible', dur: 30 })], true)); const b = medallasGanadas();

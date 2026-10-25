@@ -248,8 +248,12 @@ let descarga=normDescarga(leerJSON(DKEY,{}));
 const CKEY='reloj-anomalo-calib',BQKEY='reloj-anomalo-bloque',COPKEY='reloj-anomalo-copia';
 const leerObj=(k,norm)=>norm(leerJSON(k,{}));
 // sin espacio: los guardados que fallan avisan igual que el historial (antes callaban y al recargar se perdía el cambio)
-function sinSitio(){try{sinEspacio=true;renderAlmacen()}catch(e){}return false}
-const guardarObj=(k,o)=>{try{localStorage.setItem(k,JSON.stringify(o));return true}catch(e){return sinSitio()}};
+// v38: qué claves no se pudieron guardar. El aviso de espacio sigue a la vista mientras quede alguna (antes, una escritura que sí
+// cabía, como el historial, lo apagaba aunque el entrenamiento o la sesión en curso siguieran sin guardarse)
+const sinEn=new Set();
+function sinSitio(k){try{sinEn.add(k||'?');sinEspacio=true;renderAlmacen()}catch(e){}return false}
+function conSitio(k){if(sinEn.delete(k)&&!sinEn.size){sinEspacio=false;try{renderAlmacen()}catch(e){}}}
+const guardarObj=(k,o)=>{try{localStorage.setItem(k,JSON.stringify(o));conSitio(k);return true}catch(e){return sinSitio(k)}};
 let calibC=leerObj(CKEY,normCalib),bloque=leerObj(BQKEY,normBloque),copiaC=leerObj(COPKEY,normCopiaC);
 // Rutinas: varios grupos seguidos; al cerrar uno, 2 min de cambio y empieza el siguiente.
 const RUTINAS=[{n:'Un grupo'},{n:'Pecho + Tríceps',g:['pecho','triceps']},{n:'Espalda + Bíceps',g:['espalda','biceps']},{n:'Brazos',g:['biceps','triceps']},
@@ -260,7 +264,24 @@ const rutLista=()=>{if(typeof cierreGrupos==='function'){const c=cierreGrupos();
   const R=RUTINAS[rutI];return (R.mia?miaLista:R.g||[]).filter(g=>!enPausa(g))};   // los grupos en pausa (cuidar, dolor extremo) se saltan
 const enRutina=()=>!ssSel.on&&rutLista().length>1;   // con superserie elegida no hay rutina
 const guardarRut=()=>guardarObj(RKEY,{i:rutI,mia:miaLista});
-const now=()=>Date.now()/1000;
+/* v38 · reloj de la sesión con detección de saltos de la hora del teléfono en CUALQUIER lectura (no solo en el tick: el salto
+   puede ocurrir justo antes de un toque):
+   · hacia atrás (cambio a mano, viaje, ajuste de la red): los tiempos de la sesión se desplazan lo mismo; nunca hay duraciones negativas;
+   · hacia delante con la pantalla encendida: performance.now no avanzó lo mismo y no hubo suspensión (al apagarse la pantalla la
+     página se oculta), así que fue la hora, no el tiempo: igual. Un adelanto con la pantalla apagada no se distingue de una suspensión.
+   Si el salto cae en mitad de una serie, su duración queda «desconocida»; si cae en un descanso, ese descanso queda «interrumpido». */
+let relT=0,relP=0,relOculta=false;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')relOculta=true});
+function now(){const t=Date.now()/1000,p=(typeof performance!=='undefined'&&performance.now?performance.now():NaN)/1000;
+  if(relT){const dT=t-relT,dP=p-relP;let d=0;
+    // d = cuánto saltó la hora respecto al tiempo real: los relojes de la sesión se desplazan d (t0 += d)
+    if(dT<-1)d=isFinite(dP)&&dP>=0?dT-dP:dT;
+    else if(!relOculta&&!document.hidden&&dP>=0&&dT-dP>2)d=dT-dP;
+    if(d)corrigeSalto(d)}
+  relT=t;relP=p;relOculta=false;return t}
+function corrigeSalto(d){try{if(!S)return;if(S.t0)S.t0+=d;if(S.last)S.last+=d;if(S.tempoHasta)S.tempoHasta+=d;
+  if(typeof SS!=='undefined'&&SS&&SS.otro&&SS.otro.t0)SS.otro.t0+=d;
+  if(S.st==='work')S.durInv=true;else if(['rest','shift','trans'].includes(S.st))S.restInt=true}catch(e){}}
 const num=x=>String(Math.round(x*10)/10).replace('.',',');
 const num2=x=>String(Math.round(x*100)/100).replace('.',',');
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -353,8 +374,7 @@ function etiqueta(){const E=est();
 
 function empezar(){const t=now();beep(1320,.25);vibrar(250);if(typeof entActividad==='function')entActividad();   // v36: cada serie mantiene vivo el entrenamiento
   // v38: el descanso REAL que acaba aquí queda en la serie anterior (restR) con su calidad (restQ); rest sigue siendo el planificado
-  if(['rest','shift','trans'].includes(S.st)&&S.sets.length){const u=S.sets[S.sets.length-1],real=Math.max(0,t-S.t0);u.restR=Math.round(real);u.restQ=S.restInt?'interrumpido':restQDe(real,S.restDur)}
-  S.restInt=false;
+  cierraDescanso(t);
   if(SS)ssEmpieza(t);   // superserie: la mini-serie se reajusta al descanso real
   const c=!!S.cal&&S.calI<S.cal.length;let f=c?fraseCal():fraseTrabajo();
   if(S.molAv&&!S.molDicho&&(c||S.phase==='act')){f=S.molAv+'. '+f;S.molDicho=true}
@@ -513,6 +533,14 @@ function efectivaBase(r){
 const FIS_IMP=.35,FIS_IMPROB=1.2,FIS_HIST=.5;   // PLAUS y RESTQ, junto a normSet (se usan al leer el historial)
 const plausDe=(dur,reps)=>!(dur>0)||!(reps>0)?'desconocida':dur/reps<FIS_IMP?'imposible':dur/reps<FIS_IMPROB?'improbable':'plausible';
 const restQDe=(real,plan)=>{const tol=Math.max(5,.25*plan);return real<plan-tol?'saltado':real>plan+tol?'alargado':'medido'};
+/* El descanso REAL que acaba (al empezar la serie siguiente o al terminar la sesión en mitad de él) queda en la serie anterior: restR
+   y restQ. Se compara con el descanso con el que se PREDIJO la mini-serie (u.rest): «+30 s» lo alarga y la predicción ya no vale.
+   En superserie se compara con el del reloj (S.restDur): allí la mini-serie se reajusta al descanso real al empezar.
+   Se guarda enseguida (si la app se cierra ahora, no se pierde). */
+function cierraDescanso(t){
+  if(['rest','shift','trans'].includes(S.st)&&S.sets.length){const u=S.sets[S.sets.length-1],real=Math.max(0,t-S.t0),plan=SS?S.restDur:(u.rest||S.restDur);
+    u.restR=Math.round(real);u.restQ=S.restInt?'interrumpido':restQDe(real,plan);if(S.id&&hist.some(h=>h.id===S.id))escribirHist()}
+  S.restInt=false}
 const fisEnsena=r=>r.plaus==='plausible';                                   // solo lo medido y verosímil enseña al modelo
 const fisProgresa=r=>r.plaus!=='imposible'&&r.plaus!=='improbable';        // récords, «próxima vez» y referencias de carga
 function efectiva(r){return r.plaus==='imposible'?0:efectivaBase(r)}
@@ -668,7 +696,7 @@ function ssResumen(){const f=i=>{const x=ssLadoS(i),v=avanceDe(x);return `${'AB'
 function ssGuardaLado(){if(sinCal(S.sets).length)guardar(S.st==='done'&&!S.antes);else{hist=hist.filter(h=>h.id!==S.id);escribirHist()}}
 function ssTerminar(){   // sin series de trabajo en ningún lado (solo calentamiento o la primera aún sin reportar): se corta, como fuera de la superserie
   if(!sinCal(S.sets).length&&!sinCal(SS.otro.sets).length){nuevaConf=Date.now()+5000;$('nueva').onclick();return}
-  for(let k=0;k<2;k++){if(S.st!=='done'){if(sinCal(S.sets).length){const ok=metaHecha();S.st='done';S.antes=!ok;guardar(ok)}else S.st='done'}SS.fin[SS.t]=true;ssCambia()}
+  for(let k=0;k<2;k++){if(S.st!=='done'){if(sinCal(S.sets).length){cierraDescanso(now());const ok=metaHecha();S.st='done';S.antes=!ok;guardar(ok)}else S.st='done'}SS.fin[SS.t]=true;ssCambia()}
   if(!sinCal(S.sets).length)ssCambia();
   const md=revisarMedallas(),t=now();celebrar(md,t);decir(fraseMed(md)+ssFraseFin());render()}
 /* ---------- v18 · días de fuerza: 1 compuesto (4–5 × 3–6 al 80–88 % del 1RM estimado, 1–2 en reserva, descanso fijo) + 1 accesorio opcional.
@@ -944,8 +972,8 @@ function guardar(completa){
 /* ---------- almacenamiento: historial completo en localStorage (compartido con Comida, ~5 millones de caracteres por origen).
    Si no cabe NO se borra nada: queda en memoria, se avisa y se sugiere la copia de seguridad completa (que lo lleva entero). ---------- */
 const LS_MAX=5.2e6;let sinEspacio=false,persistE=null,histSucio=false;
-function escribirHist(){try{localStorage.setItem(KEY,JSON.stringify(hist));if(sinEspacio){sinEspacio=false;renderAlmacen()}return true}
-  catch(e){sinEspacio=true;renderAlmacen();return false}}
+function escribirHist(){try{localStorage.setItem(KEY,JSON.stringify(hist));conSitio(KEY);if(sinEspacio&&!sinEn.size){sinEspacio=false;renderAlmacen()}return true}
+  catch(e){return sinSitio(KEY)}}
 const usoLS=()=>{let n=0;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);n+=k.length+(localStorage.getItem(k)||'').length}}catch(e){}return n};
 // El navegador decide solo (no sale ningún cuadro). Se pide una vez; si lo niega, se vuelve a pedir como mucho una vez por semana.
 async function pedirPersist(){const st=navigator.storage;if(!st||!st.persisted){persistE=false;renderAlmacen();return}
@@ -967,11 +995,7 @@ function pintarHist(){if(tab==='historial')renderHist();else histSucio=true}
    así que suma bien aunque los tics se duerman con la pantalla apagada. En la serie (y el calentamiento) P no cambia. */
 function tick(){
   if(['work','cal','rest','shift','trans'].indexOf(S.st)<0)return;
-  const t=now();
-  // v37 · la hora del teléfono retrocedió (cambio a mano, viaje, ajuste de la red): los relojes de la sesión se desplazan lo
-  // mismo, así las duraciones siguen siendo las reales (antes salían negativas y P y C se iban a ±Infinity en pantalla).
-  // Un adelanto no se puede distinguir de una suspensión real, así que no se toca.
-  if(S.last&&t<S.last-1){const d=t-S.last;S.t0+=d;if(S.tempoHasta)S.tempoHasta+=d;if(SS&&SS.otro&&SS.otro.t0)SS.otro.t0+=d}
+  const t=now();   // v37/v38: los saltos de la hora del teléfono los corrige now() en cualquier lectura (corrigeSalto)
   const t1=S.last||t;S.last=t;
   if(S.st!=='work'&&S.st!=='cal'){
     const e=Math.max(0,t-S.t0);S.P=S.P0*Math.exp(-e/TP);S.C=recC(S.C0,S.tauC,e);
@@ -1041,7 +1065,8 @@ $('molB').onclick=e=>{const b=e.target.closest('button');if(!b||S.st!=='report')
 $('terminar').onclick=()=>{if(SS){if(enCurso())ssTerminar();return}
   // sin series de trabajo (pausa antes del siguiente grupo de la rutina, o solo el calentamiento): lo hecho ya está guardado; se corta aquí
   if(!sinCal(S.sets).length&&enCurso()){nuevaConf=Date.now()+5000;$('nueva').onclick();return}
-  if(sinCal(S.sets).length&&S.st!=='done'){const ok=metaHecha();S.st='done';S.antes=!ok;guardar(ok);const md=revisarMedallas(),t=now();
+  if(sinCal(S.sets).length&&S.st!=='done'){cierraDescanso(now());   // v38: el descanso cortado al terminar también se mide
+    const ok=metaHecha();S.st='done';S.antes=!ok;guardar(ok);const md=revisarMedallas(),t=now();
   if(sigueRutina(fraseMed(md))){celebrar(md,t);return}celebrar(md,t);if(md.length)decir(fraseMed(md));render()}};
 // Con una sesión en curso pide un segundo toque (5 s) dentro de la página; lo ya reportado queda guardado como «Parcial».
 let nuevaConf=0;
@@ -2435,7 +2460,7 @@ function guardarEnCurso(){if(retomar)return;   // mientras se ofrece retomar la 
   const f=[S.id,S.st,S.sec,S.phase,S.sets.length,S.calI,S.ronda,S.levyN,grupo,rutPos,S.kg,S.hechas,S.molR,S.nIn,pila.length,S.cal?S.cal.length:-1].join('|')+(SS?'|'+SS.t+'|'+SS.otro.sets.length+'|'+SS.fin.join()+'|'+SS.otro.restDur:'');
   if(f===firmaEC)return;firmaEC=f;
   // v37: si no cabe, avisa como el historial (antes callaba: con el teléfono lleno no se podía retomar y no lo sabías)
-  try{localStorage.setItem(ENKEY,JSON.stringify({t:Date.now(),S,grupo,rutI,miaLista,rutPos,rutEf,pila,...(SS?{ss:SS}:{})}))}catch(e){firmaEC='';sinSitio()}}
+  try{localStorage.setItem(ENKEY,JSON.stringify({t:Date.now(),S,grupo,rutI,miaLista,rutPos,rutEf,pila,...(SS?{ss:SS}:{})}));conSitio(ENKEY)}catch(e){firmaEC='';sinSitio(ENKEY)}}
 /* Lo guardado se valida campo por campo contra el estado inicial (fresh): mismos tipos, números finitos, textos acotados, series
    con normSet, y la pila de «deshacer» igual. Si algo esencial no encaja, no se ofrece retomar. */
 const FASES=['act','myo','ext','hold','vac'];

@@ -56,7 +56,7 @@
       Storage.prototype.setItem = function (k, v) { if (k === ENKEY) throw new DOMException('lleno', 'QuotaExceededError'); return set.call(this, k, v); };
       firmaEC = ''; guardarEnCurso();
       return { ok: sinEspacio && !$('cuotaAv').hidden && firmaEC === '', d: $('cuotaAv').textContent.slice(0, 70) };
-    } finally { Storage.prototype.setItem = set; S = S0; firmaEC = f0; sinEspacio = e0; renderAlmacen(); }
+    } finally { Storage.prototype.setItem = set; S = S0; firmaEC = f0; sinEn.clear(); sinEspacio = e0; renderAlmacen(); }
   });
   await prueba('H10 · Hora del teléfono atrasada una semana en mitad de un descanso: P y C siguen en [0, 1] y el descanso sigue bien', () => {
     const S0 = S, real = Date.now;
