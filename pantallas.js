@@ -84,7 +84,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-vold],[dat
    Por sesión: carga, reps, reserva, 1RM estimado (con peso) o reps hasta el fallo, trabajo (reps × carga), series, descanso previo
    a la primera serie y récords. Tendencias de fuerza (1RM) y de resistencia (reps con la misma carga) con el detector de la Fase 5. */
 let ejSel='';
-function psEjercicios(){const c={};hist.forEach(h=>{const g=gDe(h);if(!g||!CAT[g])return;(h.sets||[]).forEach(r=>{if(r.k==='act.'){const ej=nomFila(r,g);c[ej]=(c[ej]||0)+1}})});
+function psEjercicios(){const c=Object.create(null);hist.forEach(h=>{const g=gDe(h);if(!g||!CAT[g])return;(h.sets||[]).forEach(r=>{if(r.k==='act.'){const ej=nomFila(r,g);c[ej]=(c[ej]||0)+1}})});
   return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([n])=>n)}
 function renderEjDet(){const el=$('pEjDet');if(!el)return;const L=psEjercicios();if(!L.length){el.innerHTML='<p class="hint">Aún no hay series principales registradas.</p>';return}
   if(!L.includes(ejSel))ejSel=L[0];

@@ -6,8 +6,9 @@
 const AUD_VERSION='aud-2';   // v31: calidad de la carga
 function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.push({c,t,ids}),av=(c,t,ids)=>A.push({c,t,ids});
   // --- sesiones ---
-  const porId={};hist.forEach(h=>{(porId[h.id]=porId[h.id]||[]).push(h)});
-  const dup=Object.entries(porId).filter(([,v])=>v.length>1).map(([k])=>k);if(dup.length)err('id-duplicado',`${dup.length} identificadores de sesión repetidos`,dup);
+  // v37: Map, no {}: un id importado como «constructor» o «hasOwnProperty» chocaba con las propiedades de Object y la auditoría fallaba entera
+  const porId=new Map();hist.forEach(h=>{const L=porId.get(h.id);if(L)L.push(h);else porId.set(h.id,[h])});
+  const dup=[...porId].filter(([,v])=>v.length>1).map(([k])=>k);if(dup.length)err('id-duplicado',`${dup.length} identificadores de sesión repetidos`,dup);
   const huerf=hist.filter(h=>!gDe(h)||!CAT[gDe(h)]).map(h=>h.id);if(huerf.length)err('huerfana',`${huerf.length} sesiones sin un grupo muscular válido`,huerf);
   const fut=hist.filter(h=>Date.parse(h.start)>ahora+36e5).map(h=>h.id);if(fut.length)err('futuro',`${fut.length} sesiones con fecha en el futuro`,fut);
   const ed=hist.filter(h=>h.creada&&h.editada&&Date.parse(h.editada)<Date.parse(h.creada)).map(h=>h.id);if(ed.length)err('edicion-antes',`${ed.length} sesiones editadas antes de registrarse`,ed);

@@ -44,7 +44,7 @@ const ALT={
  abdominales:['Crunch en máquina','Rueda abdominal','Elevación de piernas en banco','Crunch inverso','Pallof press'],
  piernas:['Sentadilla con barra','Prensa','Zancada búlgara','Peso muerto rumano','Extensión de cuádriceps','Curl femoral sentado','Hip thrust','Gemelo sentado']};
 const RANGOS=['5–8','6–10','8–12','10–15','12–20','15–25'];
-const rango=r=>{const m=String(r).match(/(\d+)\D+(\d+)/);return m?[+m[1],+m[2]]:[8,12]};
+const rango=r=>{const m=String(r).match(/(\d+)\D+(\d+)/);return m?[Math.min(+m[1],+m[2]),Math.max(+m[1],+m[2])]:[8,12]};   // v37: «12-8» escrito al revés da [8, 12]
 /* 2 a 5 estaciones por grupo. misEj[g] = {0:{n,s,r},…: cambios de las originales (como siempre), x:[…]: agregadas, q:[i]: originales quitadas}.
    Orden: originales que quedan, luego las agregadas y el vacío siempre al final. b = índice original, xi = índice en x. */
 const EST_MIN=2,EST_MAX=5,KEXT={part:1.5,hold:1,flat:1.3};
@@ -69,7 +69,10 @@ function normBien1(b){if(!esObj(b))return null;const o={},su=vNum(b.sueno,0,14),
 function normBienMapa(o,cnt){const out={};if(!esObj(o))return out;let n=0;
   for(const k in o){if(!tiene(o,k))continue;if(++n>20000)break;const b=vDia(k)&&normBien1(o[k]);if(b)out[k]=b;else if(cnt)cnt.mal++}return out}
 // una serie
-function normSet(r){if(!esObj(r))return null;const o={ex:vTxt(r.ex)??'',k:vTxt(r.k,40)??'',reps:vTxt(r.reps,20)??'',rir:vTxt(r.rir,5)??'—'};
+// v37: la reserva solo toma sus valores conocidos (antes un número como 1e308 se recortaba distinto en cada lectura: «1e+308» → «1e+30»)
+const RIR_OK=['0','1','2','3','3+','4+','—','?'];
+const normRir=v=>{const t=vTxt(v,12);if(t==null)return '—';if(RIR_OK.includes(t))return t;const n=vNum(t,0,100);return n!=null&&Number.isInteger(n)&&n>=4?'4+':'—'};
+function normSet(r){if(!esObj(r))return null;const o={ex:vTxt(r.ex)??'',k:vTxt(r.k,40)??'',reps:vTxt(r.reps,20)??'',rir:normRir(r.rir)};
   const ej=vTxt(r.ej);if(ej!=null)o.ej=ej;
   if('kg' in r)o.kg=r.kg==null||r.kg===''?null:vNum(r.kg,0,1000);
   o.P=vNum(r.P,0,10)??0;o.rest=vNum(r.rest,0,36000)??0;
@@ -285,7 +288,8 @@ function decir(t){if(!CFG.voz||!t||!window.speechSynthesis)return;try{const sp=s
   sp.cancel();const u=new SpeechSynthesisUtterance(t.replace(/–/g,' a ').replace(/·/g,',').replace(/\breps\b/g,'repeticiones'));
   u.lang=vozEs?vozEs.lang:'es-ES';if(vozEs)u.voice=vozEs;u.rate=1.05;sp.speak(u)}catch(e){}}
 const vibrar=pt=>{if(CFG.vibra)try{navigator.vibrate&&navigator.vibrate(pt)}catch(e){}};
-const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const fmt=s=>{s=Number.isFinite(s)?Math.max(0,Math.round(s)):0;   // v37: nunca «NaN:NaN» en pantalla
+return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
 const levy=()=>{const a=2.2,lo=15,hi=50,u=Math.random();return Math.round(lo*Math.pow(1-u*(1-Math.pow(lo/hi,a-1)),-1/(a-1)))};
 const recC=(C,tauC,t)=>1-(1-C)*Math.exp(-t/tauC);
@@ -332,7 +336,7 @@ const enCurso=()=>S.st!=='idle'&&S.st!=='done';
 
 function restStar(){const A=1-S.C,ts=A>S.tauC/(S.tauC+TP)?S.tauC*Math.log(A*(S.tauC+TP)/S.tauC):10;return Math.min(110,Math.max(10,ts*Math.exp(.1*gauss())))}
 function bump(R,p,dur,ext){const g=.6*(R/(R+8))*(.5+.5*p);S.P=S.P+(1-S.P)*g;
-  const D=(.3+.7*p**3)*(.6+.4*Math.min(1,dur/35))*(ext?.75:1);S.C*=1-D;S.tauC*=1.04}
+  const D=(.3+.7*p**3)*(.6+.4*Math.min(1,Math.max(0,dur)/35))*(ext?.75:1);S.C*=1-D;S.tauC*=1.04}   // v37: duración acotada a ≥ 0 (C nunca pasa de 1)
 function etiqueta(){const E=est();
   if(S.phase==='vac')return `Vacío ${S.levyN+1}/3 · objetivo ${S.levyT} s`;
   if(S.phase==='act')return `${E.n}: ${E.r} reps`+(S.kg!=null?` · ${kgTxt(S.kg)}`:'');
@@ -484,8 +488,8 @@ function sigueRutina(pre=''){const L=rutLista();if(!enRutina()||rutPos>=L.length
    El historial anterior guardaba «3+»: se cuenta como RIR 3. */
 const PESO_RIR={'0':1,'1':1,'2':.75,'3':.25,'3+':.25,'4+':0};
 function efectiva(r){
-  if(r.rir==='—')return r.k==='isom.'?.5*Math.min(1,(parseInt(r.reps,10)||0)/30):0;
-  const R=parseInt(r.reps,10)||0,q=PESO_RIR[r.rir]??0;
+  if(r.rir==='—')return r.k==='isom.'?.5*Math.min(1,Math.max(0,parseInt(r.reps,10)||0)/30):0;
+  const R=Math.max(0,parseInt(r.reps,10)||0),q=PESO_RIR[r.rir]??0;   // v37: reps negativas (datos viejos importados) nunca restan
   return r.k==='myo'?q*.5*Math.min(1,R/4):q*Math.min(1,R/5)}
 const efDe=sets=>sets.reduce((a,r)=>a+efectiva(r),0);
 const ef1=x=>(Math.round(x*10)/10).toString().replace('.',',');
@@ -601,7 +605,7 @@ function ssIniciar(){const L=ssLados();if(!L)return false;
   Object.assign(S,{st:'trans',t0:t,last:t,restDur:0,lastSec:-1});S.label=etiqueta();
   SS.otro=S;SS.otroG=grupo;SS.t=0;grupo=L[0].g;S=fresh();iniciarSesion({ests:L[0].ests});return true}
 // el lado que entra espera lo que le falte de SU descanso, y como poco el cambio de máquina
-function ssEntra(t){const e=t-S.t0,w=Math.max(S.restDur-e,SS_TRANS);S.restDur=e+w;S.lastSec=-1;S.ssW=true;SS.esp+=w;return w}
+function ssEntra(t){const e=Math.max(0,t-S.t0),w=Math.max(S.restDur-e,SS_TRANS);S.restDur=e+w;S.lastSec=-1;S.ssW=true;SS.esp+=w;return w}
 function ssTras(o,t){const av=S.aviso?S.aviso+'. ':'';
   if(o.mode==='shift'||SS.fin[1-SS.t]){SS.esp+=o.rest;return av+fraseDescanso(o.mode)}
   const de=ladoNom(SS.t);ssCambia();const w=ssEntra(t);
@@ -925,9 +929,14 @@ function pintarHist(){if(tab==='historial')renderHist();else histSucio=true}
    así que suma bien aunque los tics se duerman con la pantalla apagada. En la serie (y el calentamiento) P no cambia. */
 function tick(){
   if(['work','cal','rest','shift','trans'].indexOf(S.st)<0)return;
-  const t=now(),t1=S.last||t;S.last=t;
+  const t=now();
+  // v37 · la hora del teléfono retrocedió (cambio a mano, viaje, ajuste de la red): los relojes de la sesión se desplazan lo
+  // mismo, así las duraciones siguen siendo las reales (antes salían negativas y P y C se iban a ±Infinity en pantalla).
+  // Un adelanto no se puede distinguir de una suspensión real, así que no se toca.
+  if(S.last&&t<S.last-1){const d=t-S.last;S.t0+=d;if(S.tempoHasta)S.tempoHasta+=d;if(SS&&SS.otro&&SS.otro.t0)SS.otro.t0+=d}
+  const t1=S.last||t;S.last=t;
   if(S.st!=='work'&&S.st!=='cal'){
-    const e=t-S.t0;S.P=S.P0*Math.exp(-e/TP);S.C=recC(S.C0,S.tauC,e);
+    const e=Math.max(0,t-S.t0);S.P=S.P0*Math.exp(-e/TP);S.C=recC(S.C0,S.tauC,e);
     const rem=Math.ceil(S.restDur-e);if(rem!==S.lastSec){S.lastSec=rem;if(rem>=1&&rem<=3){beep(660,.08);vibrar(40)}if(rem===10&&S.restDur>=25)decir('Faltan diez segundos')}
     if(S.P0>.5){const th=TP*Math.log(S.P0/.5);S.tuc+=Math.max(0,S.t0-t1)+Math.max(0,Math.min(e,th)-Math.max(0,t1-S.t0))}
     if(e>=S.restDur){empezar();return}
@@ -968,7 +977,7 @@ $('pad').onclick=async()=>{
     Object.assign(S,{st:'rest',P0:S.P,C0:S.C,t0:t,last:t,restDur:r,lastSec:-1,calRest:true});
     const sg=fin?null:S.cal[S.calI];S.label=fin?etiqueta():`Calentamiento ${S.calI+1}/${S.cal.length}: ${kgTxt(sg.kg)} × ${sg.reps}`;
     vibrar([80,60,80]);decir(fin?`Calentamiento listo. Descansa ${r} segundos y va la serie de trabajo`:`Descansa ${r} segundos. Sigue ${sg.reps} con ${kgVoz(sg.kg)}`);render()}
-  else if(S.st==='work'){const dur=t-S.t0;
+  else if(S.st==='work'){const dur=Math.max(0,t-S.t0);   // v37: nunca negativa
     if(S.phase==='hold'||S.phase==='vac'){aplicar({hold:dur});return}
     Object.assign(S,{st:'report',workDur:dur,hechas:repsSug(),molR:null});render();verReporte()}
   else if(['rest','shift','trans'].indexOf(S.st)>=0){   // un toque suelto (sudor, bolsillo) no salta el descanso: hace falta otro en 2 s
@@ -1845,7 +1854,7 @@ function periodos(){const L=lunes(Date.now()),W=7*864e5,d=new Date(),y=d.getFull
   if(cmpModo==='mano'){if(!cmpF)cmpF={a1:diaK(L-7*W),a2:diaK(L-3*W-864e5),b1:diaK(L-3*W),b2:diaK(Date.now())};
     const r=(x,z)=>{let a=dK(x),b=dK(z);if(b<a)[a,b]=[b,a];return [a,new Date(b).setDate(new Date(b).getDate()+1)]};return [r(cmpF.a1,cmpF.a2),r(cmpF.b1,cmpF.b2)]}
   return [[L-W,L],[L,L+W]]}
-function statsP(a,b){const hs=hist.filter(h=>{const t=Date.parse(h.start);return t>=a&&t<b}),best={};
+function statsP(a,b){const hs=hist.filter(h=>{const t=Date.parse(h.start);return t>=a&&t<b}),best=Object.create(null);   // v37: sin prototipo (nombres importados)
   hs.forEach(h=>(h.sets||[]).forEach(r=>{if(r.k!=='act.'||!(r.kg>0)||!r.ej)return;const v=e1(r);if(!best[r.ej]||v>best[r.ej])best[r.ej]=v}));
   return {ses:hs.length,dias:new Set(hs.map(h=>diaK(Date.parse(h.start)))).size,g:volRango(a,b),z:volMusR(a,b).v,
     recs:hs.reduce((n,h)=>n+(h.sets||[]).filter(r=>r.pr).length,0),ef:hs.reduce((n,h)=>n+efH(h),0),best}}
@@ -2263,7 +2272,18 @@ $('expCsv').onclick=()=>{
 };
 $('impJson').onclick=()=>$('impFile').click();
 // Una sesión importada se acepta si tiene id, fecha válida y series en una lista (ver normSes: cada campo con su tipo y rango).
-const sesValida=normSes;
+/* v37 · importar y restaurar son más estrictos que leer lo propio (lo ya guardado no se reescribe al arrancar):
+   · repeticiones: un entero 0–999, o «N s» (isometría y vacíos); cualquier otra cosa («-3», «3+», «abc») descarta esa serie
+     (antes se aceptaba y unas reps negativas restaban volumen);
+   · las efectivas, series y reps de la sesión se recalculan de sus series (como al guardar y en el editor): el campo del
+     archivo podía no cuadrar con ellas y el historial, la meta y las medallas usaban un número distinto del mapa.
+   Las series descartadas se cuentan en cnt.mal («datos no válidos se descartaron»). Una sesión que se queda sin series no entra. */
+const REPS_OK=/^\d{1,3}( s)?$/;
+function sesValida(s,cnt){const v=normSes(s);if(!v)return null;const n0=v.sets.length;
+  v.sets=v.sets.filter(r=>REPS_OK.test(r.reps));const fuera=n0-v.sets.length;if(fuera&&cnt)cnt.mal+=fuera;
+  if(n0&&!v.sets.length)return null;
+  if(v.sets.length){v.series=sinCal(v.sets).length;v.reps=repsDe(v.sets);v.efectivas=Math.round(efDe(v.sets)*100)/100}
+  return v}
 const IMP_MAX=30e6,COPIA_MAX=150e6;   // tamaño máximo del archivo (caracteres): historial y copia completa con fotos
 const malTxt=n=>n?` ${n} ${n===1?'dato no válido se descartó':'datos no válidos se descartaron'}.`:'';
 $('impFile').onchange=async e=>{
@@ -2273,7 +2293,7 @@ $('impFile').onchange=async e=>{
     const d=JSON.parse(await f.text()),ses=Array.isArray(d)?d:esObj(d)?d.sesiones:null;
     if(!Array.isArray(ses))throw new Error('formato');
     const ids=new Set(hist.map(h=>h.id));let n=0,nm=0,mal=Math.max(0,ses.length-SES_MAX);
-    ses.slice(0,SES_MAX).forEach(s=>{const v=sesValida(s);if(!v){mal++;return}if(!ids.has(v.id)){hist.push(v);ids.add(v.id);n++}});
+    {const cs={mal:0};ses.slice(0,SES_MAX).forEach(s=>{const v=sesValida(s,cs);if(!v){mal++;return}if(!ids.has(v.id)){hist.push(v);ids.add(v.id);n++}});mal+=cs.mal}
     hist.sort((a,b)=>Date.parse(b.start)-Date.parse(a.start));
     const okLS=escribirHist();
     // medidas: solo agrega las fechas que no tienes
@@ -2306,7 +2326,7 @@ $('copiaBtn').onclick=()=>hacerCopia();
 async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw new Error('formato');
   const r={ses:0,med:0,bien:0,fotos:0,mal:0,puestos:[],mant:[]},ids=new Set(hist.map(h=>h.id));
   r.mal+=Math.max(0,d.sesiones.length-SES_MAX);
-  d.sesiones.slice(0,SES_MAX).forEach(s=>{const v=sesValida(s);if(!v){r.mal++;return}if(!ids.has(v.id)){hist.push(v);ids.add(v.id);r.ses++}});
+  d.sesiones.slice(0,SES_MAX).forEach(s=>{const v=sesValida(s,r);if(!v){r.mal++;return}if(!ids.has(v.id)){hist.push(v);ids.add(v.id);r.ses++}});
   hist.sort((a,b)=>Date.parse(b.start)-Date.parse(a.start));r.sinEspacio=!escribirHist();
   if(Array.isArray(d.medidas)){const fs=new Set(medidas.map(m=>m.f)),c={mal:0};normMedidas(d.medidas,c).forEach(m=>{if(!fs.has(m.f)){medidas.push(m);fs.add(m.f);r.med++}});r.mal+=c.mal+Math.max(0,d.medidas.length-MED_MAX);if(r.med)guardarMedidas()}
   if(esObj(d.bienestar)){const o=leerBien(),c={mal:0},nb=normBienMapa(d.bienestar,c);r.mal+=c.mal;
@@ -2361,7 +2381,8 @@ function guardarEnCurso(){if(retomar)return;   // mientras se ofrece retomar la 
   if(!enCurso()){if(firmaEC){firmaEC='';try{localStorage.removeItem(ENKEY)}catch(e){}}return}
   const f=[S.id,S.st,S.sec,S.phase,S.sets.length,S.calI,S.ronda,S.levyN,grupo,rutPos,S.kg,S.hechas,S.molR,S.nIn,pila.length,S.cal?S.cal.length:-1].join('|')+(SS?'|'+SS.t+'|'+SS.otro.sets.length+'|'+SS.fin.join()+'|'+SS.otro.restDur:'');
   if(f===firmaEC)return;firmaEC=f;
-  try{localStorage.setItem(ENKEY,JSON.stringify({t:Date.now(),S,grupo,rutI,miaLista,rutPos,rutEf,pila,...(SS?{ss:SS}:{})}))}catch(e){}}
+  // v37: si no cabe, avisa como el historial (antes callaba: con el teléfono lleno no se podía retomar y no lo sabías)
+  try{localStorage.setItem(ENKEY,JSON.stringify({t:Date.now(),S,grupo,rutI,miaLista,rutPos,rutEf,pila,...(SS?{ss:SS}:{})}))}catch(e){firmaEC='';sinSitio()}}
 /* Lo guardado se valida campo por campo contra el estado inicial (fresh): mismos tipos, números finitos, textos acotados, series
    con normSet, y la pila de «deshacer» igual. Si algo esencial no encaja, no se ofrece retomar. */
 const FASES=['act','myo','ext','hold','vac'];
