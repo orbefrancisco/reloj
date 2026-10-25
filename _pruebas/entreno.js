@@ -84,7 +84,8 @@
   prueba('Tras terminar se ve el resumen del último entrenamiento (duración, sesiones, series)', con(() => {
     const t = Date.now() - 60 * MIN; entActividad(t); hist = [ses(t + MIN), ses(t + 30 * MIN, undefined, 'triceps')]; entActividad(t + 50 * MIN); entCerrar(t + 55 * MIN);
     entRender(); const tx = $('entBarra').textContent;
-    return { ok: !$('entBarra').hidden && /Último entrenamiento/.test(tx) && /55 min/.test(tx) && /2 sesiones/.test(tx) && /4 series/.test(tx), d: tx.replace(/\s+/g, ' ').slice(0, 120) };
+    const k = [...$('entBarra').querySelectorAll('.ent-k')].map(x => x.textContent.replace(/\s+/g, ' ').trim());
+    return { ok: !$('entBarra').hidden && /Último entrenamiento/.test(tx) && /0:55:00/.test(tx) && k.includes('2sesiones') && k.includes('4series') && k.includes('40reps') && k.includes('800tonelaje (kg)') && /Bíceps/.test(tx) && /Tríceps/.test(tx), d: k.join(' | ') };
   }));
   prueba('Reloj del teléfono hacia atrás: nunca hay duraciones negativas', con(() => {
     entActividad(T0); entActividad(T0 - 2 * 60 * MIN); hist = [ses(T0)]; entCerrar(T0 - 60 * MIN);
@@ -94,7 +95,7 @@
   prueba('Se guarda en el teléfono y se recupera igual; lo corrupto se ignora sin romper', con(() => {
     entActividad(T0); hist = [ses(T0)]; entCerrar(T0 + 30 * MIN); entActividad(Date.now() - MIN);
     const leido = entNorm(JSON.parse(localStorage.getItem(ENTKEY)));
-    const igual = JSON.stringify(leido) === JSON.stringify(ent);
+    const igual = JSON.stringify(leido) === JSON.stringify(entNorm(JSON.parse(JSON.stringify(ent))));
     const malo = entNorm({ act: { id: 5 }, lista: [{ id: 'x', inicio: 'a', fin: 3 }, { id: 'y', inicio: T0, fin: T0 + 1 }, { id: 'y', inicio: T0, fin: T0 + 2 }, null, 'z'] });
     const nada = entNorm('basura');
     return { ok: igual && !malo.act && malo.lista.length === 1 && !nada.act && !nada.lista.length };
@@ -108,6 +109,39 @@
     const t = Math.max(lunes(Date.now()) + MIN, Date.now() - 3 * 60 * MIN); entActividad(t); hist = [ses(t + MIN)]; entCerrar(t + 45 * MIN);
     tab = 'historial'; entRenderHist(); const tx = $('entHist').textContent;
     return { ok: !$('entHist').hidden && /Entrenamientos/.test(tx) && /45 min/.test(tx) && /Bíceps/.test(tx), d: tx.replace(/\s+/g, ' ').slice(0, 140) };
+  }));
+  prueba('Reparto del tiempo: cada tramo va al estado en que se estaba (serie, descanso, entre sesiones) y suma la duración', con(() => {
+    const t = T0; S.st = 'idle'; entActividad(t); hist = [ses(t + 5e3)];
+    S.st = 'work'; entMuestrea(t + 10e3); S.st = 'rest'; entMuestrea(t + 40e3); S.st = 'done'; entMuestrea(t + 130e3);
+    entCerrar(t + 190e3); const e = ent.lista[0], r = e.t;
+    return { ok: r.entre === 70e3 && r.serie === 30e3 && r.desc === 90e3 && r.serie + r.desc + r.entre === entDur(e), d: JSON.stringify(r) };
+  }));
+  prueba('Pantalla apagada durante un descanso: ese tiempo cuenta como descanso, no como hueco', con(() => {
+    const t = T0; S.st = 'rest'; entActividad(t); entMuestrea(t + 1000); S.st = 'work'; entMuestrea(t + 5 * MIN);
+    return { ok: Math.abs(ent.act.t.desc - (5 * MIN - 0)) <= 1000 && ent.act.est === 'serie', d: JSON.stringify(ent.act.t) };
+  }));
+  prueba('Cierre automático en la última actividad: el reparto no cuenta las horas olvidado y suma la duración', con(() => {
+    const t = T0; S.st = 'idle'; entActividad(t); hist = [ses(t)]; S.st = 'work'; entMuestrea(t + MIN); S.st = 'done'; entActividad(t + 20 * MIN);
+    entMuestrea(t + 4 * 60 * MIN); entCaducar(t + 4 * 60 * MIN); const e = ent.lista[0], r = e.t, s = r.serie + r.desc + r.entre;
+    return { ok: e.fin === t + 20 * MIN && s === entDur(e) && r.serie === 19 * MIN, d: JSON.stringify(r) };
+  }));
+  prueba('Un entrenamiento en curso guardado por v36 (sin reparto) se lee sin romper', con(() => {
+    const viejo = { act: { id: 'e1', inicio: T0, ultima: T0 + MIN }, lista: [{ id: 'e0', inicio: T0 - 1e7, ultima: T0 - 9e6, fin: T0 - 9e6, cierre: 'manual' }] };
+    const r = entNorm(viejo);
+    return { ok: r.act && r.act.marca === T0 + MIN && r.act.est === 'entre' && r.act.t.serie === 0 && r.lista[0].t.entre === 0 };
+  }));
+  prueba('Con una sesión en marcha el recuadro es compacto (una línea) y se despliega con un toque', con(() => {
+    entActividad(Date.now() - 30 * MIN); hist = [ses(Date.now() - 29 * MIN)]; entActividad(Date.now() - MIN); S.st = 'rest'; entAbierto = false; entRender();
+    const c1 = $('entBarra').classList.contains('ent-c') && !$('entBarra').querySelector('.ent-kpi') && /0:3\d:\d\d/.test($('entReloj').textContent);
+    $('entBarra').querySelector('[data-ent="ver"]').click(); const abierto = !!$('entBarra').querySelector('.ent-kpi') && !$('entBarra').classList.contains('ent-c');
+    $('entBarra').querySelector('[data-ent="ver"]').click(); const c2 = $('entBarra').classList.contains('ent-c');
+    S.st = 'done'; entRender(); const libre = !!$('entBarra').querySelector('.ent-kpi') && !!$('entBarra').querySelector('[data-ent="terminar"]');
+    entAbierto = false;
+    return { ok: c1 && abierto && c2 && libre && !!ent.act, d: `compacto ${c1}, desplegado ${abierto}, entre sesiones completo ${libre}` };
+  }));
+  prueba('Tonelaje con separador de miles que no se confunde con la coma decimal', con(() => {
+    const t = Date.now() - 20 * MIN; entActividad(t); hist = [ses(t, Array.from({ length: 6 }, () => ({ ...serie(), kg: 50, reps: '10' })))]; entCerrar(t + 10 * MIN); entRender();
+    return { ok: /3 000/.test($('entBarra').textContent) && !/3,000/.test($('entBarra').textContent) };
   }));
   prueba('El recuadro está siempre a la vista: sin entrenamiento, en 0:00:00', con(() => {
     entRender(); const tx = $('entBarra').textContent;

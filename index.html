@@ -437,17 +437,46 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 .hoymeta button{width:44px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:20px} .hoymeta b{font-family:var(--mono);font-size:18px;min-width:2ch;text-align:center}
 #soloC .acc button:disabled{opacity:.45}
 /* v36 · tiempo de entrenamiento total (entreno.js) */
-.ent{border:2px solid var(--cap);border-radius:14px;padding:10px 12px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
-.ent.ent-fin{border:1px solid var(--line)}
-.ent-l{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
-.ent-t{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--cap)}
-.ent-fin .ent-t{color:var(--muted,inherit)}
-.ent-l b{font-family:var(--mono);font-size:24px;font-variant-numeric:tabular-nums}
-.ent-d{font-size:13px;opacity:.8;flex-basis:100%}
+.ent{border:1px solid var(--line);border-left:4px solid var(--cap);border-radius:14px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.ent.ent-fin{border-left-color:var(--line)}
+.ent-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ent-t{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ent-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--muted)}
+.ent-pill.on{color:var(--cap);border-color:var(--cap)}
+.ent-pill i{width:7px;height:7px;border-radius:50%;background:var(--cap)}
+@media (prefers-reduced-motion:no-preference){.ent-pill.on i{animation:entLat 1.6s ease-in-out infinite}}
+@keyframes entLat{50%{opacity:.25}}
+.ent-big{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.ent-big b{font-family:var(--mono);font-weight:600;font-size:40px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.ent-fin .ent-big b{font-size:32px}
+.ent-big span{font-size:12.5px;color:var(--muted);text-align:right;line-height:1.35}
+.ent-split{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--line)}
+.ent-split i{display:block;height:100%;transition:width .6s linear}
+.s-serie{background:var(--cap)} .s-desc{background:var(--amb)} .s-entre{background:var(--muted);opacity:.55}
+.ent-leg{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted)}
+.ent-leg span{display:flex;align-items:center;gap:7px}
+.ent-leg span i{width:9px;height:9px;border-radius:2px;flex:none}
+.ent-leg b{margin-left:auto;font-family:var(--mono);font-weight:500;color:var(--fg);font-variant-numeric:tabular-nums}
+.ent-kpi{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ent-k{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.ent-k b{font-family:var(--mono);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ent-k span{font-size:11px;color:var(--muted);letter-spacing:.02em}
+.ent-g{display:flex;flex-wrap:wrap;gap:6px}
+.ent-g span{font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:3px 8px}
+.ent-g span b{font-family:var(--mono);font-weight:500}
+.ent-g span.ok{border-color:var(--cap);color:var(--cap)}
+.ent-nota{margin:0;font-size:12.5px;color:var(--muted)}
+.ent .ent-b{align-self:stretch;height:44px;border:1px solid var(--line);border-radius:10px;font-weight:600}
+.ent .ent-b.conf{border:2px solid var(--mal);color:var(--mal)}
 .ent-p{display:flex;flex-direction:column;gap:6px;font-size:14px}
 .ent-p .tog{display:flex;flex-wrap:wrap;gap:6px}
-.ent-f{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px;font-size:14px;border-top:1px solid var(--line);padding-top:6px}
-.ent-f b{font-family:var(--mono)} .ent-f .muted{flex-basis:100%;font-size:12.5px}
+.ent-f{display:flex;flex-direction:column;gap:5px;font-size:14px;border-top:1px solid var(--line);padding-top:8px}
+.ent.ent-c{gap:8px;padding:10px 14px}
+.ent-tg{width:100%;padding:0;border:0;text-align:left;gap:8px}
+.ent-tg .ent-v{border:0;width:16px}
+.ent-tg b{font-family:var(--mono);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums;margin-right:auto}
+.ent-v{font-size:14px;color:var(--muted);border:1px solid var(--line);border-radius:8px;width:30px;height:28px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ent-fh{display:flex;justify-content:space-between;gap:10px} .ent-fh b{font-family:var(--mono)} .ent-f .muted{font-size:12.5px}
 /* v35 · cierre de déficits (Progreso y Reloj) */
 .cierre .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .cierre h3{font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:.04em;text-transform:uppercase;margin:10px 0 2px}
@@ -516,7 +545,7 @@ details.notas .nota{margin-top:8px}
   <header><h1><span id="hpre">Congestión · </span><span id="gnom">Bíceps</span></h1><div id="blk">3 estaciones</div></header>
 
   <section id="vReloj" style="display:flex;flex-direction:column;gap:14px">
-    <div id="entBarra" class="ent ent-fin" aria-live="off"><div class="ent-l"><span class="ent-t">Entrenamiento</span><b>0:00:00</b></div></div>
+    <div id="entBarra" class="ent ent-fin" aria-live="off"><div class="ent-h"><span class="ent-t">Entrenamiento</span></div><div class="ent-big"><b>0:00:00</b></div></div>
     <div id="retomarAv" class="aviso-d" hidden></div>
     <div id="cuotaAv" class="aviso-d" hidden></div>
     <div id="cgAviso" class="cgav" hidden></div>
