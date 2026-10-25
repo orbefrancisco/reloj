@@ -436,6 +436,9 @@ dialog.hoja::backdrop{background:rgba(0,0,0,.6)}
 .hoyej .hoyb{display:flex;gap:6px;flex-wrap:wrap} .hoymeta{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
 .hoymeta button{width:44px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:20px} .hoymeta b{font-family:var(--mono);font-size:18px;min-width:2ch;text-align:center}
 #soloC .acc button:disabled{opacity:.45}
+/* v38 · integridad física: aviso al anotar una serie con un tiempo que no cuadra */
+.fisav{border:2px solid var(--amb);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.45;background:var(--surface);display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.fisav b{color:var(--amb)} .fisav .btn2{align-self:flex-start} .fisav .btn2.on{border:2px solid var(--cap);color:var(--cap)}
 /* v36 · tiempo de entrenamiento total (entreno.js) */
 .ent{border:1px solid var(--line);border-left:4px solid var(--cap);border-radius:14px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
 .ent.ent-fin{border-left-color:var(--line)}
@@ -661,6 +664,7 @@ details.notas .nota{margin-top:8px}
     <button id="deshacer" type="button" class="btn2" hidden>Deshacer última serie</button>
     <div id="cgPeso" hidden></div>
     <section id="report" hidden>
+      <div id="fisAv" class="fisav" hidden aria-live="polite"></div>
       <div class="step" id="kgFila">
         <button id="kgMenos" type="button" aria-label="Menos peso">−</button>
         <div style="text-align:center"><label class="lbl" for="kgv">Peso</label><br><input id="kgv" class="kgv" inputmode="decimal" autocomplete="off" placeholder="—" aria-describedby="kgU"><div class="lbl" id="kgU">kg</div></div>

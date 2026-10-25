@@ -71,6 +71,7 @@ function normBienMapa(o,cnt){const out={};if(!esObj(o))return out;let n=0;
 // una serie
 // v37: la reserva solo toma sus valores conocidos (antes un número como 1e308 se recortaba distinto en cada lectura: «1e+308» → «1e+30»)
 const RIR_OK=['0','1','2','3','3+','4+','—','?'];
+const PLAUS=['plausible','improbable','imposible','desconocida','confirmada'],RESTQ=['medido','saltado','alargado','interrumpido'];   // v38
 const normRir=v=>{const t=vTxt(v,12);if(t==null)return '—';if(RIR_OK.includes(t))return t;const n=vNum(t,0,100);return n!=null&&Number.isInteger(n)&&n>=4?'4+':'—'};
 function normSet(r){if(!esObj(r))return null;const o={ex:vTxt(r.ex)??'',k:vTxt(r.k,40)??'',reps:vTxt(r.reps,20)??'',rir:normRir(r.rir)};
   const ej=vTxt(r.ej);if(ej!=null)o.ej=ej;
@@ -87,6 +88,8 @@ function normSet(r){if(!esObj(r))return null;const o={ex:vTxt(r.ex)??'',k:vTxt(r
   {const p=vNum(r.kgPlan,0,1000);if(p!=null)o.kgPlan=p;const n=vNum(r.niv,0,100);if(n!=null)o.niv=n}
   if(['mancuerna','total','extra','corporal'].includes(r.tc))o.tc=r.tc;if(['kg','lb','nivel'].includes(r.u))o.u=r.u;
   if(r.m==='f')o.m='f';if(r.kgCambio===true)o.kgCambio=true;
+  // v38 · integridad física: duración medida, descanso real y su calidad, verosimilitud (ver efectiva)
+  {const d=vNum(r.dur,0,3600),rr=vNum(r.restR,0,36000);if(d!=null)o.dur=d;if(rr!=null)o.restR=rr;if(RESTQ.includes(r.restQ))o.restQ=r.restQ;if(PLAUS.includes(r.plaus))o.plaus=r.plaus}
   return o}
 // una sesión del historial: hace falta id y fecha válidos; las series raras se descartan
 function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha(s.start);
@@ -100,6 +103,7 @@ function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha
   if(esObj(s.rut)){const n=vTxt(s.rut.n,40),pos=vEnt(s.rut.pos,0,20),de=vEnt(s.rut.de,1,20);if(n!=null&&pos!=null&&de!=null)o.rut={n,pos,de}}
   // v18: día de fuerza, superserie ('biceps+triceps', mismo superId en sus dos sesiones, lado A o B) y zona cuidada
   if(s.fza===true)o.fza=true;if(s.cierre===true)o.cierre=true;   // v35: parte de un cierre de déficits
+  if(esObj(s.fis)&&s.fis.v===1)o.fis={v:1};   // v38: sesión con integridad física (tiempos medidos); sin esto, historial sin verificar
   if(typeof s.super==='string'&&s.super.length<=40){const p=s.super.split('+');if(p.length===2&&p.every(esG)){o.super=s.super;const si=vTxt(s.superId,80);if(si)o.superId=si;if(s.lado==='A'||s.lado==='B')o.lado=s.lado}}
   // v26: versión de esquema y fechas de registro (creada) y de última edición (editada), distintas de la del entrenamiento (start)
   {const e=vEnt(s.esq,1,99);if(e!=null)o.esq=e;const c=vFecha(s.creada),ed=vFecha(s.editada);if(c)o.creada=c;if(ed)o.editada=ed}
@@ -328,7 +332,10 @@ function fresh(){return {st:'idle',P:0,C:1,tauC:35,P0:0,C0:1,sec:0,nIn:0,R1:0,RT
   // v31 · carga (cargas.js): referencia de «Mis cargas» en uso (cgK), procedencia de la carga actual, carga planificada, nivel de máquina,
   // carga de la serie principal (kgA, cgA: para no confundir un cambio de carga con fatiga), cambio solo para una serie (cgOne) y factor
   // de carga con que se calculó el objetivo de la mini-serie (rPre)
-  cgK:'',kgSrc:'',kgPlan:null,niv:null,kgA:null,cgA:null,cgOne:null,rPre:1}}
+  cgK:'',kgSrc:'',kgPlan:null,niv:null,kgA:null,cgA:null,cgOne:null,rPre:1,
+  // v38 · integridad física: la serie en curso se cortó (al retomar su duración es desconocida), el descanso en curso se interrumpió
+  // por un cierre de la app, y «Sí, la hice» en una serie que salió imposible
+  durInv:false,restInt:false,confImp:false}}
 S=fresh();
 const estsDe=()=>S.fza?S.fza.e:S.planE?S.planE:CAT[grupo].e;   // en fuerza, sus 1–2 estaciones propias; v34: «otro ejercicio hoy», el plan de hoy
 const est=()=>estsDe()[S.sec];
@@ -345,6 +352,9 @@ function etiqueta(){const E=est();
   return `${E.s}: ${S.target} reps · ${E.tempo}`}
 
 function empezar(){const t=now();beep(1320,.25);vibrar(250);if(typeof entActividad==='function')entActividad();   // v36: cada serie mantiene vivo el entrenamiento
+  // v38: el descanso REAL que acaba aquí queda en la serie anterior (restR) con su calidad (restQ); rest sigue siendo el planificado
+  if(['rest','shift','trans'].includes(S.st)&&S.sets.length){const u=S.sets[S.sets.length-1],real=Math.max(0,t-S.t0);u.restR=Math.round(real);u.restQ=S.restInt?'interrumpido':restQDe(real,S.restDur)}
+  S.restInt=false;
   if(SS)ssEmpieza(t);   // superserie: la mini-serie se reajusta al descanso real
   const c=!!S.cal&&S.calI<S.cal.length;let f=c?fraseCal():fraseTrabajo();
   if(S.molAv&&!S.molDicho&&(c||S.phase==='act')){f=S.molAv+'. '+f;S.molDicho=true}
@@ -371,7 +381,7 @@ const gDe=h=>h.g||Object.keys(CAT).find(k=>CAT[k].n===h.grupo);
 // Por sesión anterior de un ejercicio (de la más reciente a la más antigua): su primera serie principal y el mejor 1RM estimado.
 function previas(g,n,excl){const out=[];
   for(const h of hist){if(h.id===excl||gDe(h)!==g)continue;
-    const r=(h.sets||[]).filter(x=>x.ej===n&&x.k==='act.'&&x.kg!=null);
+    const r=(h.sets||[]).filter(x=>x.ej===n&&x.k==='act.'&&x.kg!=null&&fisProgresa(x));   // v38: sin series imposibles ni improbables
     if(r.length)out.push({...r[0],mejor:Math.max(...r.map(e1)),fecha:h.start,...(h.fza?{fza:true}:{})})}
   return out}
 const descargaManual=()=>!!descarga.hasta&&Date.now()<Date.parse(descarga.hasta);
@@ -487,10 +497,34 @@ function sigueRutina(pre=''){const L=rutLista();if(!enRutina()||rutPos>=L.length
    (una serie suave no suma); mini-serie = la mitad; isometría hasta el fallo = ½ si dura 30 s; los vacíos no cuentan.
    El historial anterior guardaba «3+»: se cuenta como RIR 3. */
 const PESO_RIR={'0':1,'1':1,'2':.75,'3':.25,'3+':.25,'4+':0};
-function efectiva(r){
+function efectivaBase(r){
   if(r.rir==='—')return r.k==='isom.'?.5*Math.min(1,Math.max(0,parseInt(r.reps,10)||0)/30):0;
   const R=Math.max(0,parseInt(r.reps,10)||0),q=PESO_RIR[r.rir]??0;   // v37: reps negativas (datos viejos importados) nunca restan
   return r.k==='myo'?q*.5*Math.min(1,R/4):q*Math.min(1,R/5)}
+/* v38 · INTEGRIDAD FÍSICA (Lab anómalo, INTEGRIDAD_FISICA.md P2–P7). Cada serie guarda lo MEDIDO, no solo lo planificado:
+   dur (s de trabajo: del toque de empezar al de terminar), restR (descanso real después de ella, s) y restQ (medido | saltado |
+   alargado | interrumpido), y plaus: plausible | improbable (< 1,2 s por rep) | imposible (< 0,35 s por rep) | desconocida (duración
+   inventada al retomar tras un cierre) | confirmada (salió imposible y dijiste «Sí, la hice»). Son supuestos ajustables, no fisiología.
+   Política (sin bloqueos): la imposible no cuenta (volumen, meta, medallas, récords, progresión, aprendizaje) salvo que la confirmes;
+   la improbable cuenta pero no mueve la progresión ni enseña al modelo; la desconocida y la confirmada cuentan pero no enseñan.
+   La recuperación por zona (48 h) es prudente: toda serie cuenta como estímulo (efectivaBase). Las sesiones guardadas desde v38 llevan
+   fis:{v:1}; las anteriores (historial sin verificar: no tienen tiempos) siguen en el aprendizaje con la MITAD de peso (opción b).
+   Nada se borra ni se reescribe; rest conserva su significado (el planificado). */
+const FIS_IMP=.35,FIS_IMPROB=1.2,FIS_HIST=.5;   // PLAUS y RESTQ, junto a normSet (se usan al leer el historial)
+const plausDe=(dur,reps)=>!(dur>0)||!(reps>0)?'desconocida':dur/reps<FIS_IMP?'imposible':dur/reps<FIS_IMPROB?'improbable':'plausible';
+const restQDe=(real,plan)=>{const tol=Math.max(5,.25*plan);return real<plan-tol?'saltado':real>plan+tol?'alargado':'medido'};
+const fisEnsena=r=>r.plaus==='plausible';                                   // solo lo medido y verosímil enseña al modelo
+const fisProgresa=r=>r.plaus!=='imposible'&&r.plaus!=='improbable';        // récords, «próxima vez» y referencias de carga
+function efectiva(r){return r.plaus==='imposible'?0:efectivaBase(r)}
+// al anotar la serie: si el tiempo medido no cuadra con las reps, se dice (sin bloquear). La imposible se puede confirmar.
+function renderFis(){const el=$('fisAv');if(!el)return;let h='';
+  if(S.st==='report'){const d=S.workDur,R=S.hechas,q=S.durInv?'desconocida':plausDe(d,R),spr=R>0?d/R:0;
+    if(q==='imposible')h=`<span><b>${R} reps en ${num(d)} s</b> (${num(spr)} s por repetición) no es posible: <b>así no contará</b> en tu volumen, la meta ni el aprendizaje. Si de verdad la hiciste (tocaste tarde para empezar, por ejemplo), confírmalo.</span>`
+      +`<button type="button" class="btn2${S.confImp?' on':''}" data-fis="si" aria-pressed="${S.confImp}">${S.confImp?'✓ Confirmada: contará':'Sí, la hice'}</button>`;
+    else if(q==='improbable')h=`<span><b>${R} reps en ${num(d)} s</b> es muy rápido (${num(spr)} s por repetición): contará, pero no se usará para aprender ni para subir el peso.</span>`;
+    else if(q==='desconocida'&&S.durInv)h=`<span>Esta serie se cortó al cerrarse la app: su duración no se midió. Contará, pero no se usará para aprender.</span>`}
+  el.hidden=!h;if(el.innerHTML!==h)el.innerHTML=h}
+document.addEventListener('click',e=>{if(e.target.closest('[data-fis="si"]')&&S.st==='report'){S.confImp=!S.confImp;vibrar(30);renderFis()}});
 const efDe=sets=>sets.reduce((a,r)=>a+efectiva(r),0);
 const ef1=x=>(Math.round(x*10)/10).toString().replace('.',',');
 // reparte la meta del grupo entre sus ejercicios con series (los vacíos no llevan meta)
@@ -518,7 +552,9 @@ function avanzar(ev){
   const E=est(),ph=S.phase;
   if(ev.hold!=null){
     const sg=ev.hold;bump(sg/2.5,1,sg,false);S.iso+=sg;
-    const row={ex:ph==='vac'?'Vacío':E.s,ej:E.n,k:ph==='vac'?`obj ${S.levyT} s`:'isom.',reps:Math.round(sg)+' s',rir:'—',P:S.P,rest:0};
+    const row={ex:ph==='vac'?'Vacío':E.s,ej:E.n,k:ph==='vac'?`obj ${S.levyT} s`:'isom.',reps:Math.round(sg)+' s',rir:'—',P:S.P,rest:0,
+      dur:Math.round(sg*10)/10,plaus:'plausible'};   // v38: en la isometría y el vacío, lo medido es la propia duración
+    S.durInv=false;S.confImp=false;
     const c=efectiva(row);S.efE+=c;S.ef+=c;
     if(ph==='vac'){S.levyN++;if(S.levyN<3){S.levyT=levy();const r=30+15*Math.random();row.rest=Math.round(r);return {row,mode:'rest',rest:r}}
       return siguienteEstacion(row)}
@@ -526,9 +562,11 @@ function avanzar(ev){
     return cerrarEstacion(row)}
   const R=ev.R,rir=ev.rir,p=R/(R+rir+1e-9);
   if(ph==='act'){S.R1=R;S.RTF=R+rir}
-  bump(R,p,ev.dur,ph==='ext');S.nIn++;
+  bump(R,p,S.durInv?30:ev.dur,ph==='ext');S.nIn++;   // v38: con la duración desconocida (retomada), un valor neutro, no el inventado
   const row={ex:E.s,ej:E.n,k:ph==='act'?'act.':ph==='ext'?(E.ext==='part'?'parc.':'final'):'myo',reps:String(R),rir:rir>=4?'4+':String(rir),
     kg:ph==='ext'&&E.ext==='flat'?null:S.kg,P:S.P,rest:0};
+  // v38: duración medida y verosimilitud física (antes de calcular sus efectivas: la imposible no cuenta salvo que la confirmes)
+  {const q=S.durInv?'desconocida':plausDe(ev.dur,R);row.plaus=q==='imposible'&&S.confImp?'confirmada':q;if(!S.durInv&&ev.dur>0)row.dur=Math.round(ev.dur*10)/10;S.durInv=false;S.confImp=false}
   if(typeof cgFila==='function')cgFila(row,ph,E);   // v31: procedencia de la carga, cambio de una sola serie y carga distinta de la principal
   if(ph==='act'){S.kgA=row.kg;S.cgA=cargaDe(row,grupo)}
   // v31: con otra carga que la serie principal, las reps esperables cambian (Epley con reserva): no es fatiga ni falta de recuperación
@@ -540,7 +578,7 @@ function avanzar(ev){
   const c=efectiva(row);S.efE+=c;S.ef+=c;
   if(ph==='act'&&row.kg>0)S.calHecho=true;   // ya se trabajó con peso: los ejercicios siguientes no vuelven a calentar (la fila aún no está en S.sets)
   // con carga de «Mis cargas» la progresión es semanal (revisión de la semana): aquí no se sugiere cambiarla serie a serie
-  if(ph==='act'&&row.kg!=null&&S.ronda===1&&!S.fza&&!S.cgK){const rg=regla(E,row);if(rg.cambio)S.aviso=`Próxima vez en ${E.s}: ${rg.txt}`}
+  if(ph==='act'&&row.kg!=null&&S.ronda===1&&!S.fza&&!S.cgK&&fisProgresa(row)){const rg=regla(E,row);if(rg.cambio)S.aviso=`Próxima vez en ${E.s}: ${rg.txt}`}
   if(S.fza)return avanzarFuerza(R,row);
   if(E.lesM&&!S.desc)row.recta=true;   // cuidar una zona: serie recta, sin fallo
   if(S.desc||E.lesM)return avanzarDescarga(R,row);
@@ -872,7 +910,7 @@ $('deshacer').onclick=deshacer;
 function aplicar(ev){
   pila.push({S:clon(S),grupo,rutPos,rutEf,med:clon(medVistas||{}),ev:{R:ev.R,rir:ev.rir,hold:ev.hold},...(SS?{ss:clon(SS)}:{}),...(S.fza?{fz:clon(fzaCfg)}:{})});if(pila.length>PILA_MAX)pila.shift();rirPrev=null;
   const mol=S.molR,molP=S.molP;S.molR=null;S.molP=null;
-  const o=avanzar(ev),t=now(),pr=esRecord(o.row);if(pr)o.row.pr=true;if(mol!=null){o.row.mol=mol||'sin zona';if(mol&&molP&&LES_P[mol]&&LES_P[mol].includes(molP))o.row.molP=molP}S.sets.push(o.row);
+  const o=avanzar(ev),t=now(),pr=fisProgresa(o.row)&&esRecord(o.row);if(pr)o.row.pr=true;if(mol!=null){o.row.mol=mol||'sin zona';if(mol&&molP&&LES_P[mol]&&LES_P[mol].includes(molP))o.row.molP=molP}S.sets.push(o.row);   // v38: una serie imposible o improbable no es récord
   Object.assign(S,{P0:S.P,C0:S.C,t0:t,last:t,restDur:o.rest,lastSec:-1});
   const prR=pr&&o.row.prT==='reps';   // récord de reps con la misma carga
   if(pr){S.pr=t+6;S.prK=prR?'¡Récord de reps!':'¡Récord personal!';S.prTxt=`${o.row.ex}: ${o.row.kg>0?kgTxt(o.row.kg):'peso corporal'} × ${o.row.reps}`;fanfarria()}
@@ -897,7 +935,7 @@ function guardar(completa){
     cierre:typeof cierreOn!=='undefined'&&cierreOn||undefined,   // v35: sesión del cierre de déficits
     rut:enRutina()?{n:typeof cierreOn!=='undefined'&&cierreOn?'Cierre de déficits':RUTINAS[rutI].mia?'La mía':RUTINAS[rutI].n,pos:rutPos,de:rutLista().length}:undefined,
     fza:S.fza?true:undefined,super:SS?SS.lados.map(l=>l.g).join('+'):undefined,superId:SS?SS.id:undefined,lado:SS?'AB'[SS.t]:undefined,cuida:S.les||undefined,cuidaP:S.les&&S.lesP||undefined,cuidaN:S.les&&S.lesN||undefined,cuidaL:S.les&&S.lesL&&S.lesL.length>1?S.lesL:undefined,
-    esq:ESQUEMA,creada:prev&&prev.creada||ahora,editada:prev&&prev.editada||undefined};
+    esq:ESQUEMA,creada:prev&&prev.creada||ahora,editada:prev&&prev.editada||undefined,fis:{v:1}};   // v38: con tiempos medidos
   hist=[ent].concat(hist.filter(h=>h.id!==S.id));   // sin tope: nunca se borran sesiones viejas
   $('save').textContent=escribirHist()?'Guardado ✓':'Sin espacio: no se guardó (mira el aviso)';
   if(S.st==='done')recRegistra();   // Fase 4: al cerrar la sesión se reevalúa el modelo y se registra si cambió
@@ -1081,19 +1119,25 @@ const clK=x=>Math.min(1.3,Math.max(.7,x));
      fuera: una conocida y la otra no, cargas distintas, o mini-serie marcada con otra carga (kgCambio): un cambio de carga no es recuperación.
    Antes (v29) solo se descartaba cuando las DOS cargas estaban anotadas y eran distintas: una sin anotar y otra con 0 pasaba. */
 const REC_PRES=.5;
-function obsRec(){const out=[],desde=calibC.desde?Date.parse(calibC.desde):0,ex={cambio:0,mixta:0};
+/* (v38) INTEGRIDAD FÍSICA de cada observación. En las sesiones con tiempos medidos (fis, desde v38) solo entra la mini-serie
+     plausible, con su serie principal plausible y con el descanso previo MEDIDO (ni saltado, ni alargado, ni interrumpido): Cpre se
+     calculó suponiendo el descanso planificado, así que con otro descanso la predicción no es comparable. Las de antes de v38 no
+     tienen tiempos (historial sin verificar): entran con la mitad de peso (FIS_HIST, opción b), como las presuntas de v31. */
+function obsRec(){const out=[],desde=calibC.desde?Date.parse(calibC.desde):0,ex={cambio:0,mixta:0,serie:0,principal:0,descanso:0};
   hist.slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)).forEach(h=>{const g=gDe(h),t=Date.parse(h.start);if(!g||!CAT[g]||(desde&&t<=desde))return;
-    const rtf={};(h.sets||[]).forEach((x,i)=>{const ej=x.ej||x.ex,R=parseInt(x.reps,10);
-      if(x.k==='act.'){rtf[ej]={v:R+rirN(x.rir),cens:/\+/.test(x.rir||''),kg:x.kg,c:cargaDe(x,g)};return}
+    const fisH=!!h.fis,sets=h.sets||[];
+    const rtf={};sets.forEach((x,i)=>{const ej=x.ej||x.ex,R=parseInt(x.reps,10);
+      if(x.k==='act.'){rtf[ej]={v:R+rirN(x.rir),cens:/\+/.test(x.rir||''),kg:x.kg,c:cargaDe(x,g),ok:!fisH||fisEnsena(x)};return}
       if(x.k!=='myo'||!(+x.obj>0)||!(+x.Cpre>0)||!rtf[ej]||!(R>=0))return;
       const ca=rtf[ej].c,cb=cargaDe(x,g);
       if(x.kgCambio||(ca!=null&&cb!=null&&ca!==cb)){ex.cambio++;return}
       if((ca==null)!==(cb==null)){ex.mixta++;return}
+      if(fisH){if(!fisEnsena(x)){ex.serie++;return}if(!rtf[ej].ok){ex.principal++;return}const pr=sets[i-1];if(!pr||pr.restQ!=='medido'){ex.descanso++;return}}
       const kc=+x.kc||1,Cf=+x.Cpre/kc,pf=rtf[ej].v*Cf,cens=rtf[ej].cens||/\+/.test(x.rir||'');
-      if(!(pf>=1))return;out.push({t:t+i,g,ej,pf:Math.round(pf*100)/100,obs:R+rirN(x.rir),r:R,obj:+x.obj,kc,cens,mod:x.mod||'rec-1',q:ca!=null?'v':'p'})})});
+      if(!(pf>=1))return;out.push({t:t+i,g,ej,pf:Math.round(pf*100)/100,obs:R+rirN(x.rir),r:R,obj:+x.obj,kc,cens,mod:x.mod||'rec-1',q:ca!=null?'v':'p',hv:fisH?1:FIS_HIST})})});
   out.sort((a,b)=>a.t-b.t);out.excl=ex;return out}
 const logsDe=L=>L.filter(o=>!o.cens&&o.obs>0).map(o=>Math.log(o.obs/o.pf));
-const pesoObs=o=>o.q==='p'?REC_PRES:1,nEf=L=>L.filter(o=>!o.cens&&o.obs>0).reduce((a,o)=>a+pesoObs(o),0);
+const pesoObs=o=>(o.q==='p'?REC_PRES:1)*(o.hv??1),nEf=L=>L.filter(o=>!o.cens&&o.obs>0).reduce((a,o)=>a+pesoObs(o),0);   // (v38) × ½ si es historial sin verificar
 function kRec1(tr){const v=tr.map(o=>o.r/o.obj*o.kc),n=v.length;if(n<CALIB_MIN)return 1;const m=clK(mediana(v));return clK(1+(m-1)*n/(n+CALIB_MIN))}
 function kRec2(tr){const v=logsDe(tr),n=v.length,ne=nEf(tr);if(n<REC2_MIN)return 1;return clK(Math.exp(mediana(v)*ne/(ne+CALIB_MIN)))}
 // agrupado: común encogido hacia 0 y grupo encogido hacia el común; intervalo aproximado con la dispersión (MAD) del grupo o, si tiene pocos, de todos
@@ -1119,7 +1163,9 @@ function evalRec(){const O=obsRec(),ev=[],todos=[],lg={},r1={},neG={};let NE=0; 
     insOrd(vr,x.r/x.obj*x.kc);if(!x.cens&&x.obs>0){const l=Math.log(x.obs/x.pf),w=pesoObs(x);insOrd(vg,l);insOrd(todos,l);neG[g]=(neG[g]||0)+w;NE+=w}});
   const G={n:ev.length,mae0:maeDe(ev,'p0'),mae1:maeDe(ev,'p1'),mae2:maeDe(ev,'p2'),mae3:maeDe(ev,'p3'),sesgo0:sesgoDe(ev,'p0'),sesgo3:sesgoDe(ev,'p3'),s3:compara(ev,'p3','p0'),s2:compara(ev,'p2','p0'),
     // (v31) calidad de los datos: verificadas, presuntas y descartadas por la carga
-    cal:{v:O.filter(o=>o.q==='v').length,p:O.filter(o=>o.q==='p').length,cambio:O.excl.cambio,mixta:O.excl.mixta}};
+    cal:{v:O.filter(o=>o.q==='v').length,p:O.filter(o=>o.q==='p').length,cambio:O.excl.cambio,mixta:O.excl.mixta},
+    // (v38) integridad física: fuera por la serie, por su serie principal o por el descanso previo; del historial sin verificar (½)
+    fis:{serie:O.excl.serie,principal:O.excl.principal,descanso:O.excl.descanso,hist:O.filter(o=>o.hv<1).length,med:O.filter(o=>o.hv===1).length}};
   // (v29) la DECISIÓN se toma con las últimas REC_DEC predicciones: si el aprendido empieza a fallar (tu respuesta cambia), se vuelve al fijo
   const U=ev.slice(-REC_DEC),u={n:U.length,mae0:maeDe(U,'p0'),mae3:maeDe(U,'p3'),s3:compara(U,'p3','p0')};G.u=u;
   G.bien=u.n>=REC_NEV&&u.mae3<=u.mae0*(1-REC_GANA)&&u.s3.p<REC_P;
@@ -1142,12 +1188,15 @@ const MODELO_REC='rec-2p';   // procedimiento vigente; cada mini-serie guarda en
 const kDe=g=>{const r=recEval()[g];return r?r.kUsa:1};
 const modDe=g=>{const r=recEval()[g];return r?r.modelo:'fijo'};
 // registro de cambios: se compara la selección actual con la guardada (al arrancar y al cerrar cada sesión)
-function recRegistra(){const R=recEval(),t=new Date().toISOString(),c=R._.cal,firma=`v${c.v} p${c.p} x${c.cambio+c.mixta}`;let cambio=false;
+function recRegistra(){const R=recEval(),t=new Date().toISOString(),c=R._.cal,F=R._.fis,firma=`v${c.v} p${c.p} x${c.cambio+c.mixta} f${F.med}/${F.hist}/${F.serie+F.principal+F.descanso}`;let cambio=false;
   // (v31) la primera evaluación con la calidad de la carga queda anotada aunque k cambie poco: los datos se reclasificaron
   const reval=!modState.cal&&Object.keys(modState.sel).length>0;
+  // (v38) igual con la integridad física: la primera vez, el historial anterior pasa a contar la mitad
+  const reval38=!reval&&Object.keys(modState.sel).length>0&&!/ f\d/.test(modState.cal||'');
   for(const g of Object.keys(CAT)){const a={m:R[g].modelo,k:R[g].kUsa},d=modState.sel[g]||{m:'fijo',k:1};
-    if(a.m!==d.m||Math.abs(a.k-d.k)>.02||(reval&&Math.abs(a.k-d.k)>.001)){modState.log.push({t,g,de:`${d.m} k=${num2(d.k)}`,a:`${a.m} k=${num2(a.k)}`,
-      por:(reval?`v31: confianza reevaluada por la calidad de la carga (${c.v} mini-series verificadas, ${c.p} presuntas sin peso que cuentan la mitad, ${c.cambio+c.mixta} fuera por cambio de carga). `:'')+R[g].por});cambio=true}
+    if(a.m!==d.m||Math.abs(a.k-d.k)>.02||((reval||reval38)&&Math.abs(a.k-d.k)>.001)){modState.log.push({t,g,de:`${d.m} k=${num2(d.k)}`,a:`${a.m} k=${num2(a.k)}`,
+      por:(reval?`v31: confianza reevaluada por la calidad de la carga (${c.v} mini-series verificadas, ${c.p} presuntas sin peso que cuentan la mitad, ${c.cambio+c.mixta} fuera por cambio de carga). `:'')
+        +(reval38?`v38: integridad física — el historial anterior, sin tiempos medidos (${F.hist} mini-series), cuenta la mitad; lo nuevo solo enseña si la serie y el descanso se midieron y son verosímiles. `:'')+R[g].por});cambio=true}
     modState.sel[g]=a}
   if(modState.cal!==firma){modState.cal=firma;cambio=true}
   if(cambio){modState.log=modState.log.slice(-200);guardarObj(MODKEY,modState)}else if(!leerJSON(MODKEY,null))guardarObj(MODKEY,modState)}
@@ -1179,6 +1228,7 @@ function renderCalib(){const R=recEval(),G=R._,pc=k=>Math.round(Math.abs(1/k-1)*
       ${modState.log.filter(c=>c.g===recSel).slice(-5).reverse().map(c=>`<p class="hint">${new Date(c.t).toLocaleDateString('es-DO',{day:'numeric',month:'short'})}: ${esc(c.de)} → ${esc(c.a)}. ${esc(c.por)}.</p>`).join('')}</div>`}
   $('cCalib').innerHTML=`<p class="muted" style="font-size:13px;margin:0 0 6px">El reloj predice cuántas reps hasta el fallo te quedan en cada mini-serie (reps + reserva) y comprueba después lo que hiciste. Solo usa lo aprendido si, en orden temporal, predice mejor que el modelo fijo con evidencia suficiente; si no, sigue con el fijo y lo dice. Toca un grupo para ver por qué.</p>
     <p class="hint"><b>Evidencia global:</b> ${esc(G.por)}.</p>
+    <p class="hint"><b>Integridad física (v38):</b> ${G.fis.med} mini-series con tiempos medidos · ${G.fis.hist} del historial anterior, sin tiempos (cuentan la mitad) · fuera del aprendizaje: ${G.fis.serie} por una serie imposible, improbable o de duración desconocida, ${G.fis.principal} porque su serie principal lo era y ${G.fis.descanso} porque el descanso de antes no fue el planificado (saltado, alargado o interrumpido). Siguen contando en tu volumen; solo no enseñan al modelo.</p>
     <p class="hint"><b>Calidad de la carga:</b> ${G.cal.v} mini-series con la misma carga verificada que su serie principal · ${G.cal.p} presuntas (ni la principal ni la mini-serie tienen peso anotado: se asume la misma carga porque el reloj no registró ningún cambio, y cuentan la mitad al decidir cuánto fiarse) · fuera del aprendizaje: ${G.cal.cambio} con otra carga y ${G.cal.mixta} con una carga anotada y la otra no. Un cambio de carga no se confunde con fatiga ni con recuperación.</p>
     <div class="tbl"><table><thead><tr><th>Grupo</th><th>Modelo</th><th>Factor</th><th>Datos</th><th>Error (reps)<br>fijo → aprendido</th></tr></thead><tbody>${O.map(fila).join('')}</tbody></table></div>${det}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><button id="calibRes" type="button" class="btn2${calibBorrar?' peligro':''}">${calibBorrar?'¿Seguro? Toca otra vez':'Reiniciar calibración'}</button>
@@ -1641,7 +1691,7 @@ function render(){
     if($('deshacer').textContent!==t+og)$('deshacer').textContent=t+og}
   document.querySelectorAll('.rir button').forEach(b=>b.setAttribute('aria-pressed',S.st==='report'&&rirPrev!=null&&+b.dataset.r===Math.min(4,rirPrev)));
   renderBloque();renderCopiaAv();
-  $('report').hidden=S.st!=='report';$('done').textContent=S.hechas;
+  $('report').hidden=S.st!=='report';$('done').textContent=S.hechas;renderFis();
   // v31: con carga de «Mis cargas» no se vuelve a preguntar el peso: se asume el sugerido y se cambia con «Cambiar peso» (cargas.js)
   $('kgFila').hidden=(S.phase==='ext'&&E&&E.ext==='flat')||(!!S.cgK&&typeof cgRenderPeso==='function');
   if(document.activeElement!==$('kgv'))$('kgv').value=S.kg==null?'':num(aU(S.kg));
@@ -2265,9 +2315,10 @@ $('expCsv').onclick=()=>{
   if(!hist.length){$('ioMsg').textContent='No hay sesiones que exportar.';return}
   const q=v=>{let t=String(v);if(/^[=+\-@\t\r]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};   // sin fórmulas de Excel
   // v31: + procedencia de la carga, carga planificada, especificación, unidad declarada, nivel de máquina y carga cambiada en la mini-serie
-  const filas=[['fecha','grupo','sesion','serie_n','estacion','ejercicio','tipo','reps_o_segundos','kg','rir','congestion_P','descanso_s','efectiva','molestia','sueno_h','energia','nota_sesion','carga_origen','kg_planificado','carga_tipo','unidad_declarada','nivel','carga_distinta_principal'].join(',')];
+  const filas=[['fecha','grupo','sesion','serie_n','estacion','ejercicio','tipo','reps_o_segundos','kg','rir','congestion_P','descanso_s','efectiva','molestia','sueno_h','energia','nota_sesion','carga_origen','kg_planificado','carga_tipo','unidad_declarada','nivel','carga_distinta_principal','duracion_s','descanso_real_s','descanso_calidad','verosimilitud'].join(',')];   // v38: + integridad física
   hist.slice().reverse().forEach(h=>(h.sets||[]).forEach((r,i)=>filas.push([q(new Date(h.start).toLocaleString('es-DO')),q(h.grupo),q(h.id),i+1,q(r.ex),q(r.ej||''),q(r.k),q(r.reps),r.kg!=null?r.kg:'',q(r.rir),(+r.P).toFixed(3),r.rest||0,efectiva(r).toFixed(2),q(r.mol||''),h.bien?h.bien.sueno:'',h.bien?h.bien.energia:'',q(h.nota||''),
-    q(r.kgSrc||''),r.kgPlan!=null?r.kgPlan:'',q(r.tc||''),q(r.u||''),r.niv!=null?r.niv:'',r.kgCambio?'si':''].join(','))));
+    q(r.kgSrc||''),r.kgPlan!=null?r.kgPlan:'',q(r.tc||''),q(r.u||''),r.niv!=null?r.niv:'',r.kgCambio?'si':'',
+    r.dur!=null?r.dur:'',r.restR!=null?r.restR:'',q(r.restQ||''),q(r.plaus||(h.fis?'':'sin_tiempos'))].join(','))));   // v38: integridad física
   entregar(`series-${hoy()}.csv`,'﻿'+filas.join('\n'),'text/csv');
 };
 $('impJson').onclick=()=>$('impFile').click();
@@ -2441,9 +2492,9 @@ function retomarSesion(){const o=retomar;retomar=null;if(!o)return;
   rirPrev=null;nuevaConf=0;
   const t=now();
   if(S.st==='work'){if(S.phase==='hold'||S.phase==='vac')S.t0=t;   // la isometría o el vacío vuelven a empezar
-    else Object.assign(S,{st:'report',workDur:Math.min(60,Math.max(5,t-S.t0)),hechas:repsSug(),molR:null});S.last=t}   // la serie seguramente la terminaste: repórtala
+    else Object.assign(S,{st:'report',workDur:Math.min(60,Math.max(5,t-S.t0)),hechas:repsSug(),molR:null,durInv:true});S.last=t}   // la serie seguramente la terminaste: repórtala (v38: su duración queda «desconocida», no se inventa)
   else if(S.st==='cal'){S.t0=t;S.last=t}
-  else if(['rest','shift','trans'].includes(S.st))S.restDur=Math.max(S.restDur,t-S.t0+10);   // si el descanso ya pasó, 10 s para volver (P, C y «bajo congestión» siguen con el tiempo real)
+  else if(['rest','shift','trans'].includes(S.st)){S.restDur=Math.max(S.restDur,t-S.t0+10);S.restInt=true}   // v38: descanso interrumpido por el cierre   // si el descanso ya pasó, 10 s para volver (P, C y «bajo congestión» siguen con el tiempo real)
   S.tempoHasta=0;S.lastSec=-1;firmaEC='';activarAudio();$('save').textContent=hist.some(h=>h.id===S.id)?'Guardado ✓':'Sin guardar aún';
   if(typeof entActividad==='function')entActividad();   // v36: retomar continúa el entrenamiento (o empieza uno si ya se había cerrado)
   lastPlan='';lastG=null;renderGrupos();render();decir('Sesión retomada')}

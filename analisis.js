@@ -59,7 +59,8 @@ function anFactores(s){const f=[],D=864e5,t1=s.pts[s.pts.length-1].t,vol=(a,b)=>
 const anMusC=new Map();function anMus(ej,g){const k=g+'|'+ej;if(!anMusC.has(k))anMusC.set(k,musculos(ej,g));return anMusC.get(k)}
 function anZona(m,o={}){const D=864e5,ahora=Date.now(),dias=o.dias||7,reglaH=o.reglaH||AN_REGLA_H,musculos=anMus;
   let ult=0,ultDir=0,n=0,conKg=0,rirs=[],dir=0,ind=0;const ejs={};
-  hist.forEach(h=>{const g=gDe(h),t=Date.parse(h.start);if(!g||!CAT[g])return;(h.sets||[]).forEach(r=>{const c=efectiva(r);if(!c)return;const ej=nomFila(r,g),f=musculos(ej,g)[m];if(!f)return;
+  // v38: la recuperación es prudente: toda serie hecha cuenta como estímulo, también la marcada «imposible» (efectivaBase)
+  hist.forEach(h=>{const g=gDe(h),t=Date.parse(h.start);if(!g||!CAT[g])return;(h.sets||[]).forEach(r=>{const c=efectivaBase(r);if(!c)return;const ej=nomFila(r,g),f=musculos(ej,g)[m];if(!f)return;
     if(t>ult)ult=t;if(f>=1&&t>ultDir)ultDir=t;
     if(t>=ahora-dias*D){n++;if(r.kg!=null)conKg++;if(!/\+|—/.test(r.rir||''))rirs.push(rirN(r.rir));if(f>=1)dir+=c*f;else ind+=c*f;if(f>=1)ejs[ej]=g}})});
   const vol=d=>(o.VW&&o.VW[d]?o.VW[d]:volumen(ahora-d*D,ahora+D)).zona(m);   // VW: volúmenes ya calculados para todas las zonas

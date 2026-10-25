@@ -3,7 +3,7 @@
 // No repara nada: cualquier reparación futura pedirá confirmación y hará antes una copia de seguridad.
 // Se carga después de reloj.js y analisis.js.
 'use strict';
-const AUD_VERSION='aud-2';   // v31: calidad de la carga
+const AUD_VERSION='aud-3';   // v31: calidad de la carga; v38: integridad física
 function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.push({c,t,ids}),av=(c,t,ids)=>A.push({c,t,ids});
   // --- sesiones ---
   // v37: Map, no {}: un id importado como «constructor» o «hasOwnProperty» chocaba con las propiedades de Object y la auditoría fallaba entera
@@ -30,6 +30,14 @@ function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.p
   if(kgRaro)err('kg-rango',`${kgRaro} series con un peso fuera de rango (negativo o más de 500 kg)`,[...idsKg]);
   if(lbRaro)av('kg-lb',`${lbRaro} series cuyo peso no es un múltiplo de ¼ ni en kg ni en lb: posible error de conversión`,[...idsLb]);
   if(repet)av('serie-repetida',`${repet} series idénticas a la anterior en todos sus valores (posible doble toque)`,[...idsRep]);
+  // (v38) integridad física: series cuyo tiempo medido no cuadra con sus repeticiones y descansos distintos del planificado. Solo marca.
+  let fis={imp:0,impr:0,conf:0,desc:0,salt:0,alar:0,intr:0,med:0,sinT:0};const idsImp=new Set(),idsImpr=new Set(),idsSalt=new Set();
+  hist.forEach(h=>{if(!h.fis){if((h.sets||[]).length)fis.sinT++;return}(h.sets||[]).forEach(r=>{if(r.k==='cal.')return;
+    if(r.plaus==='imposible'){fis.imp++;idsImp.add(h.id)}else if(r.plaus==='improbable'){fis.impr++;idsImpr.add(h.id)}else if(r.plaus==='confirmada')fis.conf++;else if(r.plaus==='desconocida')fis.desc++;
+    if(r.restQ==='saltado'){fis.salt++;idsSalt.add(h.id)}else if(r.restQ==='alargado')fis.alar++;else if(r.restQ==='interrumpido')fis.intr++;else if(r.restQ==='medido')fis.med++})});
+  if(fis.imp)av('serie-imposible',`${fis.imp} series con un tiempo imposible para sus repeticiones (menos de ${num(FIS_IMP)} s por repetición): no cuentan en el volumen ni en la meta`,[...idsImp]);
+  if(fis.impr)av('serie-improbable',`${fis.impr} series muy rápidas (menos de ${num(FIS_IMPROB)} s por repetición): cuentan, pero no se usan para aprender ni para la progresión`,[...idsImpr]);
+  if(fis.salt)av('descanso-saltado',`${fis.salt} descansos saltados (más cortos que el planificado): la mini-serie siguiente no se usa para aprender`,[...idsSalt]);
   // (v31) calidad de la carga: series de trabajo sin carga conocida (no se comparan entre sesiones ni entran en el aprendizaje como verificadas)
   // y ceros dudosos (0 = peso corporal en un ejercicio con carga externa: el antiguo «−» desde vacío). Nada se borra: solo se marca.
   let sinCarga=0,cero=0,conCfg=0,cambiada=0;const idsCero=new Set(),idsCamb=new Set();
@@ -53,6 +61,7 @@ function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.p
   I.push({c:'resumen',t:`${hist.length} sesiones · ${nSer} filas · ${conKg} con peso anotado (${nSer?Math.round(conKg*100/nSer):0} %) · ${cens} con reserva «3+»/«4+» (cotas)`});
   I.push({c:'esquema',t:'versiones de esquema: '+Object.entries(esq).map(([v,n])=>`v${v}: ${n}`).join(' · ')+' (v1 = anterior a v26, sin fechas de registro ni edición)'});
   I.push({c:'modelo',t:`recuperación: ${R._.bien?'aprendido en uso':'modelo fijo'} — ${R._.por}`});
+  I.push({c:'fisica',t:`integridad física (v38): ${fis.med} descansos medidos · ${fis.salt} saltados · ${fis.alar} alargados · ${fis.intr} interrumpidos por un cierre · ${fis.desc} series de duración desconocida (retomadas) · ${fis.conf} confirmadas a mano · ${fis.sinT} sesiones anteriores sin tiempos (cuentan la mitad en el aprendizaje)`});
   {const c=R._.cal;I.push({c:'carga',t:`calidad de la carga (v31): ${sinCarga} series de trabajo sin carga conocida (se conservan; no se comparan entre sesiones) · ${conCfg} con la carga de «Mis cargas» · ${cambiada} mini-series con otra carga que su serie principal (${idsCamb.size} sesiones) · aprendizaje: ${c.v} mini-series con carga verificada, ${c.p} presuntas (cuentan ½), ${c.cambio+c.mixta} fuera por cambio o mezcla de carga`})}
   if(typeof cgResumenTxt==='function')I.push({c:'cargas',t:cgResumenTxt()});
   I.push({c:'cuidar',t:lesOn()?`cuidando ${lesQueN()}`:'sin zonas cuidadas activas'});
