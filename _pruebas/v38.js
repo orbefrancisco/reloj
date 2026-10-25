@@ -92,6 +92,12 @@
     hist = [ses('v', 6, [act(), myo()], false)]; renderCalib(); const t = $('cCalib').textContent;
     return { ok: /Integridad física \(v38\)/.test(t) && /cuentan la mitad/.test(t), d: t.match(/Integridad física[^.]*\./)?.[0] };
   }));
+  prueba('Medallas: una sesión hecha solo de series imposibles no cuenta como sesión; una mixta sí', con(() => {
+    hist = [ses('solo', 2, [act({ plaus: 'imposible', dur: 1 }), act({ plaus: 'imposible', dur: 1 })], true)]; const a = medallasGanadas();
+    hist.push(ses('mixta', 1, [act({ plaus: 'imposible', dur: 1 }), act({ plaus: 'plausible', dur: 30 })], true)); const b = medallasGanadas();
+    hist.push(ses('vieja', 3, [act()], false)); const c = medallasGanadas();
+    return { ok: !a.ses1 && b.ses1 === hist[1].start && c.ses1 === hist[2].start, d: `solo imposibles: ${a.ses1 ? 'medalla' : 'sin medalla'}; mixta: ${b.ses1 ? 'medalla' : '—'}` };
+  }));
   prueba('CSV: lleva duración, descanso real, su calidad y la verosimilitud de cada serie', con(() => {
     hist = [ses('c', 1, [act({ plaus: 'plausible', dur: 30, restQ: 'medido', restR: 31 })], true), ses('o', 2, [act()], false)];
     let csv = ''; const e0 = window.entregar; window.entregar = (n, t) => { csv = t };

@@ -2135,7 +2135,9 @@ const MEDALLAS=[
  {id:'desc1',ic:'↓',n:'Descarga hecha',d:'Completa una semana de descarga de 7 días.'}];
 const normMedVistas=o=>{const r={};if(esObj(o))MEDALLAS.forEach(m=>{const v=vFecha(o[m.id]);if(v)r[m.id]=v});return r};
 let medVistas=leerJSON(MEDKEY,null);if(medVistas!=null)medVistas=normMedVistas(medVistas);
-function medallasGanadas(){const H=hist.filter(h=>h&&h.start).slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)),g={};
+// v38: una sesión hecha SOLO de series imposibles no cuenta como sesión (medallas de sesiones y rachas); si tiene alguna real, sí
+const sesReal=h=>!h.fis||!(h.sets||[]).length||sinCal(h.sets).some(r=>r.plaus!=='imposible');
+function medallasGanadas(){const H=hist.filter(h=>h&&h.start&&sesReal(h)).slice().sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)),g={};
   const pon=(id,f)=>{if(!g[id]&&f)g[id]=f};
   H.forEach((h,i)=>{if(i===0)pon('ses1',h.start);if(i===9)pon('ses10',h.start);if(i===49)pon('ses50',h.start)});
   pon('meta',(H.find(metaHechaH)||{}).start);
