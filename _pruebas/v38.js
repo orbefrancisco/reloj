@@ -99,12 +99,15 @@
       return { ok: dur >= 39 && dur <= 41 && r.plaus === 'desconocida' && r.dur == null, d: `medido ${dur.toFixed(1)} s, ${r.plaus}` };
     } finally { Date.now = real; now(); }
   }));
-  prueba('Hora adelantada con la pantalla encendida en un descanso: no lo da por terminado y queda «interrumpido»', con(() => {
-    nueva(); const r = serie(10, 30), real = Date.now; let e;
-    try { Date.now = () => real() + 3600e3; e = now() - S.t0; Date.now = real; }
-    finally { Date.now = real; }
-    const e2 = now() - S.t0; S.t0 = now() - S.restDur; empezar();
-    return { ok: e < 5 && r.restQ === 'interrumpido', d: `transcurrido tras el salto ${e.toFixed(1)} s · ${r.restQ}` };
+  prueba('Hora adelantada con la pantalla encendida en un descanso: ese descanso queda «interrumpido» (no enseña); los tiempos no se mueven', con(() => {
+    nueva(); const r = serie(10, 30), real = Date.now, t0 = S.t0;
+    try { Date.now = () => real() + 3600e3; now(); } finally { Date.now = real; }
+    const quieto = S.t0 === t0; S.t0 = now() - S.restDur; empezar();
+    return { ok: quieto && r.restQ === 'interrumpido', d: `t0 sin mover: ${quieto} · ${r.restQ}` };
+  }));
+  prueba('Con el teléfono lleno, el aviso sale al abrir la app; se quita cuando el historial vuelve a caber', con(() => {
+    sinSitio('arranque'); const a = !$('cuotaAv').hidden; escribirHist(); const b = $('cuotaAv').hidden;
+    return { ok: a && b, d: `al abrir: ${a ? 'aviso' : 'sin aviso'}; tras guardar: ${b ? 'se quita' : 'sigue'}` };
   }));
   prueba('«+30 s» alarga el descanso: queda «alargado» (la predicción de la mini-serie suponía el planificado) y no enseña', con(() => {
     nueva(); const r = serie(10, 30), plan = r.rest; $('mas30').onclick(); $('mas30').onclick(); S.t0 = now() - S.restDur; empezar();

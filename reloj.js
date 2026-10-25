@@ -252,7 +252,7 @@ const leerObj=(k,norm)=>norm(leerJSON(k,{}));
 // cabía, como el historial, lo apagaba aunque el entrenamiento o la sesión en curso siguieran sin guardarse)
 const sinEn=new Set();
 function sinSitio(k){try{sinEn.add(k||'?');sinEspacio=true;renderAlmacen()}catch(e){}return false}
-function conSitio(k){if(sinEn.delete(k)&&!sinEn.size){sinEspacio=false;try{renderAlmacen()}catch(e){}}}
+function conSitio(k){const a=sinEn.delete(k),b=k===KEY&&sinEn.delete('arranque');if((a||b)&&!sinEn.size){sinEspacio=false;try{renderAlmacen()}catch(e){}}}   // si el historial cabe, hay sitio
 const guardarObj=(k,o)=>{try{localStorage.setItem(k,JSON.stringify(o));conSitio(k);return true}catch(e){return sinSitio(k)}};
 let calibC=leerObj(CKEY,normCalib),bloque=leerObj(BQKEY,normBloque),copiaC=leerObj(COPKEY,normCopiaC);
 // Rutinas: varios grupos seguidos; al cerrar uno, 2 min de cambio y empieza el siguiente.
@@ -274,13 +274,15 @@ let relT=0,relP=0,relOculta=false;
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')relOculta=true});
 function now(){const t=Date.now()/1000,p=(typeof performance!=='undefined'&&performance.now?performance.now():NaN)/1000;
   if(relT){const dT=t-relT,dP=p-relP;let d=0;
-    // d = cuánto saltó la hora respecto al tiempo real: los relojes de la sesión se desplazan d (t0 += d)
+    // d = cuánto saltó la hora respecto al tiempo real. Hacia atrás: los relojes de la sesión se desplazan d (t0 += d), si no
+    // habría duraciones negativas. Hacia delante: NO se desplazan (si fuera una suspensión que el navegador no avisó, desplazarlos
+    // alargaría el descanso todo lo que durmió el teléfono): solo se marca lo afectado como dudoso.
     if(dT<-1)d=isFinite(dP)&&dP>=0?dT-dP:dT;
     else if(!relOculta&&!document.hidden&&dP>=0&&dT-dP>2)d=dT-dP;
     if(d)corrigeSalto(d)}
   relT=t;relP=p;relOculta=false;return t}
-function corrigeSalto(d){try{if(!S)return;if(S.t0)S.t0+=d;if(S.last)S.last+=d;if(S.tempoHasta)S.tempoHasta+=d;
-  if(typeof SS!=='undefined'&&SS&&SS.otro&&SS.otro.t0)SS.otro.t0+=d;
+function corrigeSalto(d){try{if(!S)return;
+  if(d<0){if(S.t0)S.t0+=d;if(S.last)S.last+=d;if(S.tempoHasta)S.tempoHasta+=d;if(typeof SS!=='undefined'&&SS&&SS.otro&&SS.otro.t0)SS.otro.t0+=d}
   if(S.st==='work')S.durInv=true;else if(['rest','shift','trans'].includes(S.st))S.restInt=true}catch(e){}}
 const num=x=>String(Math.round(x*10)/10).replace('.',',');
 const num2=x=>String(Math.round(x*100)/100).replace('.',',');
@@ -2539,6 +2541,9 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   navigator.serviceWorker.register('sw.js').then(r=>{document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})})}).catch(()=>{});
 }
 
+// v38: al abrir se comprueba que queda sitio (una escritura de prueba que se borra enseguida): con el teléfono lleno el aviso sale
+// ya, no cuando falle algo que se cierra antes de poder avisar (el entrenamiento al salir de la app, por ejemplo)
+try{localStorage.setItem('reloj-anomalo-sitio','1');localStorage.removeItem('reloj-anomalo-sitio')}catch(e){sinSitio('arranque')}
 v18listo=true;if(lesOn())aplicarEjercicios();try{recRegistra()}catch(e){}if(ssSel.on){const L=ssLados();if(L)grupo=L[0].g}
 if(enRutina())grupo=rutLista()[0];retomar=leerEnCurso();renderHist();renderGrupos();renderCfg();render();if(hist.length)pedirPersist();else renderAlmacen();
 if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>{vozEs=null};
