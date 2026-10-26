@@ -267,6 +267,19 @@ html[data-recto] *{border-radius:3px!important}
 .andet{margin-top:8px} .ant{width:100%;border-collapse:collapse;font-size:13px} .ant{table-layout:fixed} .ant td{padding:5px 4px;border-top:1px solid var(--line);vertical-align:top;white-space:normal;text-align:left;overflow-wrap:anywhere;font-family:var(--body)} .ant td:first-child{color:var(--muted);width:34%}
 .anest{border-top:1px solid var(--line);padding:6px 0} .anest summary{cursor:pointer;font-size:14px} .anest.caida summary b{color:var(--mal)} .anest.mejora summary b{color:var(--mok)}
 .anplan .top{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px} .anplan.reducir,.anplan.modificar{border-color:var(--mlo)} .anplan.aplazar{border-color:var(--mal)}
+/* v39 · tendencia de rendimiento y recuperación: forma cuadrada y colores de acento (no los del volumen) para no confundir los dos estados */
+.rdchip{display:inline-flex;align-items:center;gap:4px;border:1.5px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px;line-height:1.5;white-space:nowrap}
+.rdchip i,.rdpt{font-style:normal;font-family:var(--mono);font-weight:700}
+.rdpt{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:16px;height:16px;border-radius:3px;font-size:10px;border:1.5px solid var(--line);color:var(--fg)}
+.rd-incompleta{border-color:var(--amb)!important;color:var(--amb)} .rdpt.rd-incompleta{background:var(--amb);color:var(--bg)}
+.rd-aguda{border-color:var(--amb)!important;color:var(--amb);border-style:dashed!important}
+.rd-estancamiento{border-color:var(--muted)!important;color:var(--fg)} .rd-descarga{border-color:var(--ven)!important;color:var(--ven)}
+.rd-normal{border-color:var(--cap)!important;color:var(--cap)} .rd-referencia,.rd-insuficiente{color:var(--muted)} .rd-tenue{opacity:.6}
+.rdleg{display:flex;flex-wrap:wrap;gap:4px 10px;padding:4px 12px;font-size:12px} .rdleg span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap} .rdleg .rdpt{min-width:14px;height:14px} .semd.rdsem{margin-top:-2px}
+.rdg{border-top:1px solid var(--line);padding:8px 0} .rdgh{font-size:15px} .rdgs{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;font-size:13px;margin:4px 0}
+.rdvol{display:inline-flex;align-items:center;gap:6px} .rdvol .mpt{width:11px;height:11px}
+.rdej{border-top:1px dashed var(--line);padding:5px 0} .rdej summary{cursor:pointer;font-size:14px}
+.rdd,.rdw{font-size:12px} .rdd tr.cae td{background:var(--soft)} .rddol{margin:2px 0}
 .anmot{margin:6px 0 0;padding-left:18px;font-size:13px}
 /* Fase 3: navegación y pantallas (Hoy, Más, subpestañas de Progreso, filtros y calendario del historial) */
 .psub{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px} .psub button{flex:none;border:1px solid var(--line);border-radius:999px;padding:7px 13px;background:var(--surface);color:var(--fg);font-size:13px}
@@ -708,6 +721,7 @@ details.notas .nota{margin-top:8px}
     <p class="nota"><b>Día de fuerza.</b> Un compuesto pesado del grupo (4–5 series de 3–6 reps al 80–88 % de tu 1RM estimado, con 1–2 en reserva y descanso fijo de 3–3,5 min, sin mini-series ni fallo) y, si quieres, un accesorio. Calentamiento más largo: 40, 60, 75 y 85 %. Si completas todas las series con 2 o más en reserva, la próxima vez sube 2 puntos el %. Como mucho uno por grupo a la semana; en descarga no hay.</p>
     <p class="nota"><b>Cuidar una zona.</b> En Ajustes (o cuando marcas la misma molestia en 2 de 3 sesiones) puedes cuidar hombro, codo, muñeca, espalda baja, rodilla o cadera 7, 14 o 28 días: los ejercicios que más la cargan se cambian por otro del mismo grupo y en los que la cargan algo haces series rectas con 2–3 en reserva. No es consejo médico: si el dolor es agudo, sigue o empeora, consulta a un profesional.</p>
     <p class="nota" id="notaDesc"><b>Semana de descarga.</b> Mientras dura (la que empiezas tú o la última semana de un bloque), el reloj cambia de modo: cada ejercicio son series rectas, sin mini-series, parciales, variante ni isometría al fallo, con 2 min de descanso y dejando 2–3 en reserva. La meta es la mitad de la normal y se cuenta en <b>series completas</b> (5 reps o más, con cualquier reserva), no en efectivas, así que no te pide rondas extra. Las series se guardan igual y sus efectivas reales cuentan en Progreso.</p>
+    <p class="nota"><b>Rendimiento y recuperación (v39).</b> Cada grupo muscular tiene dos estados independientes: el <b>volumen semanal</b> (se reinicia cada lunes) y la <b>tendencia de rendimiento</b>, que compara cada ejercicio consigo mismo entre sesiones comparables (misma carga, reserva, orden y programa) y no se borra al cambiar de semana. Una caída de más del 5 % frente a tu referencia en dos sesiones seguidas se marca como <b>recuperación posiblemente incompleta</b>; una sola, como <b>fatiga aguda posible</b>; también distingue estancamiento prolongado, descarga voluntaria y progreso normal. Bajar la carga, cambiar la reserva, el orden, el ejercicio o el programa empieza una referencia nueva en lugar de contar como caída, y puedes marcar cambios de técnica. Son señales orientativas con sus datos a la vista, no diagnósticos: no permiten concluir sobreentrenamiento y nunca te impiden entrenar.</p>
     </details>
   </section>
 
@@ -897,5 +911,6 @@ details.notas .nota{margin-top:8px}
 <script src="musica.js"></script>
 <script src="cierre.js"></script>
 <script src="entreno.js"></script>
+<script src="rendimiento.js"></script>
 </body>
 </html>

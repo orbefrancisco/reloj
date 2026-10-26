@@ -64,6 +64,7 @@ function auditarDatos(){const E=[],A=[],I=[],ahora=Date.now(),err=(c,t,ids)=>E.p
   I.push({c:'fisica',t:`integridad física (v38): ${fis.med} descansos medidos · ${fis.salt} saltados · ${fis.alar} alargados · ${fis.intr} interrumpidos por un cierre · ${fis.desc} series de duración desconocida (retomadas) · ${fis.conf} confirmadas a mano · ${fis.sinT} sesiones anteriores sin tiempos (cuentan la mitad en el aprendizaje)`});
   {const c=R._.cal;I.push({c:'carga',t:`calidad de la carga (v31): ${sinCarga} series de trabajo sin carga conocida (se conservan; no se comparan entre sesiones) · ${conCfg} con la carga de «Mis cargas» · ${cambiada} mini-series con otra carga que su serie principal (${idsCamb.size} sesiones) · aprendizaje: ${c.v} mini-series con carga verificada, ${c.p} presuntas (cuentan ½), ${c.cambio+c.mixta} fuera por cambio o mezcla de carga`})}
   if(typeof cgResumenTxt==='function')I.push({c:'cargas',t:cgResumenTxt()});
+  if(typeof rdResumenTxt==='function')try{I.push({c:'rendimiento',t:rdResumenTxt()})}catch(e){}
   I.push({c:'cuidar',t:lesOn()?`cuidando ${lesQueN()}`:'sin zonas cuidadas activas'});
   const dec=leerJSON(DECKEY,[]);if(Array.isArray(dec)&&dec.length)I.push({c:'decisiones',t:`${dec.length} veces entrenaste contra la recomendación del plan (anotadas)`});
   return {app:'reloj-anomalo',tipo:'auditoria',version:AUD_VERSION,esquema:ESQUEMA,fecha:new Date().toISOString(),errores:E,avisos:A,info:I}}

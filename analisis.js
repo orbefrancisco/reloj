@@ -106,8 +106,13 @@ function anPlanGrupo(g){const mot=[],D=864e5,[lo,hi]=rangoGrupo(g),v7=volumen(Da
   if(conMol>=2&&!lesOn()){sube('modificar');mot.push(`molestia anotada en ${conMol} de tus últimas ${ult3.length} sesiones de este grupo: plantéate cuidar la zona`)}
   if(bajaHoy()){sube('reducir');mot.push('dormiste poco o tienes poca energía hoy: la meta ya baja un 25 %')}
   if(v7>hi*VOL_ALERTA){sube('reducir');mot.push(`${ef1(v7)} series en 7 días, más de +30 % sobre tu objetivo orientativo (${lo}–${hi})`)}
-  const caidas=anComparables().filter(s=>s.g===g).map(s=>({s,c:anClasifica(s.pts)})).filter(x=>x.c.estado==='caida');
-  if(caidas.length){sube('reducir');mot.push(`rendimiento en caída en ${caidas.map(x=>x.s.ej).join(', ')} (posible fatiga acumulada; no es la única explicación)`)}
+  // v39: la tendencia de rendimiento y recuperación (rendimiento.js) sustituye a la «caída sostenida»; solo una recuperación posiblemente
+  // incompleta y activa sugiere reducir; las demás señales se explican sin cambiar la recomendación. Nunca bloquea.
+  if(typeof rdGrupo==='function'){const r=rdGrupo(g),act=r.alertas.filter(e=>e.estado!=='estancamiento');
+    if(r.estado==='incompleta'&&r.vig==='activa'){sube('reducir');mot.push(`recuperación posiblemente incompleta en ${act.filter(e=>e.estado==='incompleta').map(e=>e.ej).join(', ')}: caídas repetidas de rendimiento en condiciones comparables (señal orientativa, no un diagnóstico)`)}
+    else if(act.length)mot.push(`${RD_EST[act[0].estado].c}${act[0].vig&&act[0].vig!=='activa'?' ('+(act[0].vig==='atenuada'?'atenuada por el descanso':'sin confirmar')+')':''} en ${act.map(e=>e.ej).join(', ')}: puedes entrenar con normalidad`)}
+  else{const caidas=anComparables().filter(s=>s.g===g).map(s=>({s,c:anClasifica(s.pts)})).filter(x=>x.c.estado==='caida');
+    if(caidas.length){sube('reducir');mot.push(`rendimiento en caída en ${caidas.map(x=>x.s.ej).join(', ')} (posible fatiga acumulada; no es la única explicación)`)}}
   if(!mot.length)mot.push('sin señales en contra con los datos que hay');
   return {g,acc,mot,meta:metaHoy(g),ej:CAT[g].e.filter(x=>!x.levy&&!x.lesFuera).map(x=>x.n)}}
 function anPlan(){const q=queToca();if(q.descanso)return {descanso:true,txt:q.txt};
@@ -119,7 +124,7 @@ function anRegistraDecision(g){try{const p=anPlanGrupo(g);if(p.acc==='mantener'|
 
 /* ---------- vistas ---------- */
 const AN_PREP={listo:['lpl','sin señales en contra'],espera:['lpe','esperar (regla de horas)'],cuidar:['lpc','cuidar o molestias'],nada:['lpn','sin registros']};
-let anTab='est',anSelZ='',anDias=7,anRegla=AN_REGLA_H,anSelG='biceps',anPlanVer=false;
+let anTab='rend',anSelZ='',anDias=7,anRegla=AN_REGLA_H,anSelG='biceps',anPlanVer=false;
 function anPrepHTML(){const Z={},D=864e5,t=Date.now(),VW={};[7,14,28,90].forEach(d=>VW[d]=volumen(t-d*D,t+D));   // 4 pasadas para las 18 zonas
   Object.keys(MUS).forEach(m=>Z[m]=anZona(m,{dias:anDias,reglaH:anRegla,VW}));
   const zona=(m,d)=>`<path d="${d}" data-anz="${m}" class="${AN_PREP[Z[m].prep.e][0]}${m===anSelZ?' sel':''}"><title>${esc(MUS[m][0])}: ${esc(Z[m].prep.txt)}</title></path>`;
@@ -158,17 +163,18 @@ function anVolHTML(){const R=anVolumen(anSelG);
   return h}
 function renderAnalisis(){const el=document.getElementById('pAnal');if(!el)return;
   // (v30) la preparación por zona vive en la pantalla Hoy; aquí, estancamiento y respuesta al volumen
-  if(anTab==='prep')anTab='est';
-  const T=[['est','Estancamiento'],['vol','Respuesta al volumen']];
+  // (v39) primero, rendimiento y recuperación (rendimiento.js)
+  if(anTab==='prep')anTab='est';if(anTab==='rend'&&typeof rdHTML!=='function')anTab='est';
+  const T=[...(typeof rdHTML==='function'?[['rend','Rendimiento y recuperación']]:[]),['est','Estancamiento'],['vol','Respuesta al volumen']];
   el.innerHTML=`<div class="antabs">${T.map(([k,n])=>`<button type="button" data-antab="${k}" aria-pressed="${k===anTab}">${n}</button>`).join('')}</div>`
-    +(anTab==='est'?anEstHTML():anVolHTML())}
+    +(anTab==='rend'?rdHTML():anTab==='est'?anEstHTML():anVolHTML())}
 function renderPrep(){const el=document.getElementById('hoyPrep');if(el)el.innerHTML=anPrepHTML()}
 // tarjeta del reloj en reposo: plan de hoy con «¿por qué?»
 const AN_ACC={mantener:'mantener',reducir:'reducir volumen',modificar:'modificar ejercicios',aplazar:'aplazar'};
 // render() se llama a menudo: el plan se recalcula solo si cambia algo de lo que depende
 let anPlanMemo={k:'',p:null};
 function renderPlanHoy(){const el=document.getElementById('planHoy');if(!el)return;const v=S.st==='idle'&&tab==='reloj';el.hidden=!v;if(!v)return;
-  const k=[grupo,hist.length,hist[0]?hist[0].id+(hist[0].sets||[]).length:'',lesKey(),bajaHoy(),diaK(Date.now()),Object.keys(CAT).map(enPausa).join()].join('|');
+  const k=[grupo,hist.length,hist[0]?hist[0].id+(hist[0].sets||[]).length:'',lesKey(),bajaHoy(),diaK(Date.now()),Object.keys(CAT).map(enPausa).join(),typeof rdVer!=='undefined'?rdVer:0].join('|');
   if(anPlanMemo.k!==k)anPlanMemo={k,p:anPlanGrupo(grupo)};
   const p=anPlanMemo.p,h=`<div class="top"><span><b>Plan para ${esc(CAT[grupo].n)}:</b> ${AN_ACC[p.acc]} · meta ${p.meta} series</span><button type="button" class="lnk" data-anpor="1">${anPlanVer?'Ocultar':'¿Por qué?'}</button></div>`
     +(anPlanVer?`<ul class="anmot">${p.mot.map(m=>`<li>${esc(m)}</li>`).join('')}</ul><p class="hint">Recomendación con reglas y tus datos; decides tú. Si entrenas igual un grupo que se recomendaba aplazar o reducir, queda anotado para poder revisar después cómo te fue.</p>`:'');

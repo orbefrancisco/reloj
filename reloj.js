@@ -1335,7 +1335,7 @@ function estancados(){const desde=Math.max(finDesc(),Date.now()-28*864e5),out=[]
 function semanasSinDescarga(){if(!hist.length)return 0;
   const desde=Math.max(finDesc(),Date.parse(hist[hist.length-1].start));return Math.floor((Date.now()-desde)/(7*864e5))}
 function consejoDescarga(){if(descargaActiva())return null;const e=estancados(),w=semanasSinDescarga();
-  if(e.length>=2)return `Rindes menos desde hace 3 sesiones en <b>${e.slice(0,3).map(esc).join(', ')}</b>: es fatiga acumulada, no falta de ganas.`;
+  if(e.length>=2)return `Rindes menos desde hace 3 sesiones en <b>${e.slice(0,3).map(esc).join(', ')}</b>: puede ser fatiga acumulada (es una posibilidad, no un diagnóstico).`;
   if(w>=8&&diasEntrenados(14)>=6)return `Llevas <b>${w} semanas</b> entrenando fuerte sin una semana suave.`;
   return null}
 function bannerDesc(){
@@ -1885,7 +1885,7 @@ function renderProg(){
       if(zs.length>1||o.solape>.05)det.push(`zonas: ${zTxt}${o.solape>.05?` = ${ef1(sz)} (${ef1(o.solape)} es la misma serie en dos zonas)`:''}`);
       if(o.sinDetalle>.05)det.push(`${ef1(o.sinDetalle)} de sesiones sin detalle por ejercicio (no salen en el mapa)`);
       return `<div class="sem" data-g="${g}" data-v="${v}" data-est="${est}"><span>${CAT[g].n}${enPausa(g)?' <small class="muted">· en pausa (cuidando)</small>':''}</span><div class="track"><span class="banda" style="left:${100*lo/tope}%;width:${100*(hi-lo)/tope}%"></span><div class="fill" style="width:${Math.min(100,100*v/tope)}%;background:var(--${EST_VAR[est]})"></div></div>
-        <span class="val">${ef1(v)} <small>/ ${lo}–${hi}</small></span></div><p class="semd">${det.join(' · ')}</p>`}).join('')
+        <span class="val">${ef1(v)} <small>/ ${lo}–${hi}</small></span></div><p class="semd">${det.join(' · ')}</p>${typeof rdChipGrupo==='function'?`<p class="semd rdsem">Tendencia de rendimiento y recuperación: ${rdChipGrupo(g)}</p>`:''}`}).join('')
     +`<p class="hint">Semana pasada: ${Object.keys(CAT).filter(g=>w1[g]).map(g=>`${CAT[g].n.toLowerCase()} ${ef1(w1[g])}`).join(' · ')||'sin entrenos'}.</p>`;
   // constancia
   const pd=porDia(),r=racha(),base=new Date();base.setDate(1);base.setMonth(base.getMonth()+calOff);
@@ -2129,13 +2129,18 @@ function mapaSVG(){
       <p class="hint" data-desg="${mapaSel}"><b>Directas ${ef1(zo.dir)}</b>${Object.keys(zo.deDir).length?': '+lista(zo.deDir):''}</p>
       <p class="hint" data-desgi="${mapaSel}"><b>Indirectas ${ef1(zo.ind)}</b> (estimación ponderada de lo que ayudan otros ejercicios, no equivale a series directas)${Object.keys(zo.deInd).length?': '+lista(zo.deInd):''}</p>
       ${x<=0?'<p class="hint">Ningún ejercicio de esta semana la trabajó.</p>':''}
-      <p class="hint">${una?`Es la misma magnitud que el grupo ${esc(CAT[G].n.toLowerCase())} de Progreso y usa su mismo objetivo.`:`Grupo ${esc(CAT[G].n.toLowerCase())}: ${ef1(V.grupo(G))} de ${rangoGrupo(G).join('–')} (cuenta cada serie una vez; ver Progreso).`}</p>`}
-  const ks=Object.keys(MUS),fila=m=>`<button type="button" data-m="${m}" data-v="${v[m]||0}" data-est="${estMus(m,v)}" class="musr${m===mapaSel?' on':''}" aria-pressed="${m===mapaSel}"><i class="mpt ${estMus(m,v)}"></i><span>${esc(MUS[m][3])}<small class="mr">${rangoZona(m).join('–')}</small></span><b>${ef1(v[m]||0)}</b><span class="chev" aria-hidden="true">›</span></button>`;
+      <p class="hint">${una?`Es la misma magnitud que el grupo ${esc(CAT[G].n.toLowerCase())} de Progreso y usa su mismo objetivo.`:`Grupo ${esc(CAT[G].n.toLowerCase())}: ${ef1(V.grupo(G))} de ${rangoGrupo(G).join('–')} (cuenta cada serie una vez; ver Progreso).`}</p>`
+      // v39: segundo estado, independiente del volumen: la tendencia de rendimiento y recuperación de AHORA (no se reinicia con la semana)
+      +(typeof rdZona==='function'?(z=>`<p class="hint rdmapa">Tendencia de rendimiento y recuperación (ahora): ${rdChip(z)} ${esc(z.txt)}. Detalle en Análisis → Rendimiento y recuperación.</p>`)(rdZona(mapaSel)):'')}
+  // v39: cada fila lleva sus dos estados: el punto redondo es el volumen de la semana elegida; el cuadrado, la tendencia de ahora
+  const rdP=m=>{if(typeof rdZona!=='function')return '';const z=rdZona(m),e=RD_EST[z.estado];return `<i class="rdpt rd-${z.estado}${z.vig&&z.vig!=='activa'?' rd-tenue':''}" data-rd="${z.estado}" title="Tendencia: ${esc(e.c)}" aria-label="Tendencia: ${esc(e.c)}">${e.ic}</i>`};
+  const ks=Object.keys(MUS),fila=m=>`<button type="button" data-m="${m}" data-v="${v[m]||0}" data-est="${estMus(m,v)}" class="musr${m===mapaSel?' on':''}" aria-pressed="${m===mapaSel}"><i class="mpt ${estMus(m,v)}"></i><span>${esc(MUS[m][3])}<small class="mr">${rangoZona(m).join('–')}</small></span><b>${ef1(v[m]||0)}</b>${rdP(m)}<span class="chev" aria-hidden="true">›</span></button>`;
   return `<div class="calnav mnav"><button type="button" data-moff="1" aria-label="Semana anterior" ${mapaOff>=8?'disabled':''}>‹</button>
     <span class="msel"><span class="mlab" aria-hidden="true">${esc(semNom(mapaOff))}<i>▾</i></span><select id="mSem" aria-label="Semana del mapa">${Array.from({length:9},(_,o)=>`<option value="${o}"${o===mapaOff?' selected':''}>${esc(semNom(o))}</option>`).join('')}</select></span>
     <button type="button" data-moff="-1" aria-label="Semana siguiente" ${mapaOff<=0?'disabled':''}>›</button></div>
     ${figuraSVG({id:'mapa',aria:'Mapa muscular por zonas, frente y espalda',zona,sel:mapaSel})}
     <div class="mleg">${Object.entries(EST_MUS).map(([k,t])=>`<span><i class="mpt ${k}"></i>${t}</span>`).join('')}</div>
+    ${typeof RD_EST!=='undefined'?`<div class="rdleg"><span class="muted">Tendencia (cuadrado, ahora):</span>${RD_ORD.map(k=>`<span><i class="rdpt rd-${k}">${RD_EST[k].ic}</i>${esc(RD_EST[k].c.split(' (')[0])}</span>`).join('')}</div>`:''}
     ${det}<p class="lbl" style="margin:6px 0 0">Volumen semanal por grupo muscular</p>
     <div class="musl"><div>${ks.slice(0,8).map(fila).join('')}</div><div>${ks.slice(8).map(fila).join('')}</div></div>
     <p class="hint">Cada serie efectiva suma 1 al músculo principal del ejercicio (<b>directa</b>) y una fracción a los que ayudan (<b>indirecta</b>: el press inclinado suma ½ al deltoide anterior y ½ al tríceps). Las indirectas son una estimación, no series equivalentes. Debajo de cada zona, su objetivo semanal orientativo; tríceps y abdomen usan el mismo que en Progreso porque son la misma magnitud. Las barras por grupo usan las mismas series y coeficientes, pero cuentan cada serie una sola vez por grupo: por eso, si un ejercicio toca dos zonas del mismo grupo (aperturas: pecho medio y superior), las zonas suman más que el grupo.</p>`}
@@ -2394,7 +2399,7 @@ async function copiaJSON(){let fs=null;try{fs=await fotoTx('readonly',st=>st.get
     if(b)fotos.push({f:x.f,t:x.t,w:x.w,h:x.h,data:await blobAData(b)})}
   return {app:'reloj-anomalo',tipo:'copia-completa',v:2,exportado:new Date().toISOString(),sesiones:hist,metas,ajustes:CFG,ejercicios:misEj,
     rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,modelo:modState,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,
-    ...(typeof cgCopia==='function'?{cargas:cgCopia()}:{}),...(typeof entCopia==='function'?{entrenos:entCopia()}:{}),fotos,...(fs?{}:{sinFotos:true})}}   // v31: «Mis cargas» (todas las semanas)
+    ...(typeof cgCopia==='function'?{cargas:cgCopia()}:{}),...(typeof entCopia==='function'?{entrenos:entCopia()}:{}),...(typeof rdCopia==='function'?{rendimiento:rdCopia()}:{}),fotos,...(fs?{}:{sinFotos:true})}}   // v31: «Mis cargas» (todas las semanas)
 async function hacerCopia(msg=$('copiaMsg')){msg.textContent='Preparando la copia…';
   try{const d=await copiaJSON(),nombre=`reloj-anomalo-copia-${hoy()}.json`;
     const ok=await entregarBlob(nombre,new Blob([JSON.stringify(d)],{type:'application/json'}),msg);
@@ -2422,6 +2427,7 @@ async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw 
   // v31: «Mis cargas» se FUSIONA: semanas y ejercicios que este teléfono no tiene; lo que ya tiene no se toca
   if(d.cargas!=null&&typeof cgFusiona==='function'){const c=cgFusiona(d.cargas);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} cargas de referencia`);if(c.sinEspacio)r.sinEspacio=true}
   if(d.entrenos!=null&&typeof entFusiona==='function'){const c=entFusiona(d.entrenos);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} entrenamientos`)}   // v36: se fusionan por id
+  if(d.rendimiento!=null&&typeof rdFusiona==='function'){const c=rdFusiona(d.rendimiento);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} datos de rendimiento y sensaciones`)}   // v39
   if(d.estilo!=null&&!(typeof d.estilo==='string'&&tiene(ESTILOS,d.estilo)))r.mal++;
   else if(d.estilo!=null&&localStorage.getItem(EKEY)==null){try{localStorage.setItem(EKEY,d.estilo)}catch(e){}aplicarEstilo(d.estilo);r.puestos.push('estilo')}
   recargar();
