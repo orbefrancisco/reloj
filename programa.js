@@ -152,9 +152,12 @@ const pgErr=(err,txt)=>({ok:false,err,txt});
      verificable» en cuanto la red da la hora real (pgRevisaDudas) y no cuenta para la adherencia ni la progresión. */
 let pgRel=null,pgSalto=0,pgOculta=false;
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')pgOculta=true});
-function pgAhora(){const d=Date.now(),p=typeof performance!=='undefined'&&performance.now?performance.now():NaN;
-  if(pgRel&&isFinite(p)){const dT=d-pgRel.d,dP=p-pgRel.p;if(!pgOculta&&!document.hidden&&dP>=0&&Math.abs(dT-dP)>PG_SALTO){pgSalto-=dT-dP;pgAviso='salto'}}
-  pgRel={d,p};pgOculta=false;
+// Solo es un cambio de hora si la app estuvo VISIBLE entre las dos lecturas: con la app en segundo plano el teléfono puede dormir y
+// performance.now se detiene mientras la hora real sigue (eso es tiempo de verdad: el descanso debe seguir corriendo). pgOculta se
+// marca al ocultarse y solo se borra con la primera lectura ya visible, que no compensa nada.
+function pgAhora(){const d=Date.now(),p=typeof performance!=='undefined'&&performance.now?performance.now():NaN,vis=!document.hidden;
+  if(pgRel&&isFinite(p)&&vis&&!pgOculta){const dT=d-pgRel.d,dP=p-pgRel.p;if(dP>=0&&Math.abs(dT-dP)>PG_SALTO){pgSalto-=dT-dP;pgAviso='salto'}}
+  pgRel={d,p};if(vis)pgOculta=false;else pgOculta=true;
   let t=d+(PGS.off||0)+pgSalto;
   if(t<PGS.marca){if(PGS.marca-t>PG_SALTO)pgAviso='atras';t=PGS.marca}else PGS.marca=t;
   return t}

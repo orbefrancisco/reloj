@@ -346,6 +346,31 @@ prueba('Las pruebas de rendimiento no se contaminan: con el programa cargado, el
   const A = activo(); sesion(A, 'd01'); A.ir(T(29, 1)); ev(A, 'pgRevisaFin()'); const h = ev(A, `pgInformeHTML(pgInforme(PGS.arch[0],'terminado',PGS.arch[0].cerr))`) + ev(A, 'pgPantallaHTML(pgAhora())');
   return { ok: !/sobreentrenamiento|ganaste músculo|creciste|hipertrofia confirmada/i.test(h) }; });
 
+// descanso al salir y volver: quedaban X s, fuera Y s (Y < X) → al volver quedan X − Y
+const quedan = A => ev(A, '(c=>c.descPlan-(pgAhora()-c.desc0-(c.descPz||0))/1000)(PGS.cur)');
+const enDescanso = (desc = 120) => { const A = activo(); ev(A, `pgEntrar('d01')`); ev(A, `PG_EJ.jalon_medio.rest=${desc}`); serie(A, { rest: 0 }); return A; };
+const casi = (a, b) => Math.abs(a - b) < .01;
+prueba('Descanso: si el teléfono CIERRA la app y vuelves Y s después (Y < X), quedan X − Y (y la cuenta se ve en pantalla)', () => {
+  const r = [];for (const Y of [5, 40, 100]) { const A = enDescanso(), X = quedan(A), B = recarga(A, A.t + Y * 1000), q = quedan(B), txt = ev(B, 'pgCronoTxt(pgAhora())').replace(/<[^>]+>/g, '');
+    r.push({ ok: casi(q, X - Y) && ev(B, 'PGS.cur.fase') === 'descanso' && txt.includes(ev(B, `fmt(${q})`)), t: `${X}−${Y}=${q}` }); }
+  return { ok: r.every(x => x.ok), d: r.map(x => x.t).join(' · ') }; });
+prueba('Descanso: app en segundo plano y teléfono dormido (performance.now se detiene, Date sigue): quedan X − Y al volver, aunque Y pase de 1 min', () => {
+  const r = [];
+  for (const Y of [20, 61, 90, 115]) { const A = enDescanso(180); let perf = 5e6; A.ctx.performance = { now: () => perf }; const X = quedan(A);
+    ev(A, `document.visibilityState='hidden';document.hidden=true`); A.dispara('visibilitychange');
+    A.mas(1); perf += 1000; quedan(A);              // un tic con la app ya oculta, justo antes de dormirse
+    A.mas(Y - 1);                                   // dormido: el reloj del sistema avanza, performance.now no
+    ev(A, `document.visibilityState='visible';document.hidden=false`); A.dispara('visibilitychange'); const q = quedan(A);
+    A.mas(1); perf += 1000; const z = quedan(A);    // y sigue contando con normalidad
+    r.push({ ok: casi(q, X - Y) && casi(z, X - Y - 1), t: `${X}−${Y}=${q}→${z}` }); }
+  return { ok: r.every(x => x.ok), d: r.map(x => x.t).join(' · ') }; });
+prueba('Descanso: fuera más tiempo que el que quedaba (Y > X) → «Descanso cumplido» con el exceso, sin números negativos', () => {
+  const A = enDescanso(), X = quedan(A), B = recarga(A, A.t + (X + 10) * 1000), txt = ev(B, 'pgCronoTxt(pgAhora())').replace(/<[^>]+>/g, '');
+  return { ok: /Descanso cumplido · \+0:10/.test(txt), d: txt }; });
+prueba('Descanso: con la app abierta y visible, un cambio manual de hora de +1 h NO se come el descanso', () => {
+  const A = enDescanso(); let perf = 5e6; A.ctx.performance = { now: () => perf }; const X = quedan(A); A.mas(3600 + 5); perf += 5000; const q = quedan(A);
+  return { ok: casi(q, X - 5), d: `${X} → ${q} s` }; });
+
 // interfaz: los manejadores REALES de toques (escuchadores de document), sin llamar a pg* directamente
 prueba('Interfaz de punta a punta con toques: activar (con la casilla), entrar al tocar el día, empezar, terminar, anotar, registrar (doble toque = 1 serie), salida por seguridad', () => {
   const A = app({ ahora: T(0, 10) }), err = [], toca = (d, x) => err.push(...A.dispara('click', d, x)), escribe = (k, v, x = {}) => err.push(...A.dispara('input', { pgin: k }, { value: v, ...x }));
