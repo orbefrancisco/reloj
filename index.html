@@ -553,15 +553,51 @@ details.notas .nota{margin-top:8px}
 .hm i.z0{background:var(--m0);opacity:.55} .hm i.zlo{background:var(--mlo)} .hm i.zok{background:var(--mok)} .hm i.zhi{background:var(--mhi)} .hm i.zal{background:var(--mal)}
 .cgpend{align-self:stretch;border:2px solid var(--amb)!important}
 @media (prefers-reduced-motion: reduce){.aro-r{transition:none} .cgflash{animation:none!important}}
+/* v40 · programa de 28 días */
+.pgcard p{margin:0;font-size:14px;line-height:1.45} .pgcard-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap} .pgcard.pgon{border:2px solid var(--cap)}
+.pglock{font-weight:600}
+.pgmain{min-height:56px;width:100%;border-radius:14px;border:0;background:var(--art);color:var(--bg);font-size:17px;font-weight:700;padding:8px 14px;margin:6px 0}
+.pgmain[aria-disabled="true"]{opacity:.5} .pgmain.pgwork{background:var(--cap)}
+.pgest{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.pg-hoy,.pg-curso{border-color:var(--art);color:var(--art)} .pg-completado{border-color:var(--mok);color:var(--mok)} .pg-parcial{border-color:var(--mhi);color:var(--mhi)}
+.pg-omitido,.pg-abandonado{border-color:var(--mal);color:var(--mal)} .pg-seguridad{border-color:var(--amb);color:var(--amb)} .pg-reprogramado,.pg-cancelado{border-style:dashed;color:var(--muted)} .pg-descanso,.pg-pendiente{color:var(--muted)}
+.pgcal7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px} .pgdw{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center}
+.pgdia{min-height:52px;border:1px solid var(--line);border-radius:9px;background:var(--surface);display:flex;flex-direction:column;align-items:flex-start;padding:4px;gap:1px;overflow:hidden;text-align:left}
+.pgdia b{font-family:var(--mono);font-size:12px} .pgdia small{font-size:9.5px;line-height:1.15;color:var(--muted)} .pgdia.pghoy{outline:2px solid var(--art);outline-offset:1px} .pgdia.pgsel{background:var(--soft)}
+.pgdia.pg-completado{border-color:var(--mok);border-width:2px} .pgdia.pg-parcial{border-color:var(--mhi);border-width:2px} .pgdia.pg-omitido,.pgdia.pg-abandonado{border-color:var(--mal);border-width:2px}
+.pgdia.pg-seguridad{border-color:var(--amb);border-width:2px} .pgdia.pg-descanso{background:transparent;border-style:dashed} .pgdia.pg-reprogramado{border-style:dashed} .pgdia.pg-curso,.pgdia.pg-hoy{border-color:var(--art);border-width:2px}
+.pgley{display:flex;flex-wrap:wrap;gap:4px}
+.pgul{margin:4px 0;padding-left:18px;font-size:13.5px;line-height:1.45} .pgejd summary,.pgdd summary{cursor:pointer;padding:6px 0;font-size:14px} .pgcal{color:var(--amb)}
+.pgchk{display:flex;gap:8px;align-items:center;font-size:14px;min-height:40px}
+.pgtop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px} .pgtop>div{display:flex;flex-direction:column;gap:2px}
+.pgseg{flex:none;min-height:48px;padding:0 14px;border-radius:12px;border:2px solid var(--mal);color:var(--mal);background:var(--surface);font-weight:700;font-size:14px}
+.pgsegl{display:flex;flex-direction:column;gap:8px} .pgsegb{min-height:52px;border-radius:12px;border:2px solid var(--mal);color:var(--fg);background:var(--surface);font-size:16px;font-weight:600;text-align:left;padding:0 14px}
+.pgbarra{height:8px;border-radius:4px;background:var(--soft);overflow:hidden} .pgbarra i{display:block;height:100%;background:var(--cap)}
+.pgfase{margin:0;font-size:13.5px} .pgobj{font-size:15px}
+.pgej p{margin:0;line-height:1.45}
+.pgcrono{font-family:var(--disp);font-size:44px;font-weight:800;text-align:center;margin:6px 0} .pgcrono small{display:block;font-family:var(--mono);font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.pgreg{display:flex;flex-direction:column;gap:12px;margin-top:6px} .pgcampo{display:flex;flex-direction:column;gap:6px}
+.pgstep{display:flex;gap:14px;align-items:center} .pgstep input{width:96px;height:46px;font-size:22px;text-align:center;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)} .pgstep .btn2{width:52px;height:46px;font-size:22px;align-self:center}
+.pgsec{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px} .pgnext{margin:0;font-size:13.5px;color:var(--muted)}
+.pglista{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px} .pgli{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:6px 8px;display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-height:44px}
+.pgli small{color:var(--muted);font-size:11px} .pgli.pgact{border-color:var(--art);border-width:2px} .pgli.pgsel{background:var(--soft)}
+.pgtab{width:100%;border-collapse:collapse;font-size:12.5px} .pgtab th,.pgtab td{border-bottom:1px solid var(--line);padding:3px 4px;text-align:left} .pgtab tr.pginv td{text-decoration:line-through;color:var(--muted)}
+.pgfin{display:flex;flex-direction:column;gap:18px;align-items:stretch;margin:14px 0 8px} .pgfinb{align-self:stretch!important;height:48px!important}
+.pghold{position:relative;overflow:hidden;min-height:60px;border-radius:14px;border:2px solid var(--mal);background:var(--surface);font-size:15px;font-weight:700;touch-action:none;user-select:none;-webkit-user-select:none}
+.pghold>*{pointer-events:none} .pghold i{position:absolute;left:0;top:0;bottom:0;width:0;background:color-mix(in srgb,var(--mal) 35%,transparent)} .pghold span{position:relative}
+.pginf h3{font-family:var(--disp);font-size:15px;letter-spacing:.04em;text-transform:uppercase;margin:8px 0 2px} .pginf p{margin:0;font-size:13.5px;line-height:1.45}
+#pad.pglibre{opacity:.5}
 </style>
 <script src="estilo.js"></script>
 </head>
 <body>
 <main>
   <header><h1><span id="hpre">Congestión · </span><span id="gnom">Bíceps</span></h1><div id="blk">3 estaciones</div></header>
+  <div id="pgVolverAv" hidden></div>
 
   <section id="vReloj" style="display:flex;flex-direction:column;gap:14px">
     <div id="entBarra" class="ent ent-fin" aria-live="off"><div class="ent-h"><span class="ent-t">Entrenamiento</span></div><div class="ent-big"><b>0:00:00</b></div></div>
+    <div id="pgCard" hidden></div>
     <div id="retomarAv" class="aviso-d" hidden></div>
     <div id="cuotaAv" class="aviso-d" hidden></div>
     <div id="cgAviso" class="cgav" hidden></div>
@@ -768,6 +804,7 @@ details.notas .nota{margin-top:8px}
   <!-- Fase 3: Hoy (mi entrenamiento) -->
   <section id="vHoy" hidden style="display:flex;flex-direction:column;gap:10px">
     <div id="cgAvisoHoy" class="cgav" hidden></div>
+    <div id="pgCardHoy" hidden></div>
     <h2>Mi entrenamiento</h2>
     <div id="hoyPlan" class="card"></div>
     <h2>Todos los grupos</h2>
@@ -779,6 +816,7 @@ details.notas .nota{margin-top:8px}
   <!-- Fase 3: Más (secundarias) -->
   <section id="vMas" hidden style="display:flex;flex-direction:column;gap:10px">
     <div class="masl">
+      <button id="tPg28" type="button" data-pg="abrir"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h2M12 14h2M16 14h0M8 17h2M12 17h2"/></svg><b>Programa de hipertrofia · 28 días</b><span>Calendario de 4 semanas, 24 prescripciones, compromiso, progresión e informe final</span></button>
       <button id="tCargas" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12"/></svg><b>Mis cargas</b><span>Carga de referencia de cada ejercicio esta semana (hipertrofia y fuerza), encuesta semanal y propuestas de progresión</span></button>
       <button id="tEstilo" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><b>Ajustes</b><span>Entrenamiento, cuidar una zona, voz, tempo, unidades y estilo visual</span></button>
       <button id="tApr" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M6 16l4-5 3 3 5-7"/><circle cx="18" cy="7" r="1.5"/></svg><b>Aprendizaje</b><span>Qué ha aprendido el reloj de tu recuperación, con qué datos y cuánto acierta</span></button>
@@ -796,6 +834,14 @@ details.notas .nota{margin-top:8px}
   <section id="vAud" hidden style="display:flex;flex-direction:column;gap:10px">
     <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
     <div id="hAudit" class="card"></div>
+  </section>
+  <!-- v40: programa de 28 días (programa.js) -->
+  <section id="vPrograma" hidden style="display:flex;flex-direction:column;gap:10px">
+    <button type="button" class="lnk volver" data-volver="1">‹ Más</button>
+    <div id="vProgramaC" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+  <section id="vProgEnt" hidden style="display:flex;flex-direction:column;gap:12px" aria-label="Modo entrenamiento del programa">
+    <div id="vProgEntC" style="display:flex;flex-direction:column;gap:12px"></div>
   </section>
 
   <section id="vHist" hidden style="display:flex;flex-direction:column;gap:10px">
@@ -878,6 +924,12 @@ details.notas .nota{margin-top:8px}
   </div>
 </dialog>
 
+<!-- v40: diálogos del programa (abandono, seguridad, omitir, cancelar) -->
+<dialog id="pgDlg" class="hoja" aria-labelledby="pgDlgT">
+  <div class="hoja-top"><h2 id="pgDlgT">Programa</h2><button type="button" class="cerrar" data-pg="cerrarDlg" aria-label="Cerrar">×</button></div>
+  <div class="hoja-c" id="pgDlgC"></div>
+</dialog>
+
 <!-- v34: «Otro ejercicio hoy» -->
 <dialog id="soloDlg" class="hoja" aria-labelledby="soloT">
   <div class="hoja-top"><h2 id="soloT">Otro ejercicio hoy</h2><button id="soloX" type="button" class="cerrar" aria-label="Cerrar">×</button></div>
@@ -912,5 +964,6 @@ details.notas .nota{margin-top:8px}
 <script src="cierre.js"></script>
 <script src="entreno.js"></script>
 <script src="rendimiento.js"></script>
+<script src="programa.js"></script>
 </body>
 </html>

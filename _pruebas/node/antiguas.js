@@ -3,7 +3,7 @@
 //     node _pruebas/node/antiguas.js [vistas.js v38.js …]
 'use strict';
 const cargar = require('./entorno');
-const APPJS = ['estilo.js', 'anim.js', 'reloj.js', 'analisis.js', 'auditoria.js', 'pantallas.js', 'cargas.js', 'musica.js', 'cierre.js', 'entreno.js', 'rendimiento.js'];
+const APPJS = ['estilo.js', 'anim.js', 'reloj.js', 'analisis.js', 'auditoria.js', 'pantallas.js', 'cargas.js', 'musica.js', 'cierre.js', 'entreno.js', 'rendimiento.js', 'programa.js'];
 const lista = process.argv.slice(2).length ? process.argv.slice(2) : ['vistas.js', 'v37.js', 'v38.js', 'cierre.js', 'cargas.js', 'entreno.js', 'hoy.js', 'musica.js'];
 let fallos = 0;
 for (const f of lista) {

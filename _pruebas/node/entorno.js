@@ -18,9 +18,10 @@ module.exports = function cargar(o = {}) {
     key: i => [...mem.keys()][i] ?? null, get length() { return mem.size; }, clear: () => mem.clear() };
   if (o.hist) localStorage.setItem('reloj-anomalo-sesiones', JSON.stringify(o.hist));
   for (const [k, v] of Object.entries(o.ls || {})) localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
-  const els = new Map(), creados = [];
+  const els = new Map(), creados = [], oyentes = {};   // v40: los escuchadores de document se guardan para simular toques (dispara)
   const document = { getElementById: id => { if (!els.has(id)) els.set(id, elemento()); return els.get(id); },
-    querySelector: () => elemento(), querySelectorAll: () => [], createElement: () => { const e = elemento(); creados.push(e); return e; }, addEventListener() {}, removeEventListener() {},
+    querySelector: () => elemento(), querySelectorAll: () => [], createElement: () => { const e = elemento(); creados.push(e); return e; },
+    addEventListener(tipo, f) { (oyentes[tipo] = oyentes[tipo] || []).push(f); }, removeEventListener() {},
     body: elemento(), documentElement: elemento(), head: elemento(), visibilityState: 'visible', hidden: false, fonts: { ready: Promise.resolve() } };
   // Date con el «ahora» fijado (pruebas deterministas); fijaAhora() lo mueve
   const RealDate = Date; let t = ahora;
@@ -32,14 +33,20 @@ module.exports = function cargar(o = {}) {
     navigator: { vibrate() {}, userAgent: 'node', language: 'es-DO' }, location: { href: 'file:///', search: '', hash: '', origin: 'file://', pathname: '/', reload() {} },
     matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), performance: { now: () => t },
     addEventListener() {}, removeEventListener() {}, getComputedStyle: () => ({ getPropertyValue: () => '' }), screen: {}, innerWidth: 400, innerHeight: 800, devicePixelRatio: 1,
-    Image: class {}, FileReader: class {}, alert() {}, confirm: () => true, prompt: () => null };
+    Image: class {}, FileReader: class {}, alert() {}, confirm: () => true, prompt: () => null, scrollTo() {} };
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx;
   vm.createContext(ctx);
-  const archivos = o.archivos || ['estilo.js', 'anim.js', 'reloj.js', 'analisis.js', 'auditoria.js', 'pantallas.js', 'cargas.js', 'musica.js', 'cierre.js', 'entreno.js', 'rendimiento.js'];
+  const archivos = o.archivos || ['estilo.js', 'anim.js', 'reloj.js', 'analisis.js', 'auditoria.js', 'pantallas.js', 'cargas.js', 'musica.js', 'cierre.js', 'entreno.js', 'rendimiento.js', 'programa.js'];
   // como en la página: un script por archivo en el mismo contexto (comparten el ámbito léxico global: los const/let de uno se ven en
   // los siguientes, y la función de un archivo posterior aún no existe mientras corre uno anterior)
   for (const f of archivos) if (fs.existsSync(path.join(APP, f))) vm.runInContext(fs.readFileSync(path.join(APP, f), 'utf8'), ctx, { filename: f });
   // los const/let globales no son propiedades del objeto global: se exponen con un evaluador en ese mismo ámbito
   vm.runInContext('globalThis.__ev = s => eval(s);', ctx);
-  return { ctx, ev: s => ctx.__ev(s), ls: localStorage, els, creados, fijaAhora: x => { t = x; } };
+  // dispara(tipo, datos): un toque en un elemento con esos data-* (closest('[data-x]') lo encuentra si tiene data-x); devuelve los errores de los escuchadores
+  const dispara = (tipo, datos = {}, extra = {}) => { const el = { dataset: datos, getAttribute: k => (k === 'aria-disabled' ? datos.ariaDisabled ?? null : null), type: extra.type, checked: extra.checked, value: extra.value };
+    el.closest = sel => { const m = /\[data-([a-z-]+)\]/g; let x; while ((x = m.exec(sel))) if (x[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase()) in datos) return el; return null; };
+    const e = { target: el, key: extra.key, repeat: false, preventDefault() {} }, errores = [];
+    for (const f of oyentes[tipo] || []) try { f(e); } catch (err) { errores.push(err.message); }
+    return errores; };
+  return { ctx, ev: s => ctx.__ev(s), ls: localStorage, els, creados, dispara, fijaAhora: x => { t = x; } };
 };

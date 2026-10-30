@@ -107,6 +107,8 @@ function normSes(s){if(!esObj(s))return null;const id=vTxt(s.id,80),start=vFecha
   if(typeof s.super==='string'&&s.super.length<=40){const p=s.super.split('+');if(p.length===2&&p.every(esG)){o.super=s.super;const si=vTxt(s.superId,80);if(si)o.superId=si;if(s.lado==='A'||s.lado==='B')o.lado=s.lado}}
   // v26: versión de esquema y fechas de registro (creada) y de última edición (editada), distintas de la del entrenamiento (start)
   {const e=vEnt(s.esq,1,99);if(e!=null)o.esq=e;const c=vFecha(s.creada),ed=vFecha(s.editada);if(c)o.creada=c;if(ed)o.editada=ed}
+  // v40: sesión del programa de 28 días (programa.js): programa, sesión del calendario, intento, estado y hora no verificable
+  if(esObj(s.prog)){const p=vTxt(s.prog.p,40),ss=vTxt(s.prog.s,4),i=vTxt(s.prog.i,120),e=vTxt(s.prog.e,12);if(p!=null&&ss!=null&&i){o.prog={p,s:ss,i,e:e||''};if(s.prog.d===true)o.prog.d=true}}
   if(LES_Z.includes(s.cuida)){o.cuida=s.cuida;if(LES_P[s.cuida].includes(s.cuidaP))o.cuidaP=s.cuidaP;if(LES_N.includes(s.cuidaN))o.cuidaN=s.cuidaN;
     const cl=normLesL(s.cuidaL);if(cl.length>1)o.cuidaL=cl}   // v25: varias zonas a la vez
   return o}
@@ -494,7 +496,10 @@ const metaBase=g=>{if(descargaActiva())return Math.max(2,Math.ceil(metas[g]/2));
 // Si dormiste menos de 6 h o llegas con energía 1–2, la meta de hoy baja ~25 % (mínimo 2). Con energía 5 no sube.
 const metaHoy=g=>bajaHoy()?Math.max(2,Math.round(metaBase(g)*.75)):metaBase(g);
 // x (v18, opcional): {ests: estaciones de este lado de una superserie de piernas} o {fza: plan de fuerza}. Sin x, como siempre.
-function iniciarSesion(x){x=x||{};if(x.fza)S.fza=x.fza;if(x.ests)S.ests=x.ests;
+function iniciarSesion(x){x=x||{};
+  // v40: con el programa de 28 días activo no se empieza ninguna sesión libre, venga de la pantalla que venga (la regla vive aquí, no en el botón)
+  if(typeof pgBloqueaLibre==='function'&&pgBloqueaLibre())throw new Error('programa-activo');
+  if(x.fza)S.fza=x.fza;if(x.ests)S.ests=x.ests;
   // v34 · «otro ejercicio hoy»: el plan de hoy de este grupo (solo ese ejercicio, uno añadido o uno cambiado) sustituye al de siempre
   // en esta sesión; se consume al empezar (no en fuerza ni en superserie)
   // v35 · cierre de déficits: el bloque de este grupo, con las series efectivas de cada ejercicio (manda sobre «otro ejercicio hoy»)
@@ -1027,6 +1032,7 @@ $('pad').onclick=async()=>{
   if(!lock)try{navigator.wakeLock?.request('screen').then(l=>{lock=l}).catch(()=>{})}catch(e){}   // sin esperar: el toque responde al instante
   const t=now();
   if(S.st==='idle'){
+    if(typeof pgBloqueaLibre==='function'&&pgBloqueaLibre()){pgSay(pgMsgBloqueo());vibrar(80);render();return}   // v40: programa de 28 días activo
     if(sinGrupo()||(ssSel.on&&!ssLados())||pausaInicio()){render();return}   // «La mía» sin grupos o superserie propia sin sus dos grupos: no empieza
     // antes de la primera sesión del día: cómo llegas (un segundo toque empieza igual). Si Comida ya anotó el sueño, solo pregunta la energía.
     if(!bienHoy()&&!omitHoy()&&!pideBien){pideBien=true;bienEd=bienEd||bienDe(bienDia())||{};render();$('bien').scrollIntoView?.({block:'nearest',behavior:'smooth'});return}
@@ -1371,6 +1377,7 @@ function bloqueHTML(prog){const b=bloqueSem(),bot=n=>`<button type="button" clas
   return prog?`<p class="hint" style="margin:0">Un bloque sube la meta de series poco a poco y termina con una semana de descarga: 4 semanas (${multTxt(4)}), 5 (${multTxt(5)}) o 6 (${multTxt(6)}). Si lo empiezas de lunes a jueves cuenta desde esta semana; de viernes a domingo, desde el lunes que viene.</p><div class="tog">${[4,5,6].map(bot).join('')}</div>`:''}
 function renderBloque(){const r=$('bloqueR'),h=S.st==='idle'&&rutPos===0?bloqueHTML(false):'';r.hidden=!h;if(r.innerHTML!==h)r.innerHTML=h}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-bq]');if(!b)return;const v=b.dataset.bq;
+  if(v!=='fin'&&typeof pgBloqueaLibre==='function'&&pgBloqueaLibre()){pgSay(pgMsgBloqueo());render();return}   // v40: otro programa no se empieza
   if(v==='fin'){if(!bqFin){bqFin=true;$('pBloque').innerHTML=bloqueHTML(true);return}bqFin=false;bloque={}}
   else{const d=new Date(lunes(Date.now()));if((new Date().getDay()+6)%7>=4)d.setDate(d.getDate()+7);bloque={inicio:diaK(d),sem:+v};bqFin=false}
   guardarObj(BQKEY,bloque);if(S.st==='idle')S=fresh();renderGrupos();renderProg();render()});
@@ -1616,7 +1623,7 @@ function subInicio(E){const R=typeof cgRef==='function'?cgRef(grupo,E.n,'h'):nul
   const s=sugerir(grupo,E);
   return s?`${E.n} · última vez ${kgTxt(s.prev.kg)} × ${s.prev.reps} (reserva ${s.prev.rir}) → ${s.txt}`:`${E.n} · peso con el que ${E.r} reps te dejen a 1 del fallo`}
 // v32 · encabezado por sección, resumen plegable de la selección en reposo
-const TIT_SEC={hoy:'Hoy',progreso:'Progreso',historial:'Historial',mas:'Más',estilo:'Ajustes',aprendizaje:'Aprendizaje',auditoria:'Auditoría de datos',cargas:'Mis cargas'};
+const TIT_SEC={hoy:'Hoy',progreso:'Progreso',historial:'Historial',mas:'Más',estilo:'Ajustes',aprendizaje:'Aprendizaje',auditoria:'Auditoría de datos',cargas:'Mis cargas',programa:'Programa 28 días',pgent:'Entrenamiento'};
 let selAbierto=false;
 function selResHTML(FP,PE,HP){const t=typeof cierreOn!=='undefined'&&cierreOn?'Cierre de déficits':ssSel.on?`Superserie · ${ssNom()}`:enRutina()?(RUTINAS[rutI].mia?'Tu rutina':RUTINAS[rutI].n):CAT[grupo].n;
   // v34: los ejercicios de hoy a la vista (antes había que desplegar para verlos)
@@ -1638,10 +1645,10 @@ function render(){
   const G=CAT[grupo],E=est(),e=Math.max(0,now()-S.t0),pad=$('pad');
   // Fase 3: 5 destinos en la barra (Reloj, Hoy, Progreso, Historial, Más); Ajustes, Aprendizaje y Auditoría cuelgan de «Más»
   [['vReloj','tReloj','reloj'],['vHoy','tHoy','hoy'],['vProg','tProg','progreso'],['vHist','tHist','historial'],['vMas','tMas','mas'],
-   ['vEstilo','tMas','estilo'],['vApr','tMas','aprendizaje'],['vAud','tMas','auditoria'],['vCargas','tMas','cargas']].forEach(([v,t,k])=>{const el=$(v);if(!el)return;
+   ['vEstilo','tMas','estilo'],['vApr','tMas','aprendizaje'],['vAud','tMas','auditoria'],['vCargas','tMas','cargas'],['vPrograma','tMas','programa'],['vProgEnt','tReloj','pgent']].forEach(([v,t,k])=>{const el=$(v);if(!el)return;
     el.hidden=tab!==k;el.style.display=tab===k?'flex':'none'});
-  const enMas=['mas','estilo','aprendizaje','auditoria','cargas'].includes(tab);
-  [['tReloj','reloj'],['tHoy','hoy'],['tProg','progreso'],['tHist','historial'],['tMas','mas']].forEach(([t,k])=>{const b=$(t);if(b)b.setAttribute('aria-current',tab===k||(k==='mas'&&enMas)?'page':'false')});
+  const enMas=['mas','estilo','aprendizaje','auditoria','cargas','programa'].includes(tab);
+  [['tReloj','reloj'],['tHoy','hoy'],['tProg','progreso'],['tHist','historial'],['tMas','mas']].forEach(([t,k])=>{const b=$(t);if(b)b.setAttribute('aria-current',tab===k||(k==='mas'&&enMas)||(k==='reloj'&&tab==='pgent')?'page':'false')});
   $('gnom').textContent=SS?`${ladoNom(SS.t)} ⇄ ${ladoNom(1-SS.t)}`:S.st==='idle'&&ssSel.on?ssNom():G.n+(enRutina()?` ${rutPos+1}/${rutLista().length}`:'');
   const HP=S.st==='idle'&&!ssSel.on&&typeof hoyDe==='function'?hoyDe(grupo):null;   // v34: plan de hoy («otro ejercicio hoy»)
   const FP=S.st==='idle'&&!ssSel.on&&!HP&&fzaActiva()?planFuerza(grupo):null,PE=S.fza?S.fza.e:FP?FP.e:S.planE?S.planE:HP?HP.e:G.e,NE=PE.length;   // v18: en fuerza, sus estaciones
@@ -1742,6 +1749,7 @@ function render(){
   const rh=rows||'<tr><td colspan="7" class="muted" style="text-align:left">Las series aparecen aquí al reportarlas.</td></tr>';
   if(rh!==lastRows){lastRows=rh;$('rows').innerHTML=rh}   // la tabla solo se reescribe cuando cambia
   renderRetomar();guardarEnCurso();
+  if(typeof pgRender==='function')pgRender();   // v40: programa de 28 días (tarjeta, bloqueo, calendario y modo entrenamiento)
 }
 /* ---------- v17: animación del ejercicio (anim.js) en el pad, en «Ver cómo se hace» y en el catálogo ----------
    El SVG del pad solo se reconstruye cuando cambia lo que muestra (ejercicio, parte del recorrido o grupo), no en cada tic. */
@@ -2005,11 +2013,12 @@ const REGLAS_MUS=[
  [/press frances|extension|pushdown|patada|triceps/,{triceps:1}],[/press cerrado/,{triceps:1,pecho_med:.5,del_ant:.25}],
  [/fondos/,g=>g==='triceps'?{triceps:1,pecho_med:.5,del_ant:.25}:{pecho_med:1,triceps:.5,del_ant:.25}],
  [/flexiones? (diamante|cerrad)/,{triceps:1,pecho_med:.5}],
- [/face pull|jalon a la cara|pajaro|posterior|(apertura|contractora|pec deck|cruce|mariposa).*invers/,{del_post:1,trap_med:.5}],[/menton|remo vertical/,{del_lat:1,trap_sup:.5}],[/lateral/,{del_lat:1}],
+ [/face pull|jalon a la cara|pajaro|posterior|(apertura|contractora|pec deck|cruce|mariposa).*invers/,{del_post:1,trap_med:.5}],[/menton|remo vertical/,{del_lat:1,trap_sup:.5}],[/(^|\s)lateral/,{del_lat:1}],   // v40: «unilateral» no es deltoide lateral
  [/jalon|dominada|pullover/,{dorsal:1,biceps:.5,trap_inf:.25}],[/remo/,{trap_med:1,dorsal:.5,del_post:.5,biceps:.5}],
  [/inclinad.*(press|banca)|(press|banca).*inclinad/,{pecho_sup:1,del_ant:.5,triceps:.5}],
  [/militar|press(?!.*pecho).*(hombro|sentado)|arnold/,{del_ant:1,del_lat:.5,triceps:.5,trap_sup:.25}],
  [/press|banca|flexion|declinad/,g=>g==='hombros'?{del_ant:1,del_lat:.5,triceps:.5,trap_sup:.25}:{pecho_med:1,del_ant:.5,triceps:.5}],
+ [/(apertura|cruce)s?.*(abajo hacia arriba|de abajo arriba|baja a alta)/,{pecho_sup:1,pecho_med:.5}],   // v40: aperturas de polea baja a alta → pecho superior
  [/apertura|pec deck|cruce|contractora/,{pecho_med:1,pecho_sup:.25}],
  [/crunch|rueda|elevaci.*pierna|colgad|rodillas al pecho|plancha/,{abdomen:1}]];
 const MUS_DEF={biceps:{biceps:1},triceps:{triceps:1},espalda:{dorsal:1},pecho:{pecho_med:1},hombros:{del_lat:1},abdominales:{abdomen:1},piernas:{cuads:1}};
@@ -2399,7 +2408,7 @@ async function copiaJSON(){let fs=null;try{fs=await fotoTx('readonly',st=>st.get
     if(b)fotos.push({f:x.f,t:x.t,w:x.w,h:x.h,data:await blobAData(b)})}
   return {app:'reloj-anomalo',tipo:'copia-completa',v:2,exportado:new Date().toISOString(),sesiones:hist,metas,ajustes:CFG,ejercicios:misEj,
     rutina:{i:rutI,mia:miaLista},descarga,medidas,bienestar:leerBien(),medallas:medVistas||{},calibracion:calibC,modelo:modState,bloque,fuerza:fzaCfg,lesion,superserie:ssSel,estilo,
-    ...(typeof cgCopia==='function'?{cargas:cgCopia()}:{}),...(typeof entCopia==='function'?{entrenos:entCopia()}:{}),...(typeof rdCopia==='function'?{rendimiento:rdCopia()}:{}),fotos,...(fs?{}:{sinFotos:true})}}   // v31: «Mis cargas» (todas las semanas)
+    ...(typeof cgCopia==='function'?{cargas:cgCopia()}:{}),...(typeof entCopia==='function'?{entrenos:entCopia()}:{}),...(typeof rdCopia==='function'?{rendimiento:rdCopia()}:{}),...(typeof pgCopia==='function'?{programa:pgCopia()}:{}),fotos,...(fs?{}:{sinFotos:true})}}   // v31: «Mis cargas» (todas las semanas)
 async function hacerCopia(msg=$('copiaMsg')){msg.textContent='Preparando la copia…';
   try{const d=await copiaJSON(),nombre=`reloj-anomalo-copia-${hoy()}.json`;
     const ok=await entregarBlob(nombre,new Blob([JSON.stringify(d)],{type:'application/json'}),msg);
@@ -2428,6 +2437,8 @@ async function restaurarCopia(d){if(!esObj(d)||!Array.isArray(d.sesiones))throw 
   if(d.cargas!=null&&typeof cgFusiona==='function'){const c=cgFusiona(d.cargas);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} cargas de referencia`);if(c.sinEspacio)r.sinEspacio=true}
   if(d.entrenos!=null&&typeof entFusiona==='function'){const c=entFusiona(d.entrenos);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} entrenamientos`)}   // v36: se fusionan por id
   if(d.rendimiento!=null&&typeof rdFusiona==='function'){const c=rdFusiona(d.rendimiento);r.mal+=c.mal;if(c.n)r.puestos.push(`${c.n} datos de rendimiento y sensaciones`)}   // v39
+  // v40: programa de 28 días — se añaden programas anteriores e intentos que faltan; nunca sustituye el programa de este teléfono
+  if(d.programa!=null&&typeof pgFusiona==='function'){const c=pgFusiona(d.programa);if(c.n)r.puestos.push(`${c.n} datos del programa de 28 días`)}
   if(d.estilo!=null&&!(typeof d.estilo==='string'&&tiene(ESTILOS,d.estilo)))r.mal++;
   else if(d.estilo!=null&&localStorage.getItem(EKEY)==null){try{localStorage.setItem(EKEY,d.estilo)}catch(e){}aplicarEstilo(d.estilo);r.puestos.push('estilo')}
   recargar();
@@ -2448,6 +2459,7 @@ function recargar(){metas={...META_DEF,...normMetas(leerJSON(MKEY,{}))};
   {const x=normRut(leerJSON(RKEY,{}));rutI=x.i;miaLista=x.mia}
   descarga=leerObj(DKEY,normDescarga);calibC=leerObj(CKEY,normCalib);modState=normModelo(leerJSON(MODKEY,{}));recMemo={k:'',v:null};bloque=leerObj(BQKEY,normBloque);
   if(typeof cgRecargar==='function')cgRecargar();   // v31
+  if(typeof pgRecargar==='function')pgRecargar();   // v40
   if(S.st==='idle'){rutPos=0;rutEf=0;if(enRutina())grupo=rutLista()[0];S=fresh()}lastPlan='';renderGrupos();renderCfg();pintarHist();revisarMedallas();render()}
 $('restBtn').onclick=()=>{if(enCurso()){$('copiaMsg').textContent='Termina la sesión en curso antes de restaurar.';return}$('restFile').click()};
 $('restFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const msg=$('copiaMsg');
@@ -2520,7 +2532,7 @@ function renderRetomar(){const el=$('retomarAv'),v=!!retomar&&S.st==='idle'&&tab
     <div class="tog"><button type="button" class="btn2" data-ret="si" style="border:2px solid var(--cap);color:var(--cap)">Retomar sesión</button><button type="button" class="btn2" data-ret="no">Descartar</button></div>`;
   if(el.innerHTML!==h)el.innerHTML=h}
 function descartarRetomar(){retomar=null;firmaEC='';try{localStorage.removeItem(ENKEY)}catch(e){}}
-function retomarSesion(){const o=retomar;retomar=null;if(!o)return;
+function retomarSesion(){const o=retomar;if(!o)return;if(typeof pgBloqueaLibre==='function'&&pgBloqueaLibre()){pgSay(pgMsgBloqueo());render();return}retomar=null;
   S={...fresh(),...o.S};grupo=o.grupo;rutI=o.rutI;miaLista=o.miaLista;
   SS=o.ss?{...o.ss,otro:{...fresh(),...o.ss.otro}}:null;if(SS){ssSel.on=true;ssSel.p=SS.p;if(SS.p==='mia')ssSel.mia=SS.lados.map(l=>l.g);guardarObj(SSKEY,ssSel)}   // v18: superserie
   rutPos=o.rutPos;rutEf=o.rutEf;pila=o.pila;   // ya validados en normEnCurso

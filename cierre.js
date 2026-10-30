@@ -122,6 +122,7 @@ function cierreTomar(g){if(!cierreOn||!ci.plan)return null;const b=ci.plan.bloqu
   // cada ejercicio, normalizado (reps de referencia d, factor k…): el plan recién guardado aún no pasó por ciNorm
   return {e:b.e.map(x=>{const c=!x.hoy&&CAT[g].e.find(c=>c.n===x.n);return c?{...c,series:x.series}:{...normEjHoy(x),series:x.series}}),meta:b.e.reduce((a,x)=>a+(x.levy?0:x.series),0)}}
 function cierreEmpezar(forzar){const p=ci.plan;if(!p||enCurso())return;
+  if(typeof pgBloqueaLibre==='function'&&pgBloqueaLibre()){pgSay(pgMsgBloqueo());render();return}   // v40: programa de 28 días activo
   if(!forzar&&p.firma!==ciFirma()){ciUI.msg='desactualizado';tab='progreso';progSub='res';renderProg();renderProgSub();render();return}
   if(ssSel.on){ssSel.on=false;guardarObj(SSKEY,ssSel)}fzaHoy=false;cierreOn=true;rutPos=0;rutEf=0;grupo=p.bloques[0].g;p.estado='en curso';ciGuarda();
   S=fresh();$('save').textContent='Sin guardar aún';selAbierto=false;tab='reloj';lastG=null;renderGrupos();render();window.scrollTo(0,0)}
